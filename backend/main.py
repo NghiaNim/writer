@@ -49,17 +49,24 @@ app.include_router(council_config_router)
 import os as _os
 import re as _re
 
-_dev_pattern = r"http://(localhost|127\.0\.0\.1|0\.0\.0\.0|[\w.-]+\.local)(:(5173|5174|3000))?"
-_prod_origins = [
-    o.strip()
-    for o in (_os.environ.get("FRONTEND_ORIGINS") or "").split(",")
-    if o.strip()
+_patterns = [
+    # Local dev (any port on common loopback/.local hostnames).
+    r"http://(localhost|127\.0\.0\.1|0\.0\.0\.0|[\w.-]+\.local)(:\d+)?",
+    # Common managed-frontend hosts so the app works without needing an env
+    # var on day one. Tighten by setting FRONTEND_ORIGINS if you want to
+    # restrict to a specific domain.
+    r"https://[\w-]+(--[\w-]+)?\.vercel\.app",
+    r"https://[\w-]+\.netlify\.app",
+    r"https://[\w-]+\.onrender\.com",
+    r"https://[\w-]+\.pages\.dev",
+    r"https://[\w-]+\.github\.io",
 ]
-if _prod_origins:
-    _prod_pattern = "|".join(_re.escape(o) for o in _prod_origins)
-    _origin_regex = f"({_dev_pattern})|({_prod_pattern})"
-else:
-    _origin_regex = _dev_pattern
+for o in (_os.environ.get("FRONTEND_ORIGINS") or "").split(","):
+    o = o.strip()
+    if o:
+        _patterns.append(_re.escape(o))
+
+_origin_regex = "|".join(f"({p})" for p in _patterns)
 
 app.add_middleware(
     CORSMiddleware,

@@ -12,7 +12,7 @@ const getApiBase = () => {
   return `http://${hostname}:8001`;
 };
 
-const API_BASE = getApiBase();
+export const API_BASE = getApiBase();
 
 /**
  * Fire-and-forget warm-up ping. The hosted backend lives on Render's free
@@ -88,7 +88,7 @@ async function authedFetch(input, init = {}) {
   if (response.status === 401) {
     try {
       _onUnauthorized();
-    } catch (_) {
+    } catch {
       // swallow — handler should never break the caller
     }
   }

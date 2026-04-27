@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE } from '../api';
 import './Login.css';
 
 /**
@@ -54,7 +55,15 @@ export default function Login() {
                 }
             }
         } catch (e) {
-            setLocalError(e.message || 'Something went wrong.');
+            // Always log to console too so the user has it in dev tools even
+            // if the on-screen render somehow fails.
+            // eslint-disable-next-line no-console
+            console.error(`[${mode}] failed against ${API_BASE}:`, e);
+            const msg =
+                e?.message ||
+                e?.toString?.() ||
+                'Something went wrong (no error message).';
+            setLocalError(msg);
         }
     };
 
@@ -128,7 +137,10 @@ export default function Login() {
 
                     {displayError && (
                         <div className="login-error" role="alert">
-                            {displayError}
+                            <div className="login-error-msg">{displayError}</div>
+                            <div className="login-error-meta">
+                                Tried: <code>{API_BASE}</code>
+                            </div>
                         </div>
                     )}
 
@@ -136,6 +148,10 @@ export default function Login() {
                         {loading ? 'Working...' : buttonLabel}
                     </button>
                 </form>
+
+                <div className="login-api-hint">
+                    Backend: <code>{API_BASE}</code>
+                </div>
 
                 <div className="login-footer">
                     {mode === 'login' ? (
