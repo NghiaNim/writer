@@ -36,49 +36,9 @@ DEFAULT_DIRECT_PROVIDER_TOGGLES = {
 }
 
 
-# Curated model list shown to students in the council picker UI. We keep this
-# short and essay-friendly on purpose: free / low-cost picks plus a few strong
-# paid options. The hosted product routes everything through OpenRouter, so
-# every entry here is prefixed with "openrouter:" when used as a model id.
-#
-# Schema: { id, label, family, tier }
-#   - id:     full model id with `openrouter:` prefix (used by council.py)
-#   - label:  user-facing name
-#   - family: provider family (for grouping in the UI)
-#   - tier:   "free" | "low" | "standard" | "premium"
-#   - notes:  optional 1-line UI description
-CURATED_COUNCIL_MODELS = [
-    # Premium / strongest for synthesis (chairman default)
-    {"id": "openrouter:anthropic/claude-3.5-sonnet", "label": "Claude 3.5 Sonnet", "family": "Anthropic", "tier": "premium",
-     "notes": "Strong prose, voice-aware. Good chairman."},
-    {"id": "openrouter:openai/gpt-4o", "label": "GPT-4o", "family": "OpenAI", "tier": "premium",
-     "notes": "Versatile, structurally precise."},
-    {"id": "openrouter:anthropic/claude-3-opus", "label": "Claude 3 Opus", "family": "Anthropic", "tier": "premium",
-     "notes": "Slow, deliberate, deep voice."},
-    # Standard cost
-    {"id": "openrouter:google/gemini-pro-1.5", "label": "Gemini 1.5 Pro", "family": "Google", "tier": "standard",
-     "notes": "Long context, contrarian."},
-    {"id": "openrouter:anthropic/claude-3-haiku", "label": "Claude 3 Haiku", "family": "Anthropic", "tier": "standard",
-     "notes": "Fast, lean prose."},
-    {"id": "openrouter:mistralai/mistral-large", "label": "Mistral Large", "family": "Mistral", "tier": "standard",
-     "notes": "Tight argumentation."},
-    {"id": "openrouter:deepseek/deepseek-chat", "label": "DeepSeek V3", "family": "DeepSeek", "tier": "standard",
-     "notes": "Reasoning-heavy."},
-    # Low-cost / free
-    {"id": "openrouter:openai/gpt-4o-mini", "label": "GPT-4o Mini", "family": "OpenAI", "tier": "low",
-     "notes": "Fast, cheap, capable."},
-    {"id": "openrouter:google/gemini-flash-1.5", "label": "Gemini 1.5 Flash", "family": "Google", "tier": "low",
-     "notes": "Free tier available."},
-    {"id": "openrouter:meta-llama/llama-3.1-70b-instruct", "label": "Llama 3.1 70B", "family": "Meta", "tier": "low",
-     "notes": "Open-weight, free tier."},
-    {"id": "openrouter:meta-llama/llama-3.1-405b-instruct", "label": "Llama 3.1 405B", "family": "Meta", "tier": "standard",
-     "notes": "Largest open-weight."},
-]
-
-
-# Available models for selection (popular OpenRouter models) — legacy list,
-# still used by the older Settings UI. Curated list above is the preferred
-# source for the new council picker.
+# Available models for selection (popular OpenRouter models). The user-facing
+# council picker pulls the live OpenRouter catalog via /api/models; this list
+# is only a static fallback for the legacy Settings UI.
 AVAILABLE_MODELS = [
     # OpenAI
     {"id": "openai/gpt-4o", "name": "GPT-4o [OpenRouter]", "provider": "OpenAI", "source": "openrouter"},

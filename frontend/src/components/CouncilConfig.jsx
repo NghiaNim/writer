@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
+import SearchableModelSelect from './SearchableModelSelect';
 import './CouncilConfig.css';
 
 const PERSONA_META = {
@@ -23,13 +24,6 @@ const PERSONA_META = {
 
 const PERSONA_ORDER = ['architect', 'editor', 'devils_advocate', 'voice_guardian'];
 
-const TIER_BADGE = {
-  free: 'Free tier',
-  low: 'Low-cost',
-  standard: 'Standard',
-  premium: 'Premium',
-};
-
 /**
  * Reusable council-configuration panel.
  *
@@ -46,6 +40,8 @@ const TIER_BADGE = {
  * Notes:
  *  - At least 2 personas must be enabled. UI prevents disabling below that.
  *  - Each enabled persona must have a model selected.
+ *  - Models are pulled from the full OpenRouter catalog (~300 models). A
+ *    "Free only" toggle filters to the free-tier subset for casual use.
  */
 export default function CouncilConfig({
   value: externalValue,
@@ -55,21 +51,25 @@ export default function CouncilConfig({
   compact = false,
 }) {
   const [config, setConfig] = useState(externalValue || null);
-  const [models, setModels] = useState([]);
+  const [allModels, setAllModels] = useState([]);
+  const [loadingModels, setLoadingModels] = useState(true);
+  const [freeOnly, setFreeOnly] = useState(false);
   const [loading, setLoading] = useState(!externalValue);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
   const [error, setError] = useState(null);
 
-  // Fetch curated models once.
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setLoadingModels(true);
       try {
-        const data = await api.models.curated();
-        if (!cancelled) setModels(data.models || []);
+        const data = await api.models.list();
+        if (!cancelled) setAllModels(data.models || []);
       } catch (e) {
         // Non-fatal: UI still renders, dropdowns just look empty.
+      } finally {
+        if (!cancelled) setLoadingModels(false);
       }
     })();
     return () => {
@@ -77,7 +77,6 @@ export default function CouncilConfig({
     };
   }, []);
 
-  // Sync from external value or load user default.
   useEffect(() => {
     if (externalValue) {
       setConfig(externalValue);
@@ -101,7 +100,6 @@ export default function CouncilConfig({
     };
   }, [externalValue]);
 
-  // Derive a normalized, ordered persona list (always all 4 entries shown).
   const orderedPersonas = useMemo(() => {
     const byKey = new Map((config?.personas || []).map((p) => [p.key, p]));
     return PERSONA_ORDER.map(
@@ -116,6 +114,13 @@ export default function CouncilConfig({
 
   const enabledCount = orderedPersonas.filter((p) => p.enabled).length;
 
+  // Apply the free-only filter to the picker, but keep the *current* selection
+  // visible even when filtered out via SearchableModelSelect's allModels prop.
+  const visibleModels = useMemo(() => {
+    if (!freeOnly) return allModels;
+    return allModels.filter((m) => m.is_free);
+  }, [allModels, freeOnly]);
+
   const updateConfig = (next) => {
     setConfig(next);
     setSavedAt(null);
@@ -127,7 +132,6 @@ export default function CouncilConfig({
     const personas = orderedPersonas.map((p) => {
       if (p.key !== key) return p;
       const willDisable = p.enabled;
-      // Block disabling if it would drop us below 2 enabled.
       if (willDisable && enabledCount <= 2) return p;
       return { ...p, enabled: !p.enabled };
     });
@@ -150,7 +154,10 @@ export default function CouncilConfig({
     setSaving(true);
     setError(null);
     try {
-      await onSave({ personas: orderedPersonas, chairman_model: config?.chairman_model || '' });
+      await onSave({
+        personas: orderedPersonas,
+        chairman_model: config?.chairman_model || '',
+      });
       setSavedAt(new Date());
     } catch (e) {
       setError(e?.message || 'Could not save council settings.');
@@ -168,10 +175,21 @@ export default function CouncilConfig({
       <div className="cc-header">
         <h3 className="cc-title">Your Council</h3>
         <p className="cc-sub">
-          {enabledCount} of 4 members enabled. Pick a model for each. They write
-          drafts in parallel, then peer-review each other before the Chairman
+          {enabledCount} of 4 members enabled. Pick a model for each. They
+          write drafts in parallel, peer-review each other, then the Chairman
           synthesizes the final essay.
         </p>
+        <label className="cc-free-toggle">
+          <input
+            type="checkbox"
+            checked={freeOnly}
+            onChange={(e) => setFreeOnly(e.target.checked)}
+          />
+          <span>Free models only</span>
+          <span className="cc-free-count">
+            ({visibleModels.length} / {allModels.length} models)
+          </span>
+        </label>
       </div>
 
       <div className="cc-personas">
@@ -200,23 +218,26 @@ export default function CouncilConfig({
                 />
                 <span className="cc-persona-name">{meta.name}</span>
               </label>
-              {!compact && <div className="cc-persona-blurb">{meta.blurb}</div>}
-              <select
-                className={`cc-model-select ${modelMissing ? 'missing' : ''}`}
-                value={p.model || ''}
-                onChange={(e) => setPersonaModel(p.key, e.target.value)}
-                disabled={!enabled}
-              >
-                <option value="">— pick a model —</option>
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                    {m.tier ? ` · ${TIER_BADGE[m.tier] || m.tier}` : ''}
-                  </option>
-                ))}
-              </select>
+              {!compact && (
+                <div className="cc-persona-blurb">{meta.blurb}</div>
+              )}
+              <div className={`cc-model-wrap ${modelMissing ? 'missing' : ''}`}>
+                <SearchableModelSelect
+                  models={visibleModels}
+                  allModels={allModels}
+                  value={p.model || ''}
+                  onChange={(modelId) => setPersonaModel(p.key, modelId)}
+                  placeholder={
+                    enabled ? 'Search and select a model…' : 'Disabled'
+                  }
+                  isDisabled={!enabled}
+                  isLoading={loadingModels}
+                />
+              </div>
               {modelMissing && (
-                <div className="cc-warn">Pick a model or disable this member.</div>
+                <div className="cc-warn">
+                  Pick a model or disable this member.
+                </div>
               )}
             </div>
           );
@@ -225,19 +246,14 @@ export default function CouncilConfig({
 
       <div className="cc-chairman">
         <label className="cc-chair-label">Chairman (final synthesis)</label>
-        <select
-          className="cc-model-select"
+        <SearchableModelSelect
+          models={visibleModels}
+          allModels={allModels}
           value={config?.chairman_model || ''}
-          onChange={(e) => setChairmanModel(e.target.value)}
-        >
-          <option value="">— pick a model —</option>
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-              {m.tier ? ` · ${TIER_BADGE[m.tier] || m.tier}` : ''}
-            </option>
-          ))}
-        </select>
+          onChange={setChairmanModel}
+          placeholder="Search and select a model…"
+          isLoading={loadingModels}
+        />
       </div>
 
       {showSave && onSave && (

@@ -204,11 +204,12 @@ export const api = {
   },
 
   /**
-   * Curated, essay-friendly OpenRouter model catalog used by the council picker.
+   * Full OpenRouter model catalog used by the council picker.
+   * Returns { models: [{ id, name, provider, context_length, is_free }] }.
    */
   models: {
-    async curated() {
-      const response = await authedFetch(`${API_BASE}/api/models/curated`);
+    async list() {
+      const response = await authedFetch(`${API_BASE}/api/models`);
       if (!response.ok) {
         return { models: [] };
       }

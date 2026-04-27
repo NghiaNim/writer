@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { api } from '../api';
 import SearchableModelSelect from './SearchableModelSelect';
 import ProviderSettings from './settings/ProviderSettings';
-import CouncilConfig from './settings/CouncilConfig';
 import UserCouncilConfig from './CouncilConfig';
 import SearchSettings from './settings/SearchSettings';
 import PromptSettings from './settings/PromptSettings';
@@ -1496,16 +1495,10 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               LLM API Keys
             </button>
             <button
-              className={`sidebar-nav-item ${activeSection === 'my_council' ? 'active' : ''}`}
-              onClick={() => setActiveSection('my_council')}
-            >
-              My Council
-            </button>
-            <button
               className={`sidebar-nav-item ${activeSection === 'council' ? 'active' : ''}`}
               onClick={() => setActiveSection('council')}
             >
-              Council Config
+              Council
             </button>
             <button
               className={`sidebar-nav-item ${activeSection === 'prompts' ? 'active' : ''}`}
@@ -1580,15 +1573,17 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               />
             )}
 
-            {/* MY COUNCIL — per-user default council (extension #1) */}
-            {activeSection === 'my_council' && (
+            {/* COUNCIL — per-user council config (source of truth at runtime) */}
+            {activeSection === 'council' && (
               <div className="settings-block">
-                <h2 className="settings-section-title">My Council</h2>
+                <h2 className="settings-section-title">Council</h2>
                 <p className="settings-section-desc">
                   Pick which council members weigh in on your essays and which
                   model each one uses. This is your personal default — every
-                  new essay starts with these settings (you can override them
-                  per-essay on Step 3 of the input flow).
+                  new essay starts with these settings, and you can override
+                  them per-essay on Step 3 of the input flow. Models come from
+                  the live OpenRouter catalog; toggle "Free models only" if
+                  you want to keep things zero-cost.
                 </p>
                 <UserCouncilConfig
                   onSave={async (cfg) => {
@@ -1596,50 +1591,6 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                   }}
                 />
               </div>
-            )}
-
-            {/* COUNCIL CONFIGURATION (admin / legacy) */}
-            {activeSection === 'council' && (
-              <CouncilConfig
-                settings={settings}
-                ollamaStatus={ollamaStatus}
-                // State
-                enabledProviders={enabledProviders}
-                setEnabledProviders={setEnabledProviders}
-                directProviderToggles={directProviderToggles}
-                setDirectProviderToggles={setDirectProviderToggles}
-                showFreeOnly={showFreeOnly}
-                setShowFreeOnly={setShowFreeOnly}
-                isLoadingModels={isLoadingModels}
-                rateLimitWarning={rateLimitWarning}
-                councilModels={councilModels}
-                councilMemberFilters={councilMemberFilters}
-                chairmanModel={chairmanModel}
-                setChairmanModel={setChairmanModel}
-                chairmanFilter={chairmanFilter}
-                setChairmanFilter={setChairmanFilter}
-                councilTemperature={councilTemperature}
-                setCouncilTemperature={setCouncilTemperature}
-                chairmanTemperature={chairmanTemperature}
-                setChairmanTemperature={setChairmanTemperature}
-                // Data
-                allModels={allAvailableModels}
-                filteredModels={filteredAvailableModels}
-                ollamaAvailableModels={ollamaAvailableModels}
-                customEndpointName={customEndpointName}
-                customEndpointUrl={customEndpointUrl}
-                // Callbacks
-                handleFeelingLucky={handleFeelingLucky}
-                handleMemberFilterChange={handleMemberFilterChange}
-                handleCouncilModelChange={handleCouncilModelChange}
-                handleRemoveCouncilMember={handleRemoveCouncilMember}
-                handleAddCouncilMember={handleAddCouncilMember}
-                setActiveSection={setActiveSection}
-                setActivePromptTab={setActivePromptTab}
-                // Validation
-                validationErrors={validationErrors}
-                chairmanSelectRef={chairmanSelectRef}
-              />
             )}
 
             {/* SYSTEM PROMPTS */}

@@ -114,6 +114,42 @@
   border-color: rgba(244, 114, 182, 0.55);
 }
 
+.cc-model-wrap {
+  margin-top: 4px;
+}
+
+.cc-model-wrap.missing :global(.model-select__control) {
+  border-color: rgba(244, 114, 182, 0.55) !important;
+}
+
+.cc-free-toggle {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  width: fit-content;
+  user-select: none;
+}
+
+.cc-free-toggle input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+.cc-free-count {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.75rem;
+}
+
 .cc-warn {
   font-size: 0.75rem;
   color: rgba(244, 114, 182, 0.85);

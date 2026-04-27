@@ -1065,16 +1065,6 @@ async def get_custom_endpoint_models():
     return {"models": models}
 
 
-@app.get("/api/models/curated")
-async def get_curated_models():
-    """Curated, essay-friendly OpenRouter model list for the council picker.
-
-    Public — no auth needed (just metadata, no API keys exposed).
-    """
-    from .settings import CURATED_COUNCIL_MODELS
-    return {"models": CURATED_COUNCIL_MODELS}
-
-
 @app.get("/api/models")
 async def get_openrouter_models():
     """Fetch available models from OpenRouter API."""
