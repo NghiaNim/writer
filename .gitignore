@@ -26,6 +26,8 @@ backend/debug_*.py
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/.env.local
+frontend/.env.*.local
 
 .DS_Store
 BUGS_AND_OPTIMIZATIONS.md
