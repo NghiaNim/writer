@@ -1,0 +1,105 @@
+---
+description: Project architecture, runtime, and HTTP routes for llm-council-plus
+alwaysApply: true
+---
+
+# llm-council-plus — architecture cheat sheet
+
+Hosted essay-writing app. Auth-required. All LLM calls go through OpenRouter.
+
+## Stack
+
+- **Backend**: FastAPI (`uv run uvicorn backend.main:app`), Python 3.10+, `uv` deps.
+- **Frontend**: React + Vite. Production build deploys to a static host; reads `VITE_API_URL`.
+- **Auth + DB**: Supabase (auth.users + RLS-protected tables).
+- **LLM provider**: OpenRouter only (`OPENROUTER_API_KEY` server-side).
+- **Hosting**: Backend on Render (`https://writer-1tp5.onrender.com`); GitHub Actions cron pings `/healthz` every 14 min to dodge the 15-min cold-start.
+
+## Backend layout (relative imports only — `from .x import y`)
+
+| File | Role |
+|---|---|
+| `backend/main.py` | FastAPI app, CORS, streaming endpoint, route mounting. |
+| `backend/auth.py` | Supabase auth router; exports `get_current_user` dependency + `AuthUser`. |
+| `backend/sessions.py` | `/sessions` router — essay flow state (topic, so_what, draft, word_target, council_config). |
+| `backend/council_config.py` | `/council-config` router — per-user default council (Supabase `user_council_config`). |
+| `backend/council.py` | 3-stage orchestration. `resolve_council_config()` resolves personas+models per call. |
+| `backend/prompts.py` | Default persona prompts; `format_word_target_block()`; `PERSONA_KEYS`. |
+| `backend/voice_profile.py` | Per-user voice profile read/write. |
+| `backend/storage.py` | Conversation persistence (file-based, `data/conversations/{id}.json`). |
+| `backend/supabase_client.py` | Single `get_supabase()` client. |
+
+## Frontend layout
+
+| File | Role |
+|---|---|
+| `frontend/src/App.jsx` | Top-level shell. Resolves `currentSessionId`, `currentCouncil`, `currentWordTarget`. Wires SSE streaming. |
+| `frontend/src/api.js` | API client. Exports `API_BASE`, `warmUpBackend()`, `api.{auth,councilConfig,sessions,memory,voiceProfile,models}`. |
+| `frontend/src/contexts/AuthContext.jsx` | In-memory token (no localStorage). `useCallback` on `clearError` is required. |
+| `frontend/src/components/Login.jsx` | Login/signup, warm-up status, never-empty error fallback. |
+| `frontend/src/components/EssayFlow.jsx` | 3-step input flow with word-target picker + per-essay council override. |
+| `frontend/src/components/CouncilConfig.jsx` | The single source-of-truth council picker. Pulls full OpenRouter catalog. |
+| `frontend/src/components/CouncilChips.jsx` | Live persona/chairman status during generation. |
+| `frontend/src/components/Settings.jsx` | One Council tab (the user-facing one). LLM API Keys tab is hidden. |
+
+## HTTP routes (verified)
+
+```
+GET    /                                        root health
+GET    /healthz                                  cheap liveness (warm-up + cron)
+
+POST   /auth/signup                              public
+POST   /auth/login                               public — returns {access_token, refresh_token, user}
+POST   /auth/logout                              authed
+GET    /auth/me                                  authed
+
+GET    /council-config                           authed — per-user default
+PUT    /council-config                           authed — validate >=2 enabled, all enabled have a model
+
+POST   /sessions                                 authed — body may include word_target
+GET    /sessions/memory-check?topic=...          authed — silent past-essay lookup
+GET    /sessions/{id}                            authed
+PATCH  /sessions/{id}                            authed — accepts word_target, council_config
+
+GET    /api/voice-profile?essay_type=general     authed
+POST   /api/voice-profile                        authed — runs LLM extraction on reference paragraphs
+
+GET    /api/models                               full live OpenRouter catalog
+GET    /api/conversations                        list metadata
+POST   /api/conversations                        create
+GET    /api/conversations/{id}                   full convo
+DELETE /api/conversations/{id}                   delete
+POST   /api/conversations/{id}/message/stream    authed — SSE stream of stage1/2/3
+GET    /api/settings                             legacy/admin
+PUT    /api/settings                             legacy/admin
+```
+
+## Runtime config resolution (the truth)
+
+For every streamed message in `/api/conversations/{id}/message/stream`, the backend resolves council + word target in this order:
+
+1. `essay_sessions.council_config` / `.word_target` (per-essay override from EssayFlow Step 3)
+2. `user_council_config` row (per-user default — `Settings → Council`)
+3. `factory_council_config()` (hardcoded in `council_config.py`)
+
+Same precedence for `word_target`. `data/settings.json` is **not** consulted for council selection in the auth path — only as an index-based fallback for missing model strings inside `resolve_council_config`.
+
+## Conventions to preserve
+
+- **Relative imports** in backend (`from .config import ...`). Run via `uv run python -m backend.main`.
+- **Model IDs prefixed**: `openrouter:anthropic/claude-sonnet-4`. Strip prefix before calling OpenRouter.
+- **Persona keys**: `architect`, `editor`, `devils_advocate`, `voice_guardian` (stable; do not rename).
+- **Streaming abort**: inject raw `Request` to use `request.is_disconnected()`. Do not block on it from a Pydantic body.
+- **CORS**: `backend/main.py` auto-allows `*.vercel.app`, `*.netlify.app`, `*.onrender.com`, `*.pages.dev`, `*.github.io`. Custom domains via `FRONTEND_ORIGINS` env var.
+- **Errors must surface**: in React, never wrap a thrown error in a generic message. Use `extractError()` in `api.js`. Do not add `clearError`-style functions to `useEffect` deps without `useCallback`.
+- **Migrations**: SQL in `supabase/migrations/`. Apply manually via Supabase SQL editor; verify with `uv run python -m backend.scripts.verify_council_extensions`.
+- **No new commits without explicit user request.**
+
+## Environment variables
+
+Backend (`backend/.env` locally; Render dashboard in prod):
+- `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `OPENROUTER_API_KEY`
+- `FRONTEND_ORIGINS` (optional, comma-separated, prod custom domains)
+
+Frontend (`frontend/.env.production` for prod build):
+- `VITE_API_URL=https://writer-1tp5.onrender.com`
