@@ -5,7 +5,7 @@ import EssayFlow from './components/EssayFlow';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { api } from './api';
+import { api, warmUpBackend } from './api';
 import './App.css';
 import './components/StageCopyButtons.css';
 
@@ -885,6 +885,13 @@ function AuthGate() {
 }
 
 function App() {
+  // Fire a warm-up ping the moment the app loads so Render's cold start
+  // happens in parallel with the login / topic-entry screens, not on the
+  // user's first real submit.
+  useEffect(() => {
+    warmUpBackend();
+  }, []);
+
   return (
     <AuthProvider>
       <AuthGate />

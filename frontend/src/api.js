@@ -14,6 +14,33 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
+/**
+ * Fire-and-forget warm-up ping. The hosted backend lives on Render's free
+ * tier, which spins down after ~15 minutes of inactivity and takes 30-60s
+ * to wake up. Calling this on app mount means the cold start runs in
+ * parallel with the user reading the topic prompt instead of in series with
+ * their first submit.
+ *
+ * Returns the latency in ms on success, or null on failure (we never throw).
+ */
+export async function warmUpBackend() {
+  const started = performance.now();
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+    const res = await fetch(`${API_BASE}/healthz`, {
+      method: 'GET',
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    return Math.round(performance.now() - started);
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Auth wiring (Phase 1)
 //

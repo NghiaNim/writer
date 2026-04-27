@@ -42,11 +42,28 @@ app.include_router(sessions_router)
 # Extension #1: per-user default council config (auth-required)
 app.include_router(council_config_router)
 
-# Enable CORS for local development and network access
-# Allow requests from any hostname on ports 5173 and 3000 (frontend)
+# Enable CORS. Local dev hits localhost:5173/5174/3000; production hits the
+# hosted frontend domain(s) listed in FRONTEND_ORIGINS (comma-separated env
+# var, e.g. "https://essaycoach.app,https://essaycoach.vercel.app"). Both are
+# matched via a single regex so credentials work everywhere.
+import os as _os
+import re as _re
+
+_dev_pattern = r"http://(localhost|127\.0\.0\.1|0\.0\.0\.0|[\w.-]+\.local)(:(5173|5174|3000))?"
+_prod_origins = [
+    o.strip()
+    for o in (_os.environ.get("FRONTEND_ORIGINS") or "").split(",")
+    if o.strip()
+]
+if _prod_origins:
+    _prod_pattern = "|".join(_re.escape(o) for o in _prod_origins)
+    _origin_regex = f"({_dev_pattern})|({_prod_pattern})"
+else:
+    _origin_regex = _dev_pattern
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://.*:(5173|5174|3000)",
+    allow_origin_regex=_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -94,6 +111,16 @@ class Conversation(BaseModel):
 async def root():
     """Health check endpoint."""
     return {"status": "ok", "service": "LLM Council API"}
+
+
+@app.get("/healthz")
+async def healthz():
+    """Liveness probe used by Render's health check and the frontend warm-up
+    ping. Intentionally cheap: no DB hit, no auth, no external calls. The
+    frontend pings this on app mount so the user doesn't pay the full cold
+    start when they actually submit an essay.
+    """
+    return {"ok": True}
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
