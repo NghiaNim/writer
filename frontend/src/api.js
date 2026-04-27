@@ -70,7 +70,21 @@ async function authedFetch(input, init = {}) {
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  const response = await fetch(input, { ...init, headers });
+  let response;
+  try {
+    response = await fetch(input, { ...init, headers });
+  } catch (e) {
+    // fetch() throws on network / CORS / DNS / TLS failures. Browser default
+    // messages ("Failed to fetch", "Load failed") are useless, so attach
+    // context so the user knows which host failed and why.
+    const url = typeof input === 'string' ? input : input?.url || '';
+    const reason = e?.message || 'Unknown network error';
+    throw new Error(
+      `Could not reach the server at ${url}. ${reason}. ` +
+        `Render's free tier sleeps after ~15 minutes; first request can take 30-60s. ` +
+        `If this persists, check that the backend is running and CORS allows this origin.`
+    );
+  }
   if (response.status === 401) {
     try {
       _onUnauthorized();
@@ -79,6 +93,40 @@ async function authedFetch(input, init = {}) {
     }
   }
   return response;
+}
+
+/**
+ * Best-effort error message extractor for FastAPI/Render responses.
+ * Falls back through:
+ *   1. Parsed JSON `detail` (FastAPI standard error shape)
+ *   2. Other JSON fields (`message`, `error`, full JSON)
+ *   3. Raw body text (truncated)
+ *   4. HTTP status line
+ */
+async function extractError(response, fallback) {
+  let body = '';
+  try {
+    body = await response.text();
+  } catch {
+    body = '';
+  }
+  let parsed = null;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    parsed = null;
+  }
+  const detail =
+    parsed?.detail ||
+    parsed?.message ||
+    parsed?.error ||
+    (parsed && typeof parsed === 'object' ? JSON.stringify(parsed) : null);
+  if (detail) return `${fallback}: ${detail} (HTTP ${response.status})`;
+  if (body) {
+    const trimmed = body.trim().slice(0, 240);
+    return `${fallback}: ${trimmed} (HTTP ${response.status})`;
+  }
+  return `${fallback}: HTTP ${response.status} ${response.statusText || ''}`.trim();
 }
 
 export const api = {
@@ -93,8 +141,7 @@ export const api = {
         body: JSON.stringify({ email, password }),
       });
       if (!response.ok) {
-        const detail = await response.json().catch(() => ({}));
-        throw new Error(detail.detail || 'Signup failed');
+        throw new Error(await extractError(response, 'Signup failed'));
       }
       return response.json();
     },
@@ -106,8 +153,7 @@ export const api = {
         body: JSON.stringify({ email, password }),
       });
       if (!response.ok) {
-        const detail = await response.json().catch(() => ({}));
-        throw new Error(detail.detail || 'Invalid email or password');
+        throw new Error(await extractError(response, 'Login failed'));
       }
       return response.json();
     },

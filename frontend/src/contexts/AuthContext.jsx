@@ -37,11 +37,18 @@ export function AuthProvider({ children }) {
         try {
             const result = await api.auth.login(email, password);
             if (!result.access_token) {
-                throw new Error(
-                    result.needs_email_confirmation
-                        ? 'Check your email to confirm your account before logging in.'
-                        : 'Login failed.'
-                );
+                if (result.needs_email_confirmation) {
+                    throw new Error(
+                        'Check your email to confirm your account before logging in.'
+                    );
+                }
+                // Surface whatever the server actually returned so the user
+                // can see why no token came back (e.g. unexpected response shape).
+                const reason =
+                    result?.message ||
+                    result?.error ||
+                    JSON.stringify(result);
+                throw new Error(`Login failed: no access token returned. Server said: ${reason}`);
             }
             setToken(result.access_token);
             setUser(result.user);
