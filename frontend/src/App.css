@@ -9,6 +9,63 @@
   z-index: 1;
 }
 
+/* Phase 1 auth chip — minimal, will be replaced by full nav in Phase 6 */
+.auth-chip {
+  position: fixed;
+  top: 12px;
+  right: 14px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: 999px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-soft);
+}
+
+.auth-chip-email {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-chip-logout {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border: 1px solid var(--border-glass);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.auth-chip-logout:hover {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fca5a5;
+}
+
+@media (max-width: 640px) {
+  .auth-chip {
+    top: 10px;
+    right: 10px;
+    padding: 4px 6px 4px 10px;
+  }
+  .auth-chip-email {
+    display: none;
+  }
+}
+
 /* Mobile hamburger menu button */
 .mobile-menu-btn {
   display: none;

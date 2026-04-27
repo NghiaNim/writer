@@ -1,0 +1,180 @@
+/* Final Essay - Phase 3 essay-optimized presentation */
+
+.final-essay {
+  margin: 12px 0 20px;
+  padding: 28px 30px;
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 14px;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  box-shadow: 0 6px 32px rgba(234, 179, 8, 0.1);
+  position: relative;
+}
+
+.final-essay-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(234, 179, 8, 0.18);
+}
+
+.final-essay-byline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-family: var(--font-ui);
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.byline-label {
+  color: var(--accent-chairman, #fbbf24);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+.byline-sep {
+  opacity: 0.5;
+}
+
+.byline-model {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.byline-model strong {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.byline-provider {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Essay body - generous, readable typography */
+.final-essay-body {
+  color: #e2e8f0;
+  font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+  font-size: 17px;
+  line-height: 1.8;
+  letter-spacing: 0.005em;
+  max-width: 70ch;
+  margin: 0 auto;
+}
+
+.final-essay-body p {
+  margin: 0 0 1.1em 0;
+}
+
+.final-essay-body p:last-child {
+  margin-bottom: 0;
+}
+
+.final-essay-body h1,
+.final-essay-body h2,
+.final-essay-body h3 {
+  font-family: var(--font-display, 'Syne', serif);
+  color: #f8fafc;
+  margin-top: 1.4em;
+  margin-bottom: 0.6em;
+  line-height: 1.3;
+}
+
+.final-essay-body blockquote {
+  border-left: 3px solid rgba(234, 179, 8, 0.5);
+  padding-left: 14px;
+  margin: 1.2em 0;
+  font-style: italic;
+  color: #cbd5e1;
+}
+
+/* Action bar */
+.final-essay-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+}
+
+.essay-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  border-radius: 8px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.essay-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #f1f5f9;
+}
+
+.essay-action-btn.copied {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #86efac;
+}
+
+.essay-action-btn.essay-toggle-notes.active {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+}
+
+.essay-action-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Council notes (collapsed by default) */
+.final-essay-council-notes {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.council-notes-intro {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+  margin-bottom: 14px;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 768px) {
+  .final-essay {
+    padding: 18px 18px;
+  }
+  .final-essay-body {
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .final-essay-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

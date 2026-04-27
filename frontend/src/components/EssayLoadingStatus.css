@@ -1,0 +1,141 @@
+/* Essay Loading Status - terminal-style cycling messages */
+
+.essay-loading-status {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin: 12px 0 24px;
+  font-family: var(--font-code, 'JetBrains Mono', monospace);
+  color: #cbd5e1;
+  position: relative;
+  overflow: hidden;
+}
+
+.essay-loading-status::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.7), rgba(59, 130, 246, 0));
+}
+
+.essay-loading-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #93c5fd;
+  margin-bottom: 14px;
+}
+
+.essay-loading-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  animation: essay-pulse 1.6s infinite;
+}
+
+@keyframes essay-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.essay-loading-stage {
+  font-weight: 700;
+}
+
+.essay-loading-progress {
+  margin-left: auto;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.essay-loading-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #e2e8f0;
+}
+
+.essay-loading-prompt {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.essay-loading-message {
+  flex: 1;
+  /* Smooth fade between messages */
+  animation: essay-message-in 0.4s ease-out;
+}
+
+@keyframes essay-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.essay-loading-cursor {
+  color: #3b82f6;
+  font-weight: 700;
+  animation: essay-cursor-blink 1s steps(2, jump-none) infinite;
+}
+
+@keyframes essay-cursor-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+.essay-loading-hint {
+  margin-top: 14px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.essay-loading-status.aborted {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.essay-loading-status.aborted .essay-loading-dot {
+  background: #f87171;
+  animation: none;
+}
+
+.essay-loading-status.aborted .essay-loading-stage {
+  color: #fca5a5;
+}
+
+@media (max-width: 768px) {
+  .essay-loading-status {
+    padding: 16px 18px;
+  }
+  .essay-loading-line {
+    font-size: 14px;
+  }
+}

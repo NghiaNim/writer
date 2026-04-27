@@ -1,13 +1,113 @@
 """3-stage LLM Council orchestration."""
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Optional, Tuple
 import asyncio
 import logging
 from . import openrouter
 from . import ollama_client
 from .config import get_council_models, get_chairman_model
 from .search import perform_web_search, SearchProvider
-from .settings import get_settings
+from .settings import CouncilPersona, get_settings
+from .voice_profile import format_voice_profile_block
+from .prompts import (
+    DEFAULT_COUNCIL_PERSONAS,
+    PERSONAS_BY_KEY,
+    format_essay_mode_block,
+    format_word_target_block,
+)
+
+
+# ---------------------------------------------------------------------------
+# Per-call council resolution (extension #1 — user-customized council)
+# ---------------------------------------------------------------------------
+
+
+def resolve_council_config(council_config: Optional[Dict[str, Any]]) -> Tuple[
+    List[CouncilPersona], List[str], Optional[str]
+]:
+    """Turn a council_config dict into (personas, models, chairman_model).
+
+    Shape of `council_config`:
+        {
+          "personas": [
+            {"key": "architect", "enabled": true, "model": "openrouter:..."},
+            ...
+          ],
+          "chairman_model": "openrouter:..."
+        }
+
+    - Disabled personas are dropped.
+    - Personas without a model fall back to factory defaults (settings).
+    - Unknown persona keys are skipped.
+    - If `council_config` is None or has no enabled personas, falls back to
+      `settings.council_personas` + `settings.council_models`.
+    - Council size is clamped to >= 2 enabled personas; if the user disables
+      all but one, we silently re-enable the rest in default order. (We
+      validate >=2 in the API layer too.)
+
+    Returns:
+        personas: List of CouncilPersona objects (in execution order)
+        models:   List of model IDs (same length, same order)
+        chairman_model: explicit override, or None to use settings default
+    """
+    settings = get_settings()
+    factory_personas = settings.council_personas or [
+        CouncilPersona(**p) for p in DEFAULT_COUNCIL_PERSONAS
+    ]
+    factory_models = settings.council_models or []
+    factory_by_key = {p.key: p for p in factory_personas if p.key}
+
+    # No override / unusable override -> factory defaults
+    if not council_config or not isinstance(council_config, dict):
+        return factory_personas, factory_models, None
+
+    raw_entries = council_config.get("personas") or []
+    chairman = council_config.get("chairman_model") or None
+    if isinstance(chairman, str):
+        chairman = chairman.strip() or None
+
+    selected_personas: List[CouncilPersona] = []
+    selected_models: List[str] = []
+
+    for i, entry in enumerate(raw_entries):
+        if not isinstance(entry, dict):
+            continue
+        if not entry.get("enabled", True):
+            continue
+        key = entry.get("key")
+        persona = factory_by_key.get(key)
+        if persona is None and key in PERSONAS_BY_KEY:
+            persona = CouncilPersona(**PERSONAS_BY_KEY[key])
+        if persona is None:
+            continue
+
+        # Resolve a model for this persona: explicit > factory @ index > skip
+        model = entry.get("model")
+        if isinstance(model, str):
+            model = model.strip()
+        if not model and i < len(factory_models):
+            model = factory_models[i] or None
+        if not model:
+            # No usable model — skip rather than firing with empty string.
+            logger.warning(
+                "Skipping persona %s: no model assigned and no factory fallback.",
+                key,
+            )
+            continue
+
+        selected_personas.append(persona)
+        selected_models.append(model)
+
+    if len(selected_personas) < 2:
+        # Degenerate: fall back to factory defaults so users can never accidentally
+        # run a 0- or 1-member council. The API layer should also block this.
+        logger.info(
+            "council_config produced %d enabled personas; falling back to factory defaults.",
+            len(selected_personas),
+        )
+        return factory_personas, factory_models, chairman
+
+    return selected_personas, selected_models, chairman
 
 logger = logging.getLogger(__name__)
 
@@ -82,14 +182,31 @@ async def query_models_parallel(models: List[str], messages: List[Dict[str, str]
     return dict(results)
 
 
-async def stage1_collect_responses(user_query: str, search_context: str = "", request: Any = None) -> Any:
+async def stage1_collect_responses(
+    user_query: str,
+    search_context: str = "",
+    request: Any = None,
+    essay_mode: str = "topic",
+    council_models: Optional[List[str]] = None,
+    council_personas: Optional[List[CouncilPersona]] = None,
+    word_target: Optional[int] = None,
+) -> Any:
     """
     Stage 1: Collect individual responses from all council models.
+
+    Each council member at index `i` is given the system prompt from
+    `council_personas[i]` (the 4 essay-writing personas by default).
+    Members whose index exceeds the persona list fall back to the generic
+    settings.stage1_prompt.
 
     Args:
         user_query: The user's question
         search_context: Optional web search results to provide context
         request: FastAPI request object for checking disconnects
+        essay_mode: 'topic' (write from scratch) or 'draft' (refine user's draft)
+        council_models: per-call override; if None, uses settings.council_models
+        council_personas: per-call override; if None, uses settings.council_personas
+        word_target: optional length target rendered into {word_target_block}
 
     Yields:
         - First yield: total_models (int)
@@ -103,39 +220,69 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
         from .prompts import STAGE1_SEARCH_CONTEXT_TEMPLATE
         search_context_block = STAGE1_SEARCH_CONTEXT_TEMPLATE.format(search_context=search_context)
 
-    # Use customizable Stage 1 prompt
-    try:
-        prompt_template = settings.stage1_prompt
-        if not prompt_template:
-            from .prompts import STAGE1_PROMPT_DEFAULT
-            prompt_template = STAGE1_PROMPT_DEFAULT
+    # Render the user's voice profile (empty string if not configured).
+    # Available to every persona so users can opt-in via custom templates;
+    # by default only The Voice Guardian's template references it.
+    voice_profile_block = format_voice_profile_block()
 
-        prompt = prompt_template.format(
-            user_query=user_query,
-            search_context_block=search_context_block
-        )
-    except (KeyError, AttributeError, TypeError) as e:
-        logger.warning(f"Error formatting Stage 1 prompt: {e}. Using fallback.")
-        prompt = f"{search_context_block}Question: {user_query}" if search_context_block else user_query
+    # Phase 4: tell every persona explicitly whether the input is a topic
+    # to expand into an essay or a draft to refine.
+    essay_mode_block = format_essay_mode_block(essay_mode)
 
-    messages = [{"role": "user", "content": prompt}]
+    # Extension #1 (word target): inject "TARGET LENGTH: ~N words." block.
+    word_target_block = format_word_target_block(word_target)
+
+    from .prompts import STAGE1_PROMPT_DEFAULT
+    fallback_template = settings.stage1_prompt or STAGE1_PROMPT_DEFAULT
+    personas = council_personas if council_personas is not None else (settings.council_personas or [])
+
+    def _build_prompt_for_index(idx: int) -> str:
+        """Pick persona prompt for council member `idx`, with fallbacks."""
+        template = None
+        if idx < len(personas) and personas[idx].prompt:
+            template = personas[idx].prompt
+        if not template:
+            template = fallback_template
+
+        try:
+            return template.format(
+                user_query=user_query,
+                search_context_block=search_context_block,
+                voice_profile_block=voice_profile_block,
+                essay_mode_block=essay_mode_block,
+                word_target_block=word_target_block,
+            )
+        except (KeyError, AttributeError, TypeError) as e:
+            logger.warning(
+                f"Error formatting Stage 1 prompt for member {idx}: {e}. Using bare fallback."
+            )
+            if search_context_block:
+                return f"{search_context_block}\n\nTopic or draft from user:\n{user_query}"
+            return user_query
 
     # Prepare tasks for all models
-    models = get_council_models()
-    
+    models = council_models if council_models is not None else get_council_models()
+
     # Yield total count first
     yield len(models)
 
     council_temp = settings.council_temperature
 
-    async def _query_safe(m: str):
-        try:
-            return m, await query_model(m, messages, temperature=council_temp)
-        except Exception as e:
-            return m, {"error": True, "error_message": str(e)}
+    def _persona_name_for_index(idx: int) -> str:
+        if idx < len(personas) and personas[idx].name:
+            return personas[idx].name
+        return ""
 
-    # Create tasks
-    tasks = [asyncio.create_task(_query_safe(m)) for m in models]
+    async def _query_safe(idx: int, m: str):
+        prompt = _build_prompt_for_index(idx)
+        messages = [{"role": "user", "content": prompt}]
+        try:
+            return idx, m, await query_model(m, messages, temperature=council_temp)
+        except Exception as e:
+            return idx, m, {"error": True, "error_message": str(e)}
+
+    # Create tasks (preserve council member index so we map persona -> model)
+    tasks = [asyncio.create_task(_query_safe(i, m)) for i, m in enumerate(models)]
     
     # Process as they complete
     pending = set(tasks)
@@ -153,14 +300,17 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
 
             for task in done:
                 try:
-                    model, response = await task
-                    
+                    idx, model, response = await task
+                    persona_name = _persona_name_for_index(idx)
+
                     result = None
                     if response is not None:
                         if response.get('error'):
                             # Include failed models with error info
                             result = {
                                 "model": model,
+                                "persona": persona_name,
+                                "council_index": idx,
                                 "response": None,
                                 "error": response.get('error'),
                                 "error_message": response.get('error_message', 'Unknown error')
@@ -173,10 +323,12 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
                                 content = str(content) if content is not None else ''
                             result = {
                                 "model": model,
+                                "persona": persona_name,
+                                "council_index": idx,
                                 "response": content,
                                 "error": None
                             }
-                    
+
                     if result:
                         yield result
                 except asyncio.CancelledError:
@@ -332,7 +484,10 @@ async def stage3_synthesize_final(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
     stage2_results: List[Dict[str, Any]],
-    search_context: str = ""
+    search_context: str = "",
+    essay_mode: str = "topic",
+    chairman_model_override: Optional[str] = None,
+    word_target: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Stage 3: Chairman synthesizes final response.
@@ -341,6 +496,11 @@ async def stage3_synthesize_final(
         user_query: The original user query
         stage1_results: Individual model responses from Stage 1
         stage2_results: Rankings from Stage 2
+        essay_mode: 'topic' or 'draft' — controls whether the chairman
+            writes from scratch or refines the user's draft.
+        chairman_model_override: per-call chairman model; if None, uses
+            settings.chairman_model.
+        word_target: optional length target rendered into {word_target_block}.
 
     Returns:
         Dict with 'model' and 'response' keys
@@ -364,6 +524,18 @@ async def stage3_synthesize_final(
     if search_context:
         search_context_block = f"Context from Web Search:\n{search_context}\n"
 
+    # Render the user's voice profile so the Chairman applies every rule
+    # before returning the final essay (Phase 2). Empty string when no
+    # profile is configured.
+    voice_profile_block = format_voice_profile_block()
+
+    # Phase 4: tell the Chairman whether this is topic-mode (write fresh)
+    # or draft-mode (refine the user's draft).
+    essay_mode_block = format_essay_mode_block(essay_mode)
+
+    # Extension #1: optional word target.
+    word_target_block = format_word_target_block(word_target)
+
     try:
         # Ensure prompt is not None
         prompt_template = settings.stage3_prompt
@@ -375,7 +547,10 @@ async def stage3_synthesize_final(
             user_query=user_query,
             stage1_text=stage1_text,
             stage2_text=stage2_text,
-            search_context_block=search_context_block
+            search_context_block=search_context_block,
+            voice_profile_block=voice_profile_block,
+            essay_mode_block=essay_mode_block,
+            word_target_block=word_target_block,
         )
     except (KeyError, AttributeError, TypeError) as e:
         logger.warning(f"Error formatting Stage 3 prompt: {e}. Using fallback.")
@@ -390,15 +565,28 @@ async def stage3_synthesize_final(
     if is_default_prompt:
         # If using default, split into System (Persona) and User (Data) for better adherence at low temp
         messages = [
-            {"role": "system", "content": "You are the Chairman of an LLM Council. Your task is to synthesize the provided model responses into a single, comprehensive answer."},
-            {"role": "user", "content": chairman_prompt}
+            {
+                "role": "system",
+                "content": (
+                    "You are the Chairman of an essay-writing council. "
+                    "Synthesize the council members' draft essays into a single polished final essay. "
+                    "If the user has provided a voice profile, apply every rule before returning the essay; "
+                    "the user's voice rules override the stylistic preferences of any individual council member."
+                ),
+            },
+            {"role": "user", "content": chairman_prompt},
         ]
     else:
         # If custom prompt, send as single User message to respect user's custom persona/structure
         messages = [{"role": "user", "content": chairman_prompt}]
 
-    # Query the chairman model with error handling
-    chairman_model = get_chairman_model()
+    # Query the chairman model with error handling. Per-call override beats
+    # settings.chairman_model.
+    chairman_model = (
+        chairman_model_override.strip()
+        if isinstance(chairman_model_override, str) and chairman_model_override.strip()
+        else get_chairman_model()
+    )
     chairman_temp = settings.chairman_temperature
 
     try:

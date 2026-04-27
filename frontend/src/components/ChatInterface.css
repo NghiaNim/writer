@@ -568,6 +568,101 @@
   margin-top: 16px;
 }
 
+/* ==================== Phase 4: Essay input (Topic / Draft) ==================== */
+
+.essay-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 10px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.essay-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.essay-mode-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+}
+
+.essay-mode-btn.active {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.6);
+  color: #bfdbfe;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.08);
+}
+
+.essay-mode-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.essay-mode-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.essay-mode-hint {
+  margin-left: 6px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* In draft mode, give the textarea more room and a slightly different look. */
+.essay-input-draft .message-input {
+  resize: vertical;
+}
+
+@media (max-width: 768px) {
+  .essay-mode-hint {
+    width: 100%;
+    margin: 4px 0 0;
+  }
+}
+
+/* Phase 3: collapsible partial-results details when the user stops a run
+ * before the chairman synthesizes the final essay. */
+.aborted-fallback-notes {
+  margin-top: 12px;
+}
+.aborted-fallback-notes > summary {
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: #cbd5e1;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  list-style: none;
+  display: inline-block;
+}
+.aborted-fallback-notes > summary::-webkit-details-marker {
+  display: none;
+}
+.aborted-fallback-notes > summary:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
 .aborted-icon {
   font-size: 16px;
   color: #fb923c;

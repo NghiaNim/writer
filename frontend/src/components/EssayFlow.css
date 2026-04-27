@@ -1,0 +1,471 @@
+.essay-flow {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    min-height: 100%;
+}
+
+.essay-flow-card {
+    width: 100%;
+    max-width: 720px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: 16px;
+    padding: 40px 36px;
+    box-shadow: var(--shadow-glass);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    animation: essay-flow-fade-in 0.35s ease-out both;
+}
+
+@keyframes essay-flow-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.essay-flow-step {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.essay-flow-topic-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    padding: 5px 12px;
+    margin-bottom: 8px;
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.18);
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-family: var(--font-ui);
+    max-width: 100%;
+}
+
+.essay-flow-topic-chip span {
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 540px;
+}
+
+.essay-flow-question {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 1.25;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+
+.essay-flow-question-small {
+    font-size: 22px;
+}
+
+.essay-flow-hint {
+    margin: -4px 0 4px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.essay-flow-progress {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.essay-flow-input,
+.essay-flow-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 14px 16px;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid var(--border-glass);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 15px;
+    line-height: 1.5;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    resize: vertical;
+}
+
+.essay-flow-textarea {
+    min-height: 110px;
+    font-family: var(--font-content);
+    font-size: 16px;
+}
+
+.essay-flow-textarea-large {
+    min-height: 320px;
+}
+
+.essay-flow-input::placeholder,
+.essay-flow-textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.essay-flow-input:focus,
+.essay-flow-textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-primary-dim);
+}
+
+.essay-flow-input:disabled,
+.essay-flow-textarea:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.essay-flow-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.essay-flow-primary {
+    background: var(--accent-primary);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.essay-flow-primary:hover:not(:disabled) {
+    background: #2563eb;
+}
+
+.essay-flow-primary:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.essay-flow-primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.essay-flow-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--text-secondary);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.essay-flow-link:hover:not(:disabled) {
+    color: var(--text-primary);
+}
+
+.essay-flow-link:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.essay-flow-error {
+    padding: 9px 12px;
+    background: rgba(248, 113, 113, 0.08);
+    color: #fca5a5;
+    border: 1px solid rgba(248, 113, 113, 0.25);
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.essay-flow-memory {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 12px;
+    background: rgba(251, 191, 36, 0.08);
+    color: #fde68a;
+    border: 1px solid rgba(251, 191, 36, 0.22);
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.essay-flow-memory-dismiss {
+    background: transparent;
+    color: inherit;
+    border: none;
+    padding: 0 4px;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.essay-flow-memory-dismiss:hover {
+    opacity: 1;
+}
+
+/* Path cards */
+.essay-flow-paths {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.essay-flow-path-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 22px;
+    text-align: left;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.12s ease, background 0.15s ease;
+}
+
+.essay-flow-path-card:hover:not(:disabled) {
+    border-color: var(--accent-primary);
+    background: rgba(59, 130, 246, 0.06);
+    transform: translateY(-1px);
+}
+
+.essay-flow-path-card:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.essay-flow-path-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.essay-flow-path-desc {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+    .essay-flow {
+        padding: 24px 16px;
+    }
+    .essay-flow-card {
+        padding: 28px 20px;
+    }
+    .essay-flow-question {
+        font-size: 24px;
+    }
+    .essay-flow-paths {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Interactive history (past Q&As shown above the current question) */
+.essay-flow-history {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.essay-flow-exchange {
+    padding: 12px 14px;
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-glass);
+    border-radius: 10px;
+}
+
+.essay-flow-exchange-q {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.essay-flow-exchange-a {
+    font-family: var(--font-content);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Word target + council disclosure (extension #1)                         */
+/* ---------------------------------------------------------------------- */
+
+.essay-flow-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 0;
+    border-top: 1px solid var(--border-glass);
+}
+
+.essay-flow-section:first-of-type {
+    border-top: none;
+    padding-top: 4px;
+}
+
+.essay-flow-section-label {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.essay-flow-word-targets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.essay-flow-chip {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-glass);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    min-width: 88px;
+}
+
+.essay-flow-chip:hover:not(:disabled) {
+    border-color: rgba(59, 130, 246, 0.4);
+}
+
+.essay-flow-chip.active {
+    border-color: rgba(59, 130, 246, 0.6);
+    background: rgba(59, 130, 246, 0.12);
+}
+
+.essay-flow-chip .chip-main {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.essay-flow-chip .chip-sub {
+    font-size: 11px;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+}
+
+.essay-flow-chip.custom {
+    cursor: default;
+}
+
+.essay-flow-chip-input {
+    width: 70px;
+    padding: 2px 4px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 14px;
+    text-align: left;
+    outline: none;
+}
+
+.essay-flow-chip-input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+    font-weight: 400;
+}
+
+.essay-flow-chip-input:focus {
+    border-bottom-color: rgba(59, 130, 246, 0.6);
+}
+
+/* Hide spinner on number input */
+.essay-flow-chip-input::-webkit-outer-spin-button,
+.essay-flow-chip-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.essay-flow-chip-input[type='number'] {
+    -moz-appearance: textfield;
+}
+
+.essay-flow-word-target-summary {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.essay-flow-disclosure {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.essay-flow-disclosure:hover:not(:disabled) {
+    color: rgba(59, 130, 246, 1);
+}
+
+.essay-flow-disclosure-arrow {
+    font-size: 12px;
+    color: var(--text-secondary);
+    width: 12px;
+    text-align: center;
+}
+
+.essay-flow-disclosure-hint {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.essay-flow-council-wrapper {
+    margin-top: 8px;
+}

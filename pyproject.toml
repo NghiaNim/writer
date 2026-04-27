@@ -12,4 +12,5 @@ dependencies = [
     "pydantic>=2.9.0",
     "ddgs>=8.0.0",
     "yake>=0.4.8",
+    "supabase>=2.7.0",
 ]

@@ -14,12 +14,212 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
+// ---------------------------------------------------------------------------
+// Auth wiring (Phase 1)
+//
+// AuthContext registers a token getter and an unauthorized handler so this
+// module never has to import React. `authedFetch` is a drop-in replacement
+// for fetch that:
+//   1. Adds `Authorization: Bearer <token>` when a token is present
+//   2. On 401, clears the session via the registered handler
+// Existing endpoints are NOT yet locked down server-side; this is in place
+// for when later phases require auth on protected routes.
+// ---------------------------------------------------------------------------
+
+let _authTokenGetter = () => null;
+let _onUnauthorized = () => {};
+
+export function setAuthTokenGetter(fn) {
+  _authTokenGetter = typeof fn === 'function' ? fn : () => null;
+}
+
+export function setUnauthorizedHandler(fn) {
+  _onUnauthorized = typeof fn === 'function' ? fn : () => {};
+}
+
+async function authedFetch(input, init = {}) {
+  const token = _authTokenGetter && _authTokenGetter();
+  const headers = new Headers(init.headers || {});
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  const response = await fetch(input, { ...init, headers });
+  if (response.status === 401) {
+    try {
+      _onUnauthorized();
+    } catch (_) {
+      // swallow — handler should never break the caller
+    }
+  }
+  return response;
+}
+
 export const api = {
+  /**
+   * Auth endpoints (Phase 1 — Supabase).
+   */
+  auth: {
+    async signup(email, password) {
+      const response = await authedFetch(`${API_BASE}/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.detail || 'Signup failed');
+      }
+      return response.json();
+    },
+
+    async login(email, password) {
+      const response = await authedFetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.detail || 'Invalid email or password');
+      }
+      return response.json();
+    },
+
+    async logout() {
+      // Uses authedFetch so the current bearer token is included.
+      const response = await authedFetch(`${API_BASE}/auth/logout`, {
+        method: 'POST',
+      });
+      if (!response.ok && response.status !== 401) {
+        // 401 on logout is fine — token was already invalid.
+        throw new Error('Logout failed');
+      }
+      return { ok: true };
+    },
+
+    async me() {
+      const response = await authedFetch(`${API_BASE}/auth/me`);
+      if (!response.ok) {
+        throw new Error('Not authenticated');
+      }
+      return response.json();
+    },
+  },
+
+  /**
+   * Essay sessions (Phase 3 — auth-required).
+   */
+  sessions: {
+    /**
+     * Step 1: create a session with the topic. Returns the created row.
+     * Accepts optional word_target (50-5000) for the new word-limit picker.
+     */
+    async create(topic, essayType = 'general', wordTarget = null) {
+      const body = { topic, essay_type: essayType };
+      if (typeof wordTarget === 'number' && wordTarget > 0) {
+        body.word_target = wordTarget;
+      }
+      const response = await authedFetch(`${API_BASE}/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.detail || 'Failed to create session');
+      }
+      return response.json();
+    },
+
+    /** Read a session (must belong to the caller). */
+    async get(sessionId) {
+      const response = await authedFetch(`${API_BASE}/sessions/${sessionId}`);
+      if (!response.ok) {
+        throw new Error('Failed to load session');
+      }
+      return response.json();
+    },
+
+    /**
+     * Step 2 / Step 3: partial update.
+     * Patch object accepts: so_what_answer, path ('interactive'|'draft'),
+     * conversation, draft, status, essay_type, topic.
+     */
+    async update(sessionId, patch) {
+      const response = await authedFetch(`${API_BASE}/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.detail || 'Failed to update session');
+      }
+      return response.json();
+    },
+
+    /**
+     * Non-blocking "have I written about this before?" check.
+     * Returns { found, matches } where matches is at most 5 items.
+     */
+    async memoryCheck(topic) {
+      const response = await authedFetch(
+        `${API_BASE}/sessions/memory-check?topic=${encodeURIComponent(topic)}`
+      );
+      if (!response.ok) {
+        return { found: false, matches: [] };
+      }
+      return response.json();
+    },
+  },
+
+  /**
+   * Per-user default council configuration (extension #1).
+   * Shape of payload:
+   *   {
+   *     personas: [{ key, enabled, model }, ...],
+   *     chairman_model: string
+   *   }
+   */
+  councilConfig: {
+    async get() {
+      const response = await authedFetch(`${API_BASE}/council-config`);
+      if (!response.ok) {
+        throw new Error('Failed to load council config');
+      }
+      return response.json();
+    },
+    async save(config) {
+      const response = await authedFetch(`${API_BASE}/council-config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.detail || 'Failed to save council config');
+      }
+      return response.json();
+    },
+  },
+
+  /**
+   * Curated, essay-friendly OpenRouter model catalog used by the council picker.
+   */
+  models: {
+    async curated() {
+      const response = await authedFetch(`${API_BASE}/api/models/curated`);
+      if (!response.ok) {
+        return { models: [] };
+      }
+      return response.json();
+    },
+  },
   /**
    * List all conversations.
    */
   async listConversations() {
-    const response = await fetch(`${API_BASE}/api/conversations`);
+    const response = await authedFetch(`${API_BASE}/api/conversations`);
     if (!response.ok) {
       throw new Error('Failed to list conversations');
     }
@@ -30,7 +230,7 @@ export const api = {
    * Create a new conversation.
    */
   async createConversation() {
-    const response = await fetch(`${API_BASE}/api/conversations`, {
+    const response = await authedFetch(`${API_BASE}/api/conversations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -47,7 +247,7 @@ export const api = {
    * Get a specific conversation.
    */
   async getConversation(conversationId) {
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/api/conversations/${conversationId}`
     );
     if (!response.ok) {
@@ -60,7 +260,7 @@ export const api = {
    * Delete a conversation.
    */
   async deleteConversation(conversationId) {
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/api/conversations/${conversationId}`,
       { method: 'DELETE' }
     );
@@ -74,7 +274,7 @@ export const api = {
    * Send a message in a conversation.
    */
   async sendMessage(conversationId, content, webSearch = false) {
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/api/conversations/${conversationId}/message`,
       {
         method: 'POST',
@@ -94,7 +294,7 @@ export const api = {
    * Get application settings.
    */
   async getSettings() {
-    const response = await fetch(`${API_BASE}/api/settings`);
+    const response = await authedFetch(`${API_BASE}/api/settings`);
     if (!response.ok) {
       throw new Error('Failed to get settings');
     }
@@ -105,7 +305,7 @@ export const api = {
    * Test Tavily API key.
    */
   async testTavilyKey(apiKey) {
-    const response = await fetch(`${API_BASE}/api/settings/test-tavily`, {
+    const response = await authedFetch(`${API_BASE}/api/settings/test-tavily`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -122,7 +322,7 @@ export const api = {
    * Test OpenRouter API key.
    */
   async testOpenRouterKey(apiKey) {
-    const response = await fetch(`${API_BASE}/api/settings/test-openrouter`, {
+    const response = await authedFetch(`${API_BASE}/api/settings/test-openrouter`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -139,7 +339,7 @@ export const api = {
    * Test Brave API key.
    */
   async testBraveKey(apiKey) {
-    const response = await fetch(`${API_BASE}/api/settings/test-brave`, {
+    const response = await authedFetch(`${API_BASE}/api/settings/test-brave`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -156,7 +356,7 @@ export const api = {
    * Test Serper API key.
    */
   async testSerperKey(apiKey) {
-    const response = await fetch(`${API_BASE}/api/settings/test-serper`, {
+    const response = await authedFetch(`${API_BASE}/api/settings/test-serper`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -173,7 +373,7 @@ export const api = {
    * Test a specific provider's API key.
    */
   async testProviderKey(providerId, apiKey) {
-    const response = await fetch(`${API_BASE}/api/settings/test-provider`, {
+    const response = await authedFetch(`${API_BASE}/api/settings/test-provider`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -190,7 +390,7 @@ export const api = {
    * Test Ollama connection.
    */
   async testOllamaConnection(baseUrl) {
-    const response = await fetch(`${API_BASE}/api/settings/test-ollama`, {
+    const response = await authedFetch(`${API_BASE}/api/settings/test-ollama`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -207,7 +407,7 @@ export const api = {
    * Test custom OpenAI-compatible endpoint.
    */
   async testCustomEndpoint(name, url, apiKey) {
-    const response = await fetch(`${API_BASE}/api/settings/test-custom-endpoint`, {
+    const response = await authedFetch(`${API_BASE}/api/settings/test-custom-endpoint`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -224,7 +424,7 @@ export const api = {
    * Get available models from custom endpoint.
    */
   async getCustomEndpointModels() {
-    const response = await fetch(`${API_BASE}/api/custom-endpoint/models`);
+    const response = await authedFetch(`${API_BASE}/api/custom-endpoint/models`);
     if (!response.ok) {
       throw new Error('Failed to get custom endpoint models');
     }
@@ -235,7 +435,7 @@ export const api = {
    * Get available models from OpenRouter.
    */
   async getModels() {
-    const response = await fetch(`${API_BASE}/api/models`);
+    const response = await authedFetch(`${API_BASE}/api/models`);
     if (!response.ok) {
       throw new Error('Failed to get models');
     }
@@ -250,7 +450,7 @@ export const api = {
     if (baseUrl) {
       url += `?base_url=${encodeURIComponent(baseUrl)}`;
     }
-    const response = await fetch(url);
+    const response = await authedFetch(url);
     if (!response.ok) {
       throw new Error('Failed to get Ollama models');
     }
@@ -261,7 +461,7 @@ export const api = {
    * Get available models from direct providers.
    */
   async getDirectModels() {
-    const response = await fetch(`${API_BASE}/api/models/direct`);
+    const response = await authedFetch(`${API_BASE}/api/models/direct`);
     if (!response.ok) {
       throw new Error('Failed to get direct models');
     }
@@ -272,9 +472,38 @@ export const api = {
    * Get default model settings.
    */
   async getDefaultSettings() {
-    const response = await fetch(`${API_BASE}/api/settings/defaults`);
+    const response = await authedFetch(`${API_BASE}/api/settings/defaults`);
     if (!response.ok) {
       throw new Error('Failed to get default settings');
+    }
+    return response.json();
+  },
+
+  /**
+   * Get the user's voice profile (Phase 2).
+   * Returns: { rules: string[], reference_paragraphs: string[], inferred_style: string }
+   */
+  async getVoiceProfile() {
+    const response = await authedFetch(`${API_BASE}/api/voice-profile`);
+    if (!response.ok) {
+      throw new Error('Failed to get voice profile');
+    }
+    return response.json();
+  },
+
+  /**
+   * Save the user's voice profile (Phase 2).
+   */
+  async saveVoiceProfile(profile) {
+    const response = await authedFetch(`${API_BASE}/api/voice-profile`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(profile),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to save voice profile');
     }
     return response.json();
   },
@@ -283,7 +512,7 @@ export const api = {
    * Update application settings.
    */
   async updateSettings(settings) {
-    const response = await fetch(`${API_BASE}/api/settings`, {
+    const response = await authedFetch(`${API_BASE}/api/settings`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -308,8 +537,23 @@ export const api = {
    * @returns {Promise<void>}
    */
   async sendMessageStream(conversationId, options, onEvent, signal) {
-    const { content, webSearch = false, executionMode = 'full' } = options;
-    const response = await fetch(
+    const {
+      content,
+      webSearch = false,
+      executionMode = 'full',
+      essayMode = 'topic',
+      sessionId = null,
+    } = options;
+    const body = {
+      content,
+      web_search: webSearch,
+      execution_mode: executionMode,
+      essay_mode: essayMode,
+    };
+    if (sessionId) {
+      body.session_id = sessionId;
+    }
+    const response = await authedFetch(
       `${API_BASE}/api/conversations/${conversationId}/message/stream?_t=${Date.now()}`,
       {
         method: 'POST',
@@ -317,7 +561,7 @@ export const api = {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
         },
-        body: JSON.stringify({ content, web_search: webSearch, execution_mode: executionMode }),
+        body: JSON.stringify(body),
         signal,
         cache: 'no-store',
       }

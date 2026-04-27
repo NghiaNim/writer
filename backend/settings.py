@@ -10,8 +10,10 @@ from .search import SearchProvider
 # Settings file path
 SETTINGS_FILE = Path(__file__).parent.parent / "data" / "settings.json"
 
-# Default models (matches original llm-council defaults)
-DEFAULT_COUNCIL_MODELS = ["", ""]
+# Default models. Four empty slots so the default council size matches the
+# four essay personas (Architect, Editor, Devil's Advocate, Voice Guardian).
+# Users still pick which actual models to assign.
+DEFAULT_COUNCIL_MODELS = ["", "", "", ""]
 DEFAULT_CHAIRMAN_MODEL = ""
 
 # Default enabled providers
@@ -34,7 +36,49 @@ DEFAULT_DIRECT_PROVIDER_TOGGLES = {
 }
 
 
-# Available models for selection (popular OpenRouter models)
+# Curated model list shown to students in the council picker UI. We keep this
+# short and essay-friendly on purpose: free / low-cost picks plus a few strong
+# paid options. The hosted product routes everything through OpenRouter, so
+# every entry here is prefixed with "openrouter:" when used as a model id.
+#
+# Schema: { id, label, family, tier }
+#   - id:     full model id with `openrouter:` prefix (used by council.py)
+#   - label:  user-facing name
+#   - family: provider family (for grouping in the UI)
+#   - tier:   "free" | "low" | "standard" | "premium"
+#   - notes:  optional 1-line UI description
+CURATED_COUNCIL_MODELS = [
+    # Premium / strongest for synthesis (chairman default)
+    {"id": "openrouter:anthropic/claude-3.5-sonnet", "label": "Claude 3.5 Sonnet", "family": "Anthropic", "tier": "premium",
+     "notes": "Strong prose, voice-aware. Good chairman."},
+    {"id": "openrouter:openai/gpt-4o", "label": "GPT-4o", "family": "OpenAI", "tier": "premium",
+     "notes": "Versatile, structurally precise."},
+    {"id": "openrouter:anthropic/claude-3-opus", "label": "Claude 3 Opus", "family": "Anthropic", "tier": "premium",
+     "notes": "Slow, deliberate, deep voice."},
+    # Standard cost
+    {"id": "openrouter:google/gemini-pro-1.5", "label": "Gemini 1.5 Pro", "family": "Google", "tier": "standard",
+     "notes": "Long context, contrarian."},
+    {"id": "openrouter:anthropic/claude-3-haiku", "label": "Claude 3 Haiku", "family": "Anthropic", "tier": "standard",
+     "notes": "Fast, lean prose."},
+    {"id": "openrouter:mistralai/mistral-large", "label": "Mistral Large", "family": "Mistral", "tier": "standard",
+     "notes": "Tight argumentation."},
+    {"id": "openrouter:deepseek/deepseek-chat", "label": "DeepSeek V3", "family": "DeepSeek", "tier": "standard",
+     "notes": "Reasoning-heavy."},
+    # Low-cost / free
+    {"id": "openrouter:openai/gpt-4o-mini", "label": "GPT-4o Mini", "family": "OpenAI", "tier": "low",
+     "notes": "Fast, cheap, capable."},
+    {"id": "openrouter:google/gemini-flash-1.5", "label": "Gemini 1.5 Flash", "family": "Google", "tier": "low",
+     "notes": "Free tier available."},
+    {"id": "openrouter:meta-llama/llama-3.1-70b-instruct", "label": "Llama 3.1 70B", "family": "Meta", "tier": "low",
+     "notes": "Open-weight, free tier."},
+    {"id": "openrouter:meta-llama/llama-3.1-405b-instruct", "label": "Llama 3.1 405B", "family": "Meta", "tier": "standard",
+     "notes": "Largest open-weight."},
+]
+
+
+# Available models for selection (popular OpenRouter models) — legacy list,
+# still used by the older Settings UI. Curated list above is the preferred
+# source for the new council picker.
 AVAILABLE_MODELS = [
     # OpenAI
     {"id": "openai/gpt-4o", "name": "GPT-4o [OpenRouter]", "provider": "OpenAI", "source": "openrouter"},
@@ -63,8 +107,28 @@ AVAILABLE_MODELS = [
 from .prompts import (
     STAGE1_PROMPT_DEFAULT,
     STAGE2_PROMPT_DEFAULT,
-    STAGE3_PROMPT_DEFAULT
+    STAGE3_PROMPT_DEFAULT,
+    DEFAULT_COUNCIL_PERSONAS,
 )
+
+
+class CouncilPersona(BaseModel):
+    """A single Stage 1 persona assigned to a council member by index.
+
+    `key` is a stable identifier (e.g. "architect", "editor") used by the
+    per-user / per-essay council_config to refer to a persona independent of
+    its position in this list. Older settings.json files won't have it, so
+    it stays optional.
+    """
+    key: Optional[str] = None
+    name: str
+    description: str = ""
+    prompt: str
+
+
+def _default_personas() -> List["CouncilPersona"]:
+    return [CouncilPersona(**p) for p in DEFAULT_COUNCIL_PERSONAS]
+
 
 class Settings(BaseModel):
     """Application settings."""
@@ -120,21 +184,47 @@ class Settings(BaseModel):
     stage1_prompt: str = STAGE1_PROMPT_DEFAULT
     stage2_prompt: str = STAGE2_PROMPT_DEFAULT
     stage3_prompt: str = STAGE3_PROMPT_DEFAULT
-    
+
+    # Stage 1 council personas. Council member at index i uses
+    # council_personas[i].prompt as their Stage 1 system prompt. Members
+    # whose index exceeds the persona list fall back to stage1_prompt.
+    council_personas: List[CouncilPersona] = []  # populated via get_settings() if empty
+
     # Execution Mode
     execution_mode: str = "full"  # Default execution mode: 'chat_only', 'chat_ranking', 'full'
 
 
 def get_settings() -> Settings:
     """Load settings from file, or return defaults."""
+    settings: Settings
     if SETTINGS_FILE.exists():
         try:
             with open(SETTINGS_FILE, "r") as f:
                 data = json.load(f)
-                return Settings(**data)
+                settings = Settings(**data)
         except Exception:
-            pass
-    return Settings()
+            settings = Settings()
+    else:
+        settings = Settings()
+
+    # If personas are missing (fresh install or older settings.json from
+    # before Phase 1), seed with the 4 essay-writing defaults. We do not
+    # overwrite a user-customized non-empty list.
+    if not settings.council_personas:
+        settings.council_personas = _default_personas()
+    else:
+        # Older settings.json may have personas without a `key`. Backfill
+        # by matching name; falls back to position in DEFAULT_COUNCIL_PERSONAS
+        # if the name doesn't match.
+        defaults_by_name = {p["name"]: p["key"] for p in DEFAULT_COUNCIL_PERSONAS}
+        for i, persona in enumerate(settings.council_personas):
+            if not persona.key:
+                inferred = defaults_by_name.get(persona.name)
+                if not inferred and i < len(DEFAULT_COUNCIL_PERSONAS):
+                    inferred = DEFAULT_COUNCIL_PERSONAS[i]["key"]
+                persona.key = inferred
+
+    return settings
 
 
 def save_settings(settings: Settings) -> None:

@@ -3,8 +3,10 @@ import { api } from '../api';
 import SearchableModelSelect from './SearchableModelSelect';
 import ProviderSettings from './settings/ProviderSettings';
 import CouncilConfig from './settings/CouncilConfig';
+import UserCouncilConfig from './CouncilConfig';
 import SearchSettings from './settings/SearchSettings';
 import PromptSettings from './settings/PromptSettings';
+import VoiceProfileSettings from './settings/VoiceProfileSettings';
 import './Settings.css';
 
 
@@ -107,6 +109,10 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
   });
   const [activePromptTab, setActivePromptTab] = useState('stage1');
 
+  // Stage 1 council personas (Phase 1: essay-writing personas)
+  const [councilPersonas, setCouncilPersonas] = useState([]);
+  const [activePersonaIndex, setActivePersonaIndex] = useState(0);
+
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [showFreeOnly, setShowFreeOnly] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -162,6 +168,9 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       if (prompts.stage2_prompt !== settings.stage2_prompt) return true;
       if (prompts.stage3_prompt !== settings.stage3_prompt) return true;
 
+      // Council personas
+      if (JSON.stringify(councilPersonas) !== JSON.stringify(settings.council_personas || [])) return true;
+
       // Note: API keys are auto-saved on test, so we don't check them here
 
       return false;
@@ -185,7 +194,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     stage2Temperature,
     councilMemberFilters,
     chairmanFilter,
-    prompts
+    prompts,
+    councilPersonas
   ]);
 
   // Helper to determine if filters need to switch based on availability
@@ -399,6 +409,9 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         stage3_prompt: data.stage3_prompt || '',
 
       });
+
+      // Council personas
+      setCouncilPersonas(data.council_personas || []);
 
       // Clear Direct Keys (for security)
       setDirectKeys({
@@ -929,6 +942,54 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Stage 1 council persona handlers (Phase 1: essay-writing personas)
+  // ---------------------------------------------------------------------------
+
+  const handlePersonaFieldChange = (index, field, value) => {
+    setCouncilPersonas(prev => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleResetPersona = async (index) => {
+    try {
+      const defaults = await api.getDefaultSettings();
+      const defaultPersona = (defaults.council_personas || [])[index];
+      if (!defaultPersona) {
+        console.warn(`No default persona at index ${index}`);
+        return;
+      }
+      setCouncilPersonas(prev => {
+        const next = [...prev];
+        next[index] = { ...defaultPersona };
+        return next;
+      });
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      console.error('Failed to reset persona', err);
+      setError('Failed to reset persona');
+    }
+  };
+
+  const handleResetAllPersonas = async () => {
+    try {
+      const defaults = await api.getDefaultSettings();
+      if (defaults.council_personas) {
+        setCouncilPersonas(defaults.council_personas.map(p => ({ ...p })));
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error('Failed to reset all personas', err);
+      setError('Failed to reset personas');
+    }
+  };
+
   const handleResetToDefaults = () => {
     setShowResetConfirm(true);
   };
@@ -981,6 +1042,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         stage3_prompt: defaults.stage3_prompt,
 
       });
+      setCouncilPersonas((defaults.council_personas || []).map(p => ({ ...p })));
 
       // 5. Save the reset settings to backend
       const updates = {
@@ -1011,6 +1073,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         stage1_prompt: defaults.stage1_prompt,
         stage2_prompt: defaults.stage2_prompt,
         stage3_prompt: defaults.stage3_prompt,
+        council_personas: defaults.council_personas || [],
       };
       await api.updateSettings(updates);
 
@@ -1100,7 +1163,10 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       ollama_base_url: ollamaBaseUrl,
 
       // Prompts
-      prompts: prompts
+      prompts: prompts,
+
+      // Stage 1 council personas (Phase 1: essay-writing personas)
+      council_personas: councilPersonas
     };
 
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(config, null, 2));
@@ -1156,6 +1222,11 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         // Apply Prompts
         if (config.prompts) {
           setPrompts(prev => ({ ...prev, ...config.prompts }));
+        }
+
+        // Apply Council Personas
+        if (Array.isArray(config.council_personas)) {
+          setCouncilPersonas(config.council_personas.map(p => ({ ...p })));
         }
 
         // Validate imported models against all available models
@@ -1244,7 +1315,9 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         council_member_filters: councilMemberFilters,
         chairman_filter: chairmanFilter,
         // Prompts
-        ...prompts
+        ...prompts,
+        // Stage 1 council personas (Phase 1: essay-writing personas)
+        council_personas: councilPersonas,
       };
 
       // Only send API keys if they've been changed
@@ -1423,6 +1496,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               LLM API Keys
             </button>
             <button
+              className={`sidebar-nav-item ${activeSection === 'my_council' ? 'active' : ''}`}
+              onClick={() => setActiveSection('my_council')}
+            >
+              My Council
+            </button>
+            <button
               className={`sidebar-nav-item ${activeSection === 'council' ? 'active' : ''}`}
               onClick={() => setActiveSection('council')}
             >
@@ -1433,6 +1512,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               onClick={() => setActiveSection('prompts')}
             >
               System Prompts
+            </button>
+            <button
+              className={`sidebar-nav-item ${activeSection === 'voice' ? 'active' : ''}`}
+              onClick={() => setActiveSection('voice')}
+            >
+              My Voice
             </button>
             <button
               className={`sidebar-nav-item ${activeSection === 'search' ? 'active' : ''}`}
@@ -1495,7 +1580,25 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               />
             )}
 
-            {/* COUNCIL CONFIGURATION */}
+            {/* MY COUNCIL — per-user default council (extension #1) */}
+            {activeSection === 'my_council' && (
+              <div className="settings-block">
+                <h2 className="settings-section-title">My Council</h2>
+                <p className="settings-section-desc">
+                  Pick which council members weigh in on your essays and which
+                  model each one uses. This is your personal default — every
+                  new essay starts with these settings (you can override them
+                  per-essay on Step 3 of the input flow).
+                </p>
+                <UserCouncilConfig
+                  onSave={async (cfg) => {
+                    await api.councilConfig.save(cfg);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* COUNCIL CONFIGURATION (admin / legacy) */}
             {activeSection === 'council' && (
               <CouncilConfig
                 settings={settings}
@@ -1549,7 +1652,19 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                 setActivePromptTab={setActivePromptTab}
                 stage2Temperature={stage2Temperature}
                 setStage2Temperature={setStage2Temperature}
+                // Stage 1 council personas
+                councilPersonas={councilPersonas}
+                activePersonaIndex={activePersonaIndex}
+                setActivePersonaIndex={setActivePersonaIndex}
+                onPersonaFieldChange={handlePersonaFieldChange}
+                onResetPersona={handleResetPersona}
+                onResetAllPersonas={handleResetAllPersonas}
               />
+            )}
+
+            {/* MY VOICE (Phase 2: voice profile) */}
+            {activeSection === 'voice' && (
+              <VoiceProfileSettings />
             )}
 
             {/* SEARCH PROVIDERS (New Section) */}

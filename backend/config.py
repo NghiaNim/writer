@@ -1,9 +1,12 @@
 """Configuration for the LLM Council."""
 
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load env from backend/.env explicitly so the app picks up secrets when
+# launched from the project root (the documented launch path).
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # OpenRouter API endpoint
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"

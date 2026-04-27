@@ -1,12 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import EssayFlow from './components/EssayFlow';
 import Settings from './components/Settings';
+import Login from './components/Login';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { api } from './api';
 import './App.css';
 import './components/StageCopyButtons.css';
 
-function App() {
+function AppShell() {
+  const { user, logout } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
@@ -23,7 +27,24 @@ function App() {
   const [chairmanModel, setChairmanModel] = useState(null);
   const [searchProvider, setSearchProvider] = useState('duckduckgo');
   const [executionMode, setExecutionMode] = useState('full');
+  const [essayMode, setEssayMode] = useState('topic'); // Phase 4: 'topic' | 'draft'
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Phase 3: EssayFlow gates new essay creation. We start with it visible
+  // so a logged-in user lands directly on the topic prompt. essayFlowKey is
+  // bumped each time we want a fresh, reset EssayFlow (e.g. starting another
+  // essay after one completes).
+  const [essayFlowVisible, setEssayFlowVisible] = useState(true);
+  const [essayFlowKey, setEssayFlowKey] = useState(0);
+  // Extension #1: current essay_sessions row id, threaded into send-message
+  // so the backend can resolve per-essay word_target + council_config.
+  // Stays in App state (not the conversation) since regenerate re-uses it.
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  // The council that's active for the in-flight (or just-finished) request.
+  // Used to render CouncilChips while the council deliberates. Falls back to
+  // the user's saved default if EssayFlow doesn't supply one.
+  const [currentCouncil, setCurrentCouncil] = useState(null);
+  const [currentWordTarget, setCurrentWordTarget] = useState(null);
   const abortControllerRef = useRef(null);
   const requestIdRef = useRef(0);
   const isInitialMount = useRef(true);
@@ -207,43 +228,97 @@ function App() {
   };
 
   const handleNewConversation = async () => {
-    // Check if there's already an empty/unused conversation
-    const existingEmpty = conversations.find(conv => !conv.title && conv.message_count === 0);
-
-    if (existingEmpty) {
-      // Reuse the existing empty conversation instead of creating a new one
-      setCurrentConversationId(existingEmpty.id);
-      return;
-    }
-
-    try {
-      const newConv = await api.createConversation();
-      setConversations([
-        { id: newConv.id, created_at: newConv.created_at, message_count: 0 },
-        ...conversations,
-      ]);
-      setCurrentConversationId(newConv.id);
-    } catch (error) {
-      console.error('Failed to create conversation:', error);
-    }
+    // Phase 3: starting a new essay always opens the EssayFlow. The
+    // conversation row is created on the backend AFTER EssayFlow's Step 3
+    // completes. Bumping the key forces a fresh EssayFlow component (clears
+    // any in-progress topic / so-what / draft state from a previous run).
+    setEssayFlowKey((k) => k + 1);
+    setEssayFlowVisible(true);
+    setCurrentConversationId(null);
+    setCurrentConversation(null);
+    setCurrentSessionId(null);
   };
 
   const handleSelectConversation = (id) => {
+    // Selecting an existing conversation hides EssayFlow. We don't track the
+    // session id for legacy conversations, so clear it — regenerate will
+    // fall back to the user's default council config.
+    setEssayFlowVisible(false);
     setCurrentConversationId(id);
+    setCurrentSessionId(null);
   };
 
   const handleDeleteConversation = async (id) => {
     try {
       await api.deleteConversation(id);
-      // Remove from local state
       setConversations(conversations.filter(c => c.id !== id));
-      // If we deleted the current conversation, clear it
       if (id === currentConversationId) {
         setCurrentConversationId(null);
         setCurrentConversation(null);
+        // Pop back to EssayFlow so the user has somewhere to land.
+        setEssayFlowKey((k) => k + 1);
+        setEssayFlowVisible(true);
       }
     } catch (error) {
       console.error('Failed to delete conversation:', error);
+    }
+  };
+
+  /**
+   * Phase 3 hand-off: EssayFlow has finished collecting topic + so-what +
+   * mode-specific context. Create the conversation row, hide EssayFlow, and
+   * pipe the formatted message through the existing send-message stream.
+   * Phase 5 will replace this with a dedicated POST /council/run.
+   */
+  const handleEssayFlowComplete = async ({
+    message,
+    essayMode: chosenMode,
+    sessionId,
+    wordTarget,
+    councilConfig,
+  }) => {
+    try {
+      const newConv = await api.createConversation();
+      setConversations((prev) => [
+        { id: newConv.id, created_at: newConv.created_at, message_count: 0 },
+        ...prev,
+      ]);
+      setCurrentConversationId(newConv.id);
+      // Seed a non-null currentConversation so handleSendMessage's optimistic
+      // updates have something to spread into.
+      setCurrentConversation({
+        id: newConv.id,
+        created_at: newConv.created_at,
+        messages: [],
+      });
+      setEssayMode(chosenMode);
+      setEssayFlowVisible(false);
+      setSidebarOpen(false);
+
+      // Resolve which council to display in the chips. EssayFlow may have
+      // explicitly customized one for this essay; otherwise fetch the user's
+      // saved default. Either way, we cache it locally so the chip row can
+      // light up while stages run.
+      let activeCouncil = councilConfig;
+      if (!activeCouncil) {
+        try {
+          activeCouncil = await api.councilConfig.get();
+        } catch (e) {
+          activeCouncil = null;
+        }
+      }
+      setCurrentCouncil(activeCouncil);
+      setCurrentWordTarget(typeof wordTarget === 'number' ? wordTarget : null);
+
+      handleSendMessage(message, false, {
+        essayMode: chosenMode,
+        conversationId: newConv.id,
+        sessionId,
+      });
+    } catch (error) {
+      console.error('Failed to start essay session:', error);
+      // Surface the error in the EssayFlow card by re-throwing — caller
+      // doesn't await us right now, so we just log for safety.
     }
   };
 
@@ -256,8 +331,13 @@ function App() {
     }
   };
 
-  const handleSendMessage = async (content, webSearch) => {
-    if (!currentConversationId) return;
+  const handleSendMessage = async (content, webSearch, options = {}) => {
+    // Phase 3: accept an explicit conversationId so EssayFlow can hand off
+    // immediately after creating the conversation, without waiting for
+    // currentConversationId to propagate through React state.
+    const targetConversationId = options.conversationId || currentConversationId;
+    if (!targetConversationId) return;
+    const requestEssayMode = options.essayMode || essayMode;
 
     // Assign unique ID to this request to prevent race conditions
     const currentRequestId = ++requestIdRef.current;
@@ -307,10 +387,22 @@ function App() {
         messages: [...prev.messages, assistantMessage],
       }));
 
-      // Send message with streaming
+      // Send message with streaming. `sessionId` (extension #1) lets the
+      // backend pull word_target + council_config off the matching session.
+      // We persist the active session id for regenerate to pick up too.
+      const requestSessionId = options.sessionId || currentSessionId;
+      if (options.sessionId) {
+        setCurrentSessionId(options.sessionId);
+      }
       await api.sendMessageStream(
-        currentConversationId,
-        { content, webSearch, executionMode },
+        targetConversationId,
+        {
+          content,
+          webSearch,
+          executionMode,
+          essayMode: requestEssayMode,
+          sessionId: requestSessionId,
+        },
         (eventType, event) => {
           switch (eventType) {
             case 'search_start':
@@ -667,6 +759,32 @@ function App() {
     }
   };
 
+  // Phase 3: regenerate the most recent essay using the same user prompt.
+  // Sends a fresh request with identical content; the new attempt appears as
+  // a new assistant message below the previous one in the same conversation.
+  // Preserves the essay_mode (topic/draft) of the original attempt.
+  const handleRegenerate = () => {
+    if (!currentConversation || isLoading) return;
+    const messages = currentConversation.messages || [];
+
+    let lastUserContent = null;
+    let lastAssistantEssayMode = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role === 'assistant' && !lastAssistantEssayMode) {
+        lastAssistantEssayMode = m?.metadata?.essay_mode || null;
+      }
+      if (m.role === 'user' && typeof m.content === 'string') {
+        lastUserContent = m.content;
+        break;
+      }
+    }
+    if (!lastUserContent) return;
+    handleSendMessage(lastUserContent, false, {
+      essayMode: lastAssistantEssayMode || essayMode,
+    });
+  };
+
   // Mobile sidebar handlers
   const handleMobileSelectConversation = (id) => {
     handleSelectConversation(id);
@@ -694,6 +812,20 @@ function App() {
         <span className="hamburger-icon"></span>
       </button>
 
+      {/* Phase 1: minimal auth chip in the top-right.
+          Will be replaced by the full top nav in Phase 6. */}
+      <div className="auth-chip" role="status" aria-label="Account">
+        {user?.email && <span className="auth-chip-email">{user.email}</span>}
+        <button
+          type="button"
+          className="auth-chip-logout"
+          onClick={logout}
+          title="Sign out"
+        >
+          Sign out
+        </button>
+      </div>
+
       <Sidebar
         conversations={conversations}
         currentConversationId={currentConversationId}
@@ -706,19 +838,32 @@ function App() {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      <ChatInterface
-        conversation={currentConversation}
-        onSendMessage={handleSendMessage}
-        onAbort={handleAbort}
-        isLoading={isLoading}
-        councilConfigured={councilConfigured}
-        councilModels={councilModels}
-        chairmanModel={chairmanModel}
-        searchProvider={searchProvider}
-        onOpenSettings={handleOpenSettings}
-        executionMode={executionMode}
-        onExecutionModeChange={setExecutionMode}
-      />
+      {essayFlowVisible ? (
+        <EssayFlow
+          key={essayFlowKey}
+          onComplete={handleEssayFlowComplete}
+          isBusy={isLoading}
+        />
+      ) : (
+        <ChatInterface
+          conversation={currentConversation}
+          onSendMessage={handleSendMessage}
+          onAbort={handleAbort}
+          onRegenerate={handleRegenerate}
+          isLoading={isLoading}
+          councilConfigured={councilConfigured}
+          councilModels={councilModels}
+          chairmanModel={chairmanModel}
+          searchProvider={searchProvider}
+          onOpenSettings={handleOpenSettings}
+          executionMode={executionMode}
+          onExecutionModeChange={setExecutionMode}
+          essayMode={essayMode}
+          onEssayModeChange={setEssayMode}
+          activeCouncil={currentCouncil}
+          activeWordTarget={currentWordTarget}
+        />
+      )}
       {showSettings && (
         <Settings
           onClose={handleSettingsClose}
@@ -728,6 +873,22 @@ function App() {
         />
       )}
     </div>
+  );
+}
+
+function AuthGate() {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+  return <AppShell />;
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
   );
 }
 

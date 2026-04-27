@@ -11,11 +11,36 @@ import json
 import asyncio
 
 from . import storage
-from .council import generate_conversation_title, generate_search_query, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings, PROVIDERS
+from fastapi import Depends
+from .auth import AuthUser, get_current_user, router as auth_router
+from .council import (
+    generate_conversation_title,
+    generate_search_query,
+    stage1_collect_responses,
+    stage2_collect_rankings,
+    stage3_synthesize_final,
+    calculate_aggregate_rankings,
+    resolve_council_config,
+    PROVIDERS,
+)
+from .council_config import (
+    factory_council_config,
+    router as council_config_router,
+)
 from .search import perform_web_search, SearchProvider
+from .sessions import router as sessions_router
 from .settings import get_settings, update_settings, Settings, DEFAULT_COUNCIL_MODELS, DEFAULT_CHAIRMAN_MODEL, AVAILABLE_MODELS
+from .supabase_client import get_supabase
+from .voice_profile import VoiceProfile, get_voice_profile, save_voice_profile
 
 app = FastAPI(title="LLM Council Plus API")
+
+# Phase 1 (Supabase auth): /auth/signup, /auth/login, /auth/logout, /auth/me
+app.include_router(auth_router)
+# Phase 3 (3-step input flow): /sessions/* — auth-required
+app.include_router(sessions_router)
+# Extension #1: per-user default council config (auth-required)
+app.include_router(council_config_router)
 
 # Enable CORS for local development and network access
 # Allow requests from any hostname on ports 5173 and 3000 (frontend)
@@ -38,6 +63,15 @@ class SendMessageRequest(BaseModel):
     content: str
     web_search: bool = False
     execution_mode: str = "full"  # 'chat_only', 'chat_ranking', 'full'
+    # Phase 4: how to interpret `content`
+    #   'topic' -> the user supplied an essay topic; council writes from scratch
+    #   'draft' -> the user supplied their own draft; council refines while preserving voice
+    essay_mode: str = "topic"
+    # Extension #1: optional pointer to an essay_sessions row. When provided,
+    # the backend pulls word_target + council_config off that session and uses
+    # them for stage 1/2/3. Falls back to the user's default council config if
+    # the session has no override, then to factory defaults.
+    session_id: Optional[str] = None
 
 
 class ConversationMetadata(BaseModel):
@@ -95,8 +129,22 @@ async def delete_conversation(conversation_id: str):
 
 
 @app.post("/api/conversations/{conversation_id}/message/stream")
-async def send_message_stream(conversation_id: str, body: SendMessageRequest, request: Request):
-    """Send a message and stream the 3-stage council process."""
+async def send_message_stream(
+    conversation_id: str,
+    body: SendMessageRequest,
+    request: Request,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Send a message and stream the 3-stage council process.
+
+    Auth-required (extension #1). Resolves the council config to use in the
+    following order:
+        1. body.session_id -> essay_sessions.council_config (per-essay override)
+        2. user_council_config row (per-user default)
+        3. factory_council_config() (built-in default)
+
+    Same precedence for `word_target`.
+    """
     # Validate execution_mode
     valid_modes = ["chat_only", "chat_ranking", "full"]
     if body.execution_mode not in valid_modes:
@@ -104,7 +152,15 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
             status_code=400,
             detail=f"Invalid execution_mode. Must be one of: {valid_modes}"
         )
-    
+
+    # Validate essay_mode (Phase 4)
+    valid_essay_modes = ["topic", "draft"]
+    if body.essay_mode not in valid_essay_modes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid essay_mode. Must be one of: {valid_essay_modes}"
+        )
+
     # Check if conversation exists
     conversation = storage.get_conversation(conversation_id)
     if conversation is None:
@@ -112,6 +168,54 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
 
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
+
+    # ------------------------------------------------------------------
+    # Resolve the council config + word target for this request.
+    # ------------------------------------------------------------------
+    supabase = get_supabase()
+    raw_council_config: Optional[Dict[str, Any]] = None
+    word_target: Optional[int] = None
+
+    if body.session_id:
+        try:
+            session_row = (
+                supabase.table("essay_sessions")
+                .select("council_config, word_target")
+                .eq("id", body.session_id)
+                .eq("user_id", user.id)
+                .limit(1)
+                .execute()
+            )
+            if session_row.data:
+                row = session_row.data[0]
+                raw_council_config = row.get("council_config")
+                word_target = row.get("word_target")
+        except Exception as e:
+            print(f"WARN: failed to load session {body.session_id} for council config: {e}")
+
+    if raw_council_config is None:
+        try:
+            ucc = (
+                supabase.table("user_council_config")
+                .select("personas, chairman_model")
+                .eq("user_id", user.id)
+                .limit(1)
+                .execute()
+            )
+            if ucc.data:
+                raw_council_config = {
+                    "personas": ucc.data[0].get("personas") or [],
+                    "chairman_model": ucc.data[0].get("chairman_model"),
+                }
+        except Exception as e:
+            print(f"WARN: failed to load user council config: {e}")
+
+    if raw_council_config is None:
+        raw_council_config = factory_council_config()
+
+    council_personas, council_models, chairman_override = resolve_council_config(
+        raw_council_config
+    )
 
     async def event_generator():
         try:
@@ -186,7 +290,15 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
             
             total_models = 0
             
-            async for item in stage1_collect_responses(body.content, search_context, request):
+            async for item in stage1_collect_responses(
+                body.content,
+                search_context,
+                request,
+                essay_mode=body.essay_mode,
+                council_models=council_models,
+                council_personas=council_personas,
+                word_target=word_target,
+            ):
                 if isinstance(item, int):
                     total_models = item
                     print(f"DEBUG: Sending stage1_init with total={total_models}")
@@ -243,7 +355,15 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
                     print("Client disconnected before Stage 3")
                     raise asyncio.CancelledError("Client disconnected")
 
-                stage3_result = await stage3_synthesize_final(body.content, stage1_results, stage2_results, search_context)
+                stage3_result = await stage3_synthesize_final(
+                    body.content,
+                    stage1_results,
+                    stage2_results,
+                    search_context,
+                    essay_mode=body.essay_mode,
+                    chairman_model_override=chairman_override,
+                    word_target=word_target,
+                )
                 yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
             # Wait for title generation if it was started
@@ -258,6 +378,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
             # Save complete assistant message with metadata
             metadata = {
                 "execution_mode": body.execution_mode,  # Save mode for historical context
+                "essay_mode": body.essay_mode,  # Phase 4: topic vs draft
             }
             
             # Only include stage2/stage3 metadata if they were executed
@@ -360,6 +481,10 @@ class UpdateSettingsRequest(BaseModel):
     stage2_prompt: Optional[str] = None
     stage3_prompt: Optional[str] = None
 
+    # Stage 1 council personas (Phase 1: essay-writing personas)
+    # Each entry: {"name": str, "description": str, "prompt": str}
+    council_personas: Optional[List[Dict[str, str]]] = None
+
 
 
 class TestTavilyRequest(BaseModel):
@@ -417,6 +542,9 @@ async def get_app_settings():
         "stage1_prompt": settings.stage1_prompt,
         "stage2_prompt": settings.stage2_prompt,
         "stage3_prompt": settings.stage3_prompt,
+
+        # Stage 1 council personas
+        "council_personas": [p.model_dump() for p in settings.council_personas],
     }
 
 
@@ -428,7 +556,8 @@ async def get_default_settings():
         STAGE1_PROMPT_DEFAULT,
         STAGE2_PROMPT_DEFAULT,
         STAGE3_PROMPT_DEFAULT,
-        TITLE_PROMPT_DEFAULT
+        TITLE_PROMPT_DEFAULT,
+        DEFAULT_COUNCIL_PERSONAS,
     )
     from .settings import DEFAULT_ENABLED_PROVIDERS
     return {
@@ -438,6 +567,7 @@ async def get_default_settings():
         "stage1_prompt": STAGE1_PROMPT_DEFAULT,
         "stage2_prompt": STAGE2_PROMPT_DEFAULT,
         "stage3_prompt": STAGE3_PROMPT_DEFAULT,
+        "council_personas": DEFAULT_COUNCIL_PERSONAS,
     }
 
 
@@ -492,6 +622,24 @@ async def update_app_settings(request: UpdateSettingsRequest):
         updates["stage2_prompt"] = request.stage2_prompt
     if request.stage3_prompt is not None:
         updates["stage3_prompt"] = request.stage3_prompt
+
+    # Stage 1 council personas (Phase 1: essay-writing personas)
+    if request.council_personas is not None:
+        from .settings import CouncilPersona
+        try:
+            updates["council_personas"] = [
+                CouncilPersona(
+                    name=p.get("name", ""),
+                    description=p.get("description", ""),
+                    prompt=p.get("prompt", ""),
+                )
+                for p in request.council_personas
+            ]
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid council_personas payload: {e}",
+            )
 
     if request.serper_api_key is not None:
         updates["serper_api_key"] = request.serper_api_key
@@ -623,7 +771,38 @@ async def update_app_settings(request: UpdateSettingsRequest):
         "stage1_prompt": settings.stage1_prompt,
         "stage2_prompt": settings.stage2_prompt,
         "stage3_prompt": settings.stage3_prompt,
+
+        # Stage 1 council personas
+        "council_personas": [p.model_dump() for p in settings.council_personas],
     }
+
+
+# ---------------------------------------------------------------------------
+# Voice Profile (Phase 2)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/voice-profile")
+async def api_get_voice_profile():
+    """Return the user's voice profile (rules, reference paragraphs, inferred style)."""
+    profile = get_voice_profile()
+    return profile.model_dump()
+
+
+@app.post("/api/voice-profile")
+async def api_save_voice_profile(profile: VoiceProfile):
+    """Persist the user's voice profile.
+
+    Request body matches `VoiceProfile`:
+        {
+          "rules": ["..."],
+          "reference_paragraphs": ["..."],
+          "inferred_style": "..."
+        }
+    Whitespace-only entries are dropped on save.
+    """
+    saved = save_voice_profile(profile)
+    return saved.model_dump()
 
 
 @app.get("/api/models/direct")
@@ -884,6 +1063,16 @@ async def get_custom_endpoint_models():
     provider = CustomOpenAIProvider()
     models = await provider.get_models()
     return {"models": models}
+
+
+@app.get("/api/models/curated")
+async def get_curated_models():
+    """Curated, essay-friendly OpenRouter model list for the council picker.
+
+    Public — no auth needed (just metadata, no API keys exposed).
+    """
+    from .settings import CURATED_COUNCIL_MODELS
+    return {"models": CURATED_COUNCIL_MODELS}
 
 
 @app.get("/api/models")
