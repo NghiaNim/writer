@@ -81,7 +81,8 @@ def _make_user() -> tuple[str, str]:
     # Sign in via the public auth route to get a JWT.
     res = _http("POST", "/auth/login", {"email": email, "password": password})
     _expect(res["status"] == 200, "login (POST /auth/login)", res)
-    token = res["json"]["session"]["access_token"]
+    token = res["json"].get("access_token")
+    _expect(bool(token), "login returns access_token", res["json"])
     return user_id, token
 
 
