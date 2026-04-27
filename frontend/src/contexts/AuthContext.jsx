@@ -98,6 +98,8 @@ export function AuthProvider({ children }) {
         });
     }, [clearSession]);
 
+    const clearError = useCallback(() => setError(null), []);
+
     const value = useMemo(
         () => ({
             token,
@@ -108,9 +110,9 @@ export function AuthProvider({ children }) {
             login,
             signup,
             logout,
-            clearError: () => setError(null),
+            clearError,
         }),
-        [token, user, loading, error, login, signup, logout]
+        [token, user, loading, error, login, signup, logout, clearError]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

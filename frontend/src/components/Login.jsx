@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { API_BASE } from '../api';
+import { API_BASE, warmUpBackend } from '../api';
 import './Login.css';
 
 /**
@@ -18,13 +18,34 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [localError, setLocalError] = useState(null);
     const [confirmationMessage, setConfirmationMessage] = useState(null);
+    // 'pending' until the warm-up ping returns; 'up' on success; 'down' on
+    // failure. Render's free tier sleeps after ~15min and takes 30-60s to
+    // wake; we surface this so users understand the first-attempt failure.
+    const [backendStatus, setBackendStatus] = useState('pending');
 
     useEffect(() => {
-        // Clear any stale error when the user toggles modes
+        let cancelled = false;
+        (async () => {
+            const latency = await warmUpBackend();
+            if (cancelled) return;
+            setBackendStatus(latency === null ? 'down' : 'up');
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        // Clear any stale error when the user toggles modes. Intentionally
+        // depends only on `mode` — earlier we also depended on `clearError`,
+        // but AuthContext recreated that function on every re-render, which
+        // caused the effect to fire after we set an error and silently wipe
+        // it before paint. Only mode changes should clear errors here.
         setLocalError(null);
         setConfirmationMessage(null);
         clearError();
-    }, [mode, clearError]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mode]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -59,10 +80,21 @@ export default function Login() {
             // if the on-screen render somehow fails.
             // eslint-disable-next-line no-console
             console.error(`[${mode}] failed against ${API_BASE}:`, e);
-            const msg =
-                e?.message ||
-                e?.toString?.() ||
-                'Something went wrong (no error message).';
+            let msg =
+                (typeof e?.message === 'string' && e.message.trim()) ||
+                (typeof e?.toString === 'function' && e.toString()) ||
+                '';
+            if (!msg || msg === '[object Object]') {
+                msg = `Something went wrong during ${mode} (no error message returned). See browser console for details.`;
+            }
+            // If the warm-up never came back, prepend a hint — the user is
+            // probably hitting a cold backend.
+            if (backendStatus !== 'up') {
+                msg =
+                    'The server is still waking up (Render free tier cold start). ' +
+                    'Wait ~30 seconds and try again.\n\nOriginal error: ' +
+                    msg;
+            }
             setLocalError(msg);
         }
     };
@@ -79,6 +111,17 @@ export default function Login() {
                         Your council of writers, in one place.
                     </p>
                 </div>
+
+                {backendStatus === 'pending' && (
+                    <div className="login-status pending" role="status">
+                        Waking up the server… (cold starts can take 30-60s)
+                    </div>
+                )}
+                {backendStatus === 'down' && (
+                    <div className="login-status down" role="status">
+                        Server isn't responding yet. Try again in a few seconds.
+                    </div>
+                )}
 
                 <div className="login-tabs" role="tablist">
                     <button

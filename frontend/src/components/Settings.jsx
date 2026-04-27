@@ -1488,12 +1488,11 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         <div className="settings-body">
           {/* Sidebar Navigation */}
           <div className="settings-sidebar">
-            <button
-              className={`sidebar-nav-item ${activeSection === 'llm_keys' ? 'active' : ''}`}
-              onClick={() => setActiveSection('llm_keys')}
-            >
-              LLM API Keys
-            </button>
+            {/* LLM API Keys tab intentionally hidden: the hosted product
+                supplies OPENROUTER_API_KEY server-side via env vars, so users
+                never need to configure keys. The section is still rendered
+                conditionally below for /admin use, but is unreachable from
+                the sidebar. */}
             <button
               className={`sidebar-nav-item ${activeSection === 'council' ? 'active' : ''}`}
               onClick={() => setActiveSection('council')}

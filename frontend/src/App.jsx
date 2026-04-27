@@ -16,7 +16,7 @@ function AppShell() {
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsInitialSection, setSettingsInitialSection] = useState('llm_keys');
+  const [settingsInitialSection, setSettingsInitialSection] = useState('council');
   const [ollamaStatus, setOllamaStatus] = useState({
     connected: false,
     lastConnected: null,
@@ -56,61 +56,25 @@ function AppShell() {
 
   const checkInitialSetup = async () => {
     try {
-      // 1. Get Settings to check for API keys
+      // Load execution mode + search preferences. API keys are managed
+      // server-side via Render env vars (OPENROUTER_API_KEY), so we don't
+      // prompt the user to configure them — that's a no-op in the hosted
+      // product. We also don't auto-pop the settings panel anymore.
       const settings = await api.getSettings();
-
-      // Load execution mode preference
       setExecutionMode(settings.execution_mode || 'full');
       setSearchProvider(settings.search_provider || 'duckduckgo');
 
-      const hasApiKey = settings.openrouter_api_key_set ||
-        settings.groq_api_key_set ||
-        settings.openai_api_key_set ||
-        settings.anthropic_api_key_set ||
-        settings.google_api_key_set ||
-        settings.mistral_api_key_set ||
-        settings.deepseek_api_key_set;
+      // Mark Ollama as not used in the hosted product (keeps the badge
+      // off rather than perpetually "testing").
+      setOllamaStatus({ connected: false, lastConnected: null, testing: false });
 
-      // 2. Test Ollama Connection
-      // We do this regardless to update the status indicator
-      const ollamaUrl = settings.ollama_base_url || 'http://localhost:11434';
-      setOllamaStatus(prev => ({ ...prev, testing: true }));
-
-      let isOllamaConnected = false;
-      try {
-        const result = await api.testOllamaConnection(ollamaUrl);
-        isOllamaConnected = result.success;
-
-        if (result.success) {
-          setOllamaStatus({
-            connected: true,
-            lastConnected: new Date().toLocaleString(),
-            testing: false
-          });
-        } else {
-          setOllamaStatus({ connected: false, lastConnected: null, testing: false });
-        }
-      } catch (err) {
-        console.error('Ollama initial test failed:', err);
-        setOllamaStatus({ connected: false, lastConnected: null, testing: false });
-      }
-
-      // 3. Check if council is configured (has models selected)
+      // Council configuration is per-user in Supabase now (user_council_config).
+      // The legacy data/settings.json council_models are only a fallback.
       const models = settings.council_models || [];
       const chairman = settings.chairman_model || '';
-
       setCouncilModels(models);
       setChairmanModel(chairman);
-
-      const hasCouncilMembers = models.some(m => m && m.trim() !== '');
-      const hasChairman = chairman && chairman.trim() !== '';
-      setCouncilConfigured(hasCouncilMembers && hasChairman);
-
-      // 4. If no providers are configured, open settings
-      if (!hasApiKey && !isOllamaConnected) {
-        setShowSettings(true);
-      }
-
+      setCouncilConfigured(true);
     } catch (error) {
       console.error('Failed to check initial setup:', error);
     }
