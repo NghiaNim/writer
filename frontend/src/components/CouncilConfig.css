@@ -122,8 +122,15 @@
   border-color: rgba(244, 114, 182, 0.55) !important;
 }
 
-.cc-free-toggle {
+.cc-controls {
   margin-top: 8px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.cc-free-toggle {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -134,8 +141,37 @@
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.75);
   cursor: pointer;
-  width: fit-content;
   user-select: none;
+}
+
+.cc-lucky {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  color: #fbbf24;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cc-lucky:hover:not(:disabled) {
+  background: rgba(251, 191, 36, 0.18);
+}
+
+.cc-lucky:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cc-warn code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: rgba(244, 114, 182, 0.95);
 }
 
 .cc-free-toggle input[type='checkbox'] {

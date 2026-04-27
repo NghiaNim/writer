@@ -46,13 +46,17 @@ router = APIRouter(prefix="/council-config", tags=["council-config"])
 # spec lets us use.
 # ---------------------------------------------------------------------------
 
+# Verified against the live OpenRouter catalog. Older IDs like
+# anthropic/claude-3.5-sonnet and google/gemini-pro-1.5 were deprecated and
+# silently rendered as empty selectors — these IDs are current as of the
+# 2026 catalog and span four different model families.
 DEFAULT_PERSONA_MODELS = {
-    "architect": "openrouter:anthropic/claude-3.5-sonnet",
+    "architect": "openrouter:anthropic/claude-sonnet-4",
     "editor": "openrouter:openai/gpt-4o",
-    "devils_advocate": "openrouter:google/gemini-pro-1.5",
-    "voice_guardian": "openrouter:meta-llama/llama-3.1-70b-instruct",
+    "devils_advocate": "openrouter:google/gemini-2.5-flash",
+    "voice_guardian": "openrouter:meta-llama/llama-3.3-70b-instruct",
 }
-DEFAULT_CHAIRMAN_MODEL = "openrouter:anthropic/claude-3.5-sonnet"
+DEFAULT_CHAIRMAN_MODEL = "openrouter:anthropic/claude-sonnet-4"
 
 
 def factory_council_config() -> Dict[str, Any]:

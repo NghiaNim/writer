@@ -149,6 +149,29 @@ export default function CouncilConfig({
     updateConfig({ ...config, chairman_model: model });
   };
 
+  // Set returning a fast id-lookup so we can flag saved values that aren't in
+  // the live catalog (e.g. OpenRouter deprecated the model). When the saved
+  // value isn't found, the SearchableModelSelect renders empty, so we explain
+  // why and prompt the user to pick a fresh one.
+  const allModelIds = useMemo(
+    () => new Set(allModels.map((m) => m.id)),
+    [allModels]
+  );
+
+  const handleFeelingLucky = () => {
+    if (visibleModels.length === 0) return;
+    const pick = () =>
+      visibleModels[Math.floor(Math.random() * visibleModels.length)].id;
+    const personas = orderedPersonas.map((p) =>
+      p.enabled ? { ...p, model: pick() } : p
+    );
+    updateConfig({
+      ...config,
+      personas,
+      chairman_model: pick(),
+    });
+  };
+
   const handleSave = async () => {
     if (!onSave) return;
     setSaving(true);
@@ -179,17 +202,28 @@ export default function CouncilConfig({
           write drafts in parallel, peer-review each other, then the Chairman
           synthesizes the final essay.
         </p>
-        <label className="cc-free-toggle">
-          <input
-            type="checkbox"
-            checked={freeOnly}
-            onChange={(e) => setFreeOnly(e.target.checked)}
-          />
-          <span>Free models only</span>
-          <span className="cc-free-count">
-            ({visibleModels.length} / {allModels.length} models)
-          </span>
-        </label>
+        <div className="cc-controls">
+          <label className="cc-free-toggle">
+            <input
+              type="checkbox"
+              checked={freeOnly}
+              onChange={(e) => setFreeOnly(e.target.checked)}
+            />
+            <span>Free models only</span>
+            <span className="cc-free-count">
+              ({visibleModels.length} / {allModels.length})
+            </span>
+          </label>
+          <button
+            type="button"
+            className="cc-lucky"
+            onClick={handleFeelingLucky}
+            disabled={visibleModels.length === 0}
+            title="Pick random models for every enabled member + chairman"
+          >
+            I&rsquo;m feeling lucky
+          </button>
+        </div>
       </div>
 
       <div className="cc-personas">
@@ -197,6 +231,8 @@ export default function CouncilConfig({
           const meta = PERSONA_META[p.key] || { name: p.key, blurb: '' };
           const enabled = !!p.enabled;
           const modelMissing = enabled && !p.model;
+          const modelStale =
+            enabled && p.model && allModelIds.size > 0 && !allModelIds.has(p.model);
           const blockDisable = enabled && enabledCount <= 2;
 
           return (
@@ -239,6 +275,12 @@ export default function CouncilConfig({
                   Pick a model or disable this member.
                 </div>
               )}
+              {modelStale && (
+                <div className="cc-warn">
+                  Saved model <code>{p.model}</code> isn&rsquo;t in the current
+                  catalog (likely deprecated). Pick a new one.
+                </div>
+              )}
             </div>
           );
         })}
@@ -254,6 +296,14 @@ export default function CouncilConfig({
           placeholder="Search and select a model…"
           isLoading={loadingModels}
         />
+        {config?.chairman_model &&
+          allModelIds.size > 0 &&
+          !allModelIds.has(config.chairman_model) && (
+            <div className="cc-warn">
+              Saved model <code>{config.chairman_model}</code> isn&rsquo;t in
+              the current catalog. Pick a new one.
+            </div>
+          )}
       </div>
 
       {showSave && onSave && (

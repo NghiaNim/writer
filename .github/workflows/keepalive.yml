@@ -1,0 +1,48 @@
+name: Keep Render warm
+
+# Render's free tier sleeps after ~15 minutes of inactivity. We hit /healthz
+# every 14 minutes so the user never lands on a cold instance. The workflow
+# is intentionally cheap: a single curl, no auth, no external dependencies.
+#
+# Note: GitHub-hosted runners only honor cron schedules every 5 minutes at
+# best, and even those can drift up to a few minutes during peak load. 14
+# minutes is the practical floor that still keeps the dyno warm.
+
+on:
+  schedule:
+    # 14 minutes is the safest interval for a 15-minute sleep window.
+    - cron: '*/14 * * * *'
+  workflow_dispatch:        # allow manual trigger from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping /healthz
+        env:
+          # Override in the repo's "Actions secrets and variables" → "Variables"
+          # if the backend lives somewhere else. Falls back to the current
+          # Render URL so this works out of the box.
+          BACKEND_URL: ${{ vars.BACKEND_URL || 'https://writer-1tp5.onrender.com' }}
+        run: |
+          set -euo pipefail
+          # Up to 90s for the cold start, retry 3x with 30s gaps. We accept
+          # any 2xx; anything else logs and fails the job so the schedule
+          # surfaces real outages.
+          for attempt in 1 2 3; do
+            echo "Attempt $attempt: GET $BACKEND_URL/healthz"
+            status=$(curl -s -o /tmp/body -w '%{http_code}' \
+              --max-time 90 "$BACKEND_URL/healthz" || echo "000")
+            echo "  HTTP $status"
+            if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+              cat /tmp/body
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Backend never returned a 2xx after 3 attempts."
+          exit 1
