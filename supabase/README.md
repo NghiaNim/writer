@@ -9,6 +9,7 @@ verification script to confirm everything is wired up.
 | --- | --- |
 | `migrations/001_initial.sql` | Creates `voice_profiles`, `essay_memory`, `essay_sessions`, with indexes, `updated_at` triggers, and Row Level Security policies. |
 | `migrations/002_essay_extensions.sql` | Adds `word_target` + `council_config` to `essay_sessions`, and creates `user_council_config` (per-user default council) with RLS. |
+| `migrations/003_voice_library_and_review_queue.sql` | Creates `voice_library` (read-only voice scaffolding pool); adds `pending_suggestions` + `preferred_authors` to `voice_profiles`; adds `voice_library_id`, `audience`, `intake_questions`, `core_idea` to `essay_sessions`. After applying, run `uv run python -m backend.scripts.seed_voice_library` to populate `voice_library` from the `voices/` folder. |
 
 All migrations are idempotent: re-running them is safe.
 

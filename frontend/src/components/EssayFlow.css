@@ -1,12 +1,26 @@
+/*
+ * Layout note (don't reintroduce the centering trap):
+ *
+ * The parent <main> has overflow: hidden, so .essay-flow is the scroll
+ * container. We deliberately do NOT use `align-items: center` here —
+ * combining a centered flex child with overflow makes the top of an
+ * over-tall card unreachable (the centered child tries to extend equally
+ * past both edges, but the scroll container can only scroll down). The
+ * fix is `margin-block: auto` on the card itself: distributes free space
+ * vertically when the card fits, collapses to 0 when it overflows so the
+ * scroll container can reach the top.
+ */
 .essay-flow {
     flex: 1;
     display: flex;
-    align-items: center;
     justify-content: center;
     padding: 48px 24px;
     overflow-y: auto;
+    overflow-x: hidden;
     box-sizing: border-box;
     min-height: 100%;
+    /* iOS / trackpad: keep momentum scrolling smooth inside the card stack */
+    -webkit-overflow-scrolling: touch;
 }
 
 .essay-flow-card {
@@ -20,6 +34,8 @@
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     animation: essay-flow-fade-in 0.35s ease-out both;
+    margin-block: auto;       /* center when shorter than viewport */
+    flex-shrink: 0;           /* never let flex squish the card */
 }
 
 @keyframes essay-flow-fade-in {
@@ -299,6 +315,16 @@
     max-height: 320px;
     overflow-y: auto;
     padding-right: 4px;
+}
+
+/* When the history is the primary editable surface (the new "questions"
+   step is a stack of textareas, not a scroll-back log), let it grow with
+   the card and rely on the outer .essay-flow scroll instead of an inner
+   inertial scroll, which feels broken on long forms. */
+.essay-flow-history.expand {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
 }
 
 .essay-flow-exchange {

@@ -3,7 +3,7 @@ import { api } from '../api';
 import CouncilConfig from './CouncilConfig';
 import './EssayFlow.css';
 
-// Word-target presets for the Step 3 picker. Tuned for college admissions /
+// Word-target presets for the Step 4 picker. Tuned for college admissions /
 // statement-of-purpose use cases.
 const WORD_TARGET_PRESETS = [
     { value: 250, label: '250', sub: 'short supplement' },
@@ -14,73 +14,56 @@ const WORD_TARGET_PRESETS = [
 const DEFAULT_WORD_TARGET = 650;
 
 /**
- * EssayFlow (Phase 3) — three-step intake before the council runs.
+ * EssayFlow — smart 4-step intake.
  *
- *   1. Topic                   single sentence, persisted as essay_sessions.topic
- *   2. The "so what" question  with a single gentle follow-up if the answer
- *                              is short or vague
- *   3. Path                    Help me write it (interactive Q&A, max 4 turns)
- *                              OR  I have a draft (paste, run council)
+ *   Step 1  topic        topic + audience ("I want to write about ___ for ___")
+ *   Step 2  questions    LLM-generated 3-5 probing questions, answered inline
+ *   Step 3  core idea    LLM-drafted 1-paragraph brief, user can refine
+ *   Step 4  voice        authors-you-admire + word target + council disclosure
  *
- * On Step 3 completion, calls `onComplete({ message, essayMode, sessionId })`.
- * App-level wiring then creates a conversation and pipes `message` through
- * the existing send-message-stream so the council can run with it.
+ * On Step 4 completion, calls `onComplete({ message, essayMode, sessionId,
+ * wordTarget, councilConfig })`. App.jsx then creates a conversation and pipes
+ * `message` through the existing send-message-stream so the council can run.
  *
- * The session row is persisted at every step transition so the user can
- * refresh and resume (resume UI itself comes in a later phase).
+ * Draft path: a small "I already have a draft" link on Step 1 jumps to a
+ * compact draft step that bypasses Steps 2 + 3 (we don't want to force a
+ * Q&A loop on someone who already wrote something).
+ *
+ * The session row is persisted at every transition so the user can refresh
+ * and resume.
  */
 
-const INTERACTIVE_PROMPTS = [
-    "What's your strongest example or piece of evidence for this?",
-    'Who are you writing for, and what would they push back on?',
-    'What structure do you imagine — argumentative, narrative, list, something else?',
-    'Anything else important — opening hook, must-include sections, length, tone?',
-];
-
-const VAGUE_PHRASES = [
-    'is bad',
-    'is good',
-    'is important',
-    'is great',
-    'is terrible',
-    'matters',
-    'is interesting',
-    'is useful',
-];
-
-function isShortOrVague(text) {
-    const trimmed = (text || '').trim();
-    if (!trimmed) return true;
-    const wordCount = trimmed.split(/\s+/).length;
-    if (wordCount < 15) return true;
-    const lower = trimmed.toLowerCase();
-    if (VAGUE_PHRASES.some((p) => lower.includes(p)) && wordCount < 25) return true;
-    return false;
-}
-
-function buildDraftMessage({ topic, soWhat, draft }) {
+function buildDraftMessage({ topic, audience, draft }) {
     return [
         `TOPIC: ${topic}`,
-        '',
-        `NON-OBVIOUS TAKE: ${soWhat || '(not provided)'}`,
+        audience ? `AUDIENCE: ${audience}` : '',
         '',
         "USER'S DRAFT:",
         (draft || '').trim(),
-    ].join('\n');
+    ]
+        .filter(Boolean)
+        .join('\n');
 }
 
-function buildInteractiveMessage({ topic, soWhat, exchanges }) {
-    const briefLines = exchanges
+function buildInteractiveMessage({ topic, audience, qa, coreIdea, authors }) {
+    const briefLines = qa
         .map(({ question, answer }) => `- Q: ${question}\n  A: ${(answer || '').trim()}`)
         .join('\n');
     return [
         `TOPIC: ${topic}`,
+        audience ? `AUDIENCE: ${audience}` : '',
         '',
-        `NON-OBVIOUS TAKE: ${soWhat || '(not provided)'}`,
+        coreIdea ? 'CORE IDEA:' : '',
+        coreIdea || '',
         '',
         'USER BRIEF (collected from a short prep conversation):',
         briefLines || '(no notes)',
-    ].join('\n');
+        authors && authors.length
+            ? `\nAUTHORS THE USER ADMIRES (lean toward this stylistic register without naming them in the essay): ${authors.join(', ')}`
+            : '',
+    ]
+        .filter(Boolean)
+        .join('\n');
 }
 
 
@@ -89,112 +72,244 @@ function buildInteractiveMessage({ topic, soWhat, exchanges }) {
 // ---------------------------------------------------------------------------
 
 export default function EssayFlow({ onComplete, isBusy = false }) {
-    // Step machine: 'topic' -> 'sowhat' -> 'path' -> ('interactive' | 'draft')
+    // Steps: 'topic' -> 'questions' -> 'core_idea' -> 'voice' (-> submit)
+    //                  | 'draft' (alternate path from Step 1)
     const [step, setStep] = useState('topic');
 
     // Persisted session row (created on Step 1 submit)
     const [session, setSession] = useState(null);
 
-    // Local form state
+    // Step 1 state
     const [topic, setTopic] = useState('');
-    const [soWhat, setSoWhat] = useState('');
-    const [showFollowup, setShowFollowup] = useState(false);
-    const [draft, setDraft] = useState('');
+    const [audience, setAudience] = useState('');
 
-    // Interactive Q&A state
-    const [exchanges, setExchanges] = useState([]);
-    const [currentAnswer, setCurrentAnswer] = useState('');
+    // Step 2 state
+    const [questions, setQuestions] = useState([]);
+    const [questionsLoading, setQuestionsLoading] = useState(false);
+    const [answers, setAnswers] = useState({}); // { [questionIdx]: 'answer text' }
 
-    const [memoryMatches, setMemoryMatches] = useState([]);
-    const [memoryDismissed, setMemoryDismissed] = useState(false);
+    // Step 3 state
+    const [coreIdea, setCoreIdea] = useState('');
+    const [coreIdeaLoading, setCoreIdeaLoading] = useState(false);
 
-    // Word-target + council overrides (extension #1). Both persist to the
-    // essay_sessions row before we kick off the council.
+    // Step 4 state
+    const [authorsText, setAuthorsText] = useState('');
     const [wordTarget, setWordTarget] = useState(DEFAULT_WORD_TARGET);
     const [customWordTarget, setCustomWordTarget] = useState('');
     const [councilConfig, setCouncilConfig] = useState(null);
     const [councilOpen, setCouncilOpen] = useState(false);
 
+    // Draft alternate path
+    const [draft, setDraft] = useState('');
+
+    // Memory-check banner (silent past-essay lookup)
+    const [memoryMatches, setMemoryMatches] = useState([]);
+    const [memoryDismissed, setMemoryDismissed] = useState(false);
+
     const [error, setError] = useState(null);
     const [submitting, setSubmitting] = useState(false);
 
     // Refs for autofocus
-    const topicInputRef = useRef(null);
-    const soWhatRef = useRef(null);
+    const topicRef = useRef(null);
     const draftRef = useRef(null);
-    const interactiveRef = useRef(null);
+    const coreIdeaRef = useRef(null);
 
     useEffect(() => {
-        if (step === 'topic') topicInputRef.current?.focus();
-        if (step === 'sowhat') soWhatRef.current?.focus();
+        if (step === 'topic') topicRef.current?.focus();
         if (step === 'draft') draftRef.current?.focus();
-        if (step === 'interactive') interactiveRef.current?.focus();
+        if (step === 'core_idea') coreIdeaRef.current?.focus();
     }, [step]);
 
     // -----------------------------------------------------------------------
-    // Step 1 — Topic
+    // Step 1 — Topic + Audience
     // -----------------------------------------------------------------------
     const handleSubmitTopic = async (e) => {
         e?.preventDefault?.();
         setError(null);
-        const trimmed = topic.trim();
-        if (!trimmed) {
-            setError('Please describe what your essay is about.');
+        const trimmedTopic = topic.trim();
+        if (!trimmedTopic) {
+            setError('Tell me what your essay is about.');
             return;
         }
         setSubmitting(true);
         try {
-            const created = await api.sessions.create(trimmed);
+            const created = await api.sessions.create(trimmedTopic);
             setSession(created);
             // Memory-check is non-blocking. Failures are silent.
             api.sessions
-                .memoryCheck(trimmed)
+                .memoryCheck(trimmedTopic)
                 .then((res) => {
                     if (res?.found && Array.isArray(res.matches)) {
                         setMemoryMatches(res.matches);
                     }
                 })
                 .catch(() => {});
-            setStep('sowhat');
-        } catch (e) {
-            setError(e.message || 'Could not start the session.');
+
+            // Kick off questions LLM call as we transition.
+            setStep('questions');
+            setQuestionsLoading(true);
+            try {
+                const res = await api.intake.questions({
+                    topic: trimmedTopic,
+                    audience: audience.trim(),
+                });
+                setQuestions(Array.isArray(res?.questions) ? res.questions : []);
+            } catch (err) {
+                console.warn('intake/questions failed:', err);
+                setQuestions([
+                    "What's the strongest specific moment, scene, or example you'd build this around?",
+                    "What's the non-obvious thing you want this audience to understand?",
+                    "What contradiction or tension lives inside this topic for you?",
+                ]);
+            } finally {
+                setQuestionsLoading(false);
+            }
+        } catch (err) {
+            setError(err.message || 'Could not start the session.');
         } finally {
             setSubmitting(false);
         }
     };
 
-    // -----------------------------------------------------------------------
-    // Step 2 — "So what?"
-    // -----------------------------------------------------------------------
-    const handleSubmitSoWhat = async ({ skipFollowup = false } = {}) => {
+    const handleJumpToDraft = async () => {
         setError(null);
-        const trimmed = soWhat.trim();
-        if (!skipFollowup && !showFollowup && isShortOrVague(trimmed)) {
-            // Show one gentle follow-up; user can still skip.
-            setShowFollowup(true);
-            return;
-        }
-        if (!trimmed) {
-            setError("Add something for the 'so what' before continuing.");
+        const trimmedTopic = topic.trim();
+        if (!trimmedTopic) {
+            setError('Tell me what your essay is about first.');
             return;
         }
         setSubmitting(true);
         try {
-            await api.sessions.update(session.id, { so_what_answer: trimmed });
-            setStep('path');
-        } catch (e) {
-            setError(e.message || 'Could not save your answer.');
+            let s = session;
+            if (!s) {
+                s = await api.sessions.create(trimmedTopic);
+                setSession(s);
+            }
+            await api.sessions.update(s.id, {
+                path: 'draft',
+                ...(audience.trim() ? { /* audience persisted on intake/core-idea below */ } : {}),
+            });
+            setStep('draft');
+        } catch (err) {
+            setError(err.message || 'Could not switch to draft mode.');
         } finally {
             setSubmitting(false);
         }
     };
 
     // -----------------------------------------------------------------------
-    // Step 3 — Choose your path
+    // Step 2 — Answer the LLM-generated questions
     // -----------------------------------------------------------------------
-    const handleChoosePath = async (path) => {
+    const allQuestionsAnswered = useMemo(() => {
+        if (!questions.length) return false;
+        return questions.every((_, i) => (answers[i] || '').trim().length > 0);
+    }, [questions, answers]);
+
+    const handleAnswerChange = (idx, value) => {
+        setAnswers((prev) => ({ ...prev, [idx]: value }));
+    };
+
+    const handleSubmitAnswers = async () => {
         setError(null);
-        // Validate council config (if user opened the disclosure and customized).
+        if (!allQuestionsAnswered) {
+            setError('Add at least a sentence to each question (or use the link below to skip a few).');
+            return;
+        }
+        await advanceToCoreIdea();
+    };
+
+    const handleSkipRemaining = async () => {
+        setError(null);
+        const answeredCount = questions.filter((_, i) => (answers[i] || '').trim()).length;
+        if (answeredCount < 1) {
+            setError('Answer at least one question before continuing.');
+            return;
+        }
+        await advanceToCoreIdea();
+    };
+
+    const advanceToCoreIdea = async () => {
+        setSubmitting(true);
+        try {
+            const qa = questions
+                .map((q, i) => ({ question: q, answer: (answers[i] || '').trim() }))
+                .filter((item) => item.answer);
+            await api.sessions.update(session.id, {
+                conversation: qa,
+            });
+            setStep('core_idea');
+            setCoreIdeaLoading(true);
+            try {
+                const res = await api.intake.coreIdea({
+                    topic: topic.trim(),
+                    audience: audience.trim(),
+                    qa,
+                    sessionId: session.id,
+                });
+                setCoreIdea(res?.core_idea || '');
+            } catch (err) {
+                console.warn('intake/core-idea failed:', err);
+                setCoreIdea('');
+            } finally {
+                setCoreIdeaLoading(false);
+            }
+        } catch (err) {
+            setError(err.message || 'Could not save your answers.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // Step 3 — Approve / refine the core idea brief
+    // -----------------------------------------------------------------------
+    const handleApproveCoreIdea = async () => {
+        setError(null);
+        const trimmed = (coreIdea || '').trim();
+        if (!trimmed) {
+            setError('Add at least a sentence to your core idea before continuing.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            await api.sessions.update(session.id, { core_idea: trimmed });
+            setStep('voice');
+        } catch (err) {
+            setError(err.message || 'Could not save the core idea.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // -----------------------------------------------------------------------
+    // Step 4 — Voice setup + word target + council overrides
+    // -----------------------------------------------------------------------
+    const handlePickPreset = (value) => {
+        setWordTarget(value);
+        setCustomWordTarget('');
+    };
+
+    const handleCustomWordTarget = (raw) => {
+        setCustomWordTarget(raw);
+        const n = parseInt(raw, 10);
+        if (Number.isFinite(n) && n >= 50 && n <= 5000) {
+            setWordTarget(n);
+        }
+    };
+
+    const isPresetActive = (value) =>
+        wordTarget === value && !customWordTarget;
+
+    const parseAuthors = (raw) =>
+        (raw || '')
+            .split(/[,\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .slice(0, 5);
+
+    const handleStartCouncil = async () => {
+        setError(null);
+        // Validate council config (if user opened the disclosure).
         if (councilConfig) {
             const enabledCount = (councilConfig.personas || []).filter((p) => p.enabled).length;
             if (enabledCount < 2) {
@@ -213,14 +328,11 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
                 return;
             }
         }
+
+        const authors = parseAuthors(authorsText);
         setSubmitting(true);
         try {
-            const patch = { path };
-            if (path === 'interactive') {
-                patch.conversation = [];
-            }
-            // Persist user's word-target + council overrides on the session
-            // so the streaming endpoint can resolve them via session_id.
+            const patch = { path: 'interactive', status: 'ready' };
             if (typeof wordTarget === 'number' && wordTarget > 0) {
                 patch.word_target = wordTarget;
             }
@@ -228,30 +340,44 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
                 patch.council_config = councilConfig;
             }
             await api.sessions.update(session.id, patch);
-            setStep(path === 'draft' ? 'draft' : 'interactive');
-        } catch (e) {
-            setError(e.message || 'Could not save your choice.');
+
+            // Save preferred authors onto the user's voice profile so future
+            // essays inherit them. Best-effort — failure shouldn't block run.
+            if (authors.length) {
+                try {
+                    await api.voice.save({ preferred_authors: authors });
+                } catch (err) {
+                    console.warn('voice.save preferred_authors failed:', err);
+                }
+            }
+
+            const qa = questions
+                .map((q, i) => ({ question: q, answer: (answers[i] || '').trim() }))
+                .filter((item) => item.answer);
+            const message = buildInteractiveMessage({
+                topic: topic.trim(),
+                audience: audience.trim(),
+                qa,
+                coreIdea: coreIdea.trim(),
+                authors,
+            });
+            onComplete?.({
+                message,
+                essayMode: 'topic',
+                sessionId: session.id,
+                wordTarget,
+                councilConfig,
+            });
+        } catch (err) {
+            setError(err.message || 'Could not start the council.');
         } finally {
             setSubmitting(false);
         }
     };
 
-    const handlePickPreset = (value) => {
-        setWordTarget(value);
-        setCustomWordTarget('');
-    };
-
-    const handleCustomWordTarget = (raw) => {
-        setCustomWordTarget(raw);
-        const n = parseInt(raw, 10);
-        if (Number.isFinite(n) && n >= 50 && n <= 5000) {
-            setWordTarget(n);
-        }
-    };
-
-    const isPresetActive = (value) =>
-        wordTarget === value && !customWordTarget;
-
+    // -----------------------------------------------------------------------
+    // Draft alternate path
+    // -----------------------------------------------------------------------
     const handleSubmitDraft = async () => {
         setError(null);
         const trimmedDraft = draft.trim();
@@ -259,15 +385,17 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
             setError('Paste at least a few sentences before running the council.');
             return;
         }
+        // Default word target + no council override on the draft path.
         setSubmitting(true);
         try {
             await api.sessions.update(session.id, {
                 draft: trimmedDraft,
                 status: 'ready',
+                word_target: wordTarget,
             });
             const message = buildDraftMessage({
                 topic: topic.trim(),
-                soWhat: soWhat.trim(),
+                audience: audience.trim(),
                 draft: trimmedDraft,
             });
             onComplete?.({
@@ -275,78 +403,10 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
                 essayMode: 'draft',
                 sessionId: session.id,
                 wordTarget,
-                councilConfig,
+                councilConfig: null,
             });
-        } catch (e) {
-            setError(e.message || 'Could not save your draft.');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    // Interactive sub-flow
-    const interactiveQuestion = useMemo(() => {
-        if (exchanges.length >= INTERACTIVE_PROMPTS.length) return null;
-        return INTERACTIVE_PROMPTS[exchanges.length];
-    }, [exchanges]);
-
-    const persistInteractive = async (nextExchanges, finalize) => {
-        const patch = {
-            conversation: nextExchanges,
-        };
-        if (finalize) {
-            patch.status = 'ready';
-        }
-        try {
-            await api.sessions.update(session.id, patch);
-        } catch (e) {
-            // Non-blocking: persistence failure shouldn't trap the user
-            // mid-flow. Surface but allow them to keep going.
-            setError('Could not save your last answer (will try again).');
-            // eslint-disable-next-line no-console
-            console.warn('persistInteractive failed:', e);
-        }
-    };
-
-    const handleAnswerInteractive = async () => {
-        const answer = currentAnswer.trim();
-        if (!answer) {
-            setError('Add a quick answer (or click "Ready to write" to finish early).');
-            return;
-        }
-        setError(null);
-        const next = [...exchanges, { question: interactiveQuestion, answer }];
-        setExchanges(next);
-        setCurrentAnswer('');
-        if (next.length >= INTERACTIVE_PROMPTS.length) {
-            await persistInteractive(next, true);
-            finishInteractive(next);
-        } else {
-            persistInteractive(next, false);
-        }
-    };
-
-    const finishInteractive = (finalExchanges) => {
-        const message = buildInteractiveMessage({
-            topic: topic.trim(),
-            soWhat: soWhat.trim(),
-            exchanges: finalExchanges,
-        });
-        onComplete?.({
-            message,
-            essayMode: 'topic',
-            sessionId: session.id,
-            wordTarget,
-            councilConfig,
-        });
-    };
-
-    const handleReadyToWrite = async () => {
-        setError(null);
-        setSubmitting(true);
-        try {
-            await persistInteractive(exchanges, true);
-            finishInteractive(exchanges);
+        } catch (err) {
+            setError(err.message || 'Could not save your draft.');
         } finally {
             setSubmitting(false);
         }
@@ -356,33 +416,58 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
     // Render
     // -----------------------------------------------------------------------
     const disabled = submitting || isBusy;
+    const showTopicChip = step !== 'topic';
 
     return (
         <div className="essay-flow">
             <div className="essay-flow-card">
-                {/* topic chip on every step after the first */}
-                {step !== 'topic' && (
+                {showTopicChip && (
                     <div className="essay-flow-topic-chip" title={topic}>
                         Topic: <span>{topic}</span>
+                        {audience && (
+                            <>
+                                <span style={{ opacity: 0.5, margin: '0 4px' }}>·</span>
+                                <span>for {audience}</span>
+                            </>
+                        )}
                     </div>
                 )}
 
                 {step === 'topic' && (
                     <form onSubmit={handleSubmitTopic} className="essay-flow-step">
                         <h1 className="essay-flow-question">What is your essay about?</h1>
-                        <p className="essay-flow-hint">One sentence is enough.</p>
+                        <p className="essay-flow-hint">
+                            One sentence on the topic, plus who it's for.
+                        </p>
                         <input
-                            ref={topicInputRef}
+                            ref={topicRef}
                             type="text"
                             value={topic}
                             onChange={(e) => setTopic(e.target.value)}
-                            placeholder="e.g. Why remote work makes cities worse over time"
+                            placeholder="e.g. The summer I learned my mother had been a smuggler"
                             disabled={disabled}
                             className="essay-flow-input"
                             maxLength={500}
                         />
+                        <input
+                            type="text"
+                            value={audience}
+                            onChange={(e) => setAudience(e.target.value)}
+                            placeholder="Audience — e.g. an MIT admissions officer, a creative writing professor"
+                            disabled={disabled}
+                            className="essay-flow-input"
+                            maxLength={250}
+                        />
                         {error && <div className="essay-flow-error">{error}</div>}
                         <div className="essay-flow-actions">
+                            <button
+                                type="button"
+                                className="essay-flow-link"
+                                onClick={handleJumpToDraft}
+                                disabled={disabled || !topic.trim()}
+                            >
+                                I already have a draft →
+                            </button>
                             <button
                                 type="submit"
                                 className="essay-flow-primary"
@@ -394,37 +479,18 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
                     </form>
                 )}
 
-                {step === 'sowhat' && (
+                {step === 'questions' && (
                     <div className="essay-flow-step">
-                        {!showFollowup ? (
-                            <>
-                                <h2 className="essay-flow-question">
-                                    What's the non-obvious thing you want to say about this?
-                                </h2>
-                                <p className="essay-flow-hint">
-                                    What would someone who already agrees with you still learn?
-                                </p>
-                            </>
-                        ) : (
-                            <>
-                                <h2 className="essay-flow-question">
-                                    Can you be more specific?
-                                </h2>
-                                <p className="essay-flow-hint">
-                                    What's your actual take — something most people wouldn't
-                                    immediately say?
-                                </p>
-                            </>
+                        <h2 className="essay-flow-question">A few quick questions</h2>
+                        <p className="essay-flow-hint">
+                            These help the council write something that actually sounds like you.
+                            Skim them — answers can be short.
+                        </p>
+                        {questionsLoading && (
+                            <div className="essay-flow-hint" style={{ opacity: 0.8 }}>
+                                Drafting questions for your topic…
+                            </div>
                         )}
-                        <textarea
-                            ref={soWhatRef}
-                            value={soWhat}
-                            onChange={(e) => setSoWhat(e.target.value)}
-                            placeholder="Write 1–3 sentences."
-                            rows={5}
-                            disabled={disabled}
-                            className="essay-flow-textarea"
-                        />
                         {memoryMatches.length > 0 && !memoryDismissed && (
                             <div className="essay-flow-memory" role="status">
                                 <span>
@@ -442,35 +508,111 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
                                 </button>
                             </div>
                         )}
+                        <div className="essay-flow-history expand">
+                            {questions.map((q, i) => (
+                                <div key={i} className="essay-flow-exchange">
+                                    <div className="essay-flow-exchange-q">{q}</div>
+                                    <textarea
+                                        value={answers[i] || ''}
+                                        onChange={(e) => handleAnswerChange(i, e.target.value)}
+                                        placeholder="Type a sentence or two…"
+                                        rows={2}
+                                        disabled={disabled}
+                                        className="essay-flow-textarea"
+                                        style={{ minHeight: 60 }}
+                                    />
+                                </div>
+                            ))}
+                        </div>
                         {error && <div className="essay-flow-error">{error}</div>}
                         <div className="essay-flow-actions">
-                            {showFollowup && (
-                                <button
-                                    type="button"
-                                    className="essay-flow-link"
-                                    onClick={() => handleSubmitSoWhat({ skipFollowup: true })}
-                                    disabled={disabled || !soWhat.trim()}
-                                >
-                                    Skip, use this
-                                </button>
-                            )}
+                            <button
+                                type="button"
+                                className="essay-flow-link"
+                                onClick={handleSkipRemaining}
+                                disabled={disabled || questionsLoading}
+                            >
+                                Skip the rest →
+                            </button>
                             <button
                                 type="button"
                                 className="essay-flow-primary"
-                                disabled={disabled || !soWhat.trim()}
-                                onClick={() => handleSubmitSoWhat()}
+                                onClick={handleSubmitAnswers}
+                                disabled={disabled || questionsLoading}
                             >
-                                {submitting ? 'Saving…' : 'This looks good → continue'}
+                                {submitting ? 'Saving…' : 'Continue'}
                             </button>
                         </div>
                     </div>
                 )}
 
-                {step === 'path' && (
+                {step === 'core_idea' && (
                     <div className="essay-flow-step">
-                        <h2 className="essay-flow-question">How do you want to start?</h2>
+                        <h2 className="essay-flow-question">Here's what the council heard</h2>
+                        <p className="essay-flow-hint">
+                            This is the spine the council will write to. Edit anything that doesn't
+                            sound like you yet.
+                        </p>
+                        {coreIdeaLoading ? (
+                            <div className="essay-flow-hint" style={{ opacity: 0.8 }}>
+                                Drafting your core idea…
+                            </div>
+                        ) : (
+                            <textarea
+                                ref={coreIdeaRef}
+                                value={coreIdea}
+                                onChange={(e) => setCoreIdea(e.target.value)}
+                                placeholder="Your core idea will appear here once drafted…"
+                                rows={8}
+                                disabled={disabled}
+                                className="essay-flow-textarea"
+                            />
+                        )}
+                        {error && <div className="essay-flow-error">{error}</div>}
+                        <div className="essay-flow-actions">
+                            <button
+                                type="button"
+                                className="essay-flow-link"
+                                onClick={() => setStep('questions')}
+                                disabled={disabled}
+                            >
+                                ← Back
+                            </button>
+                            <button
+                                type="button"
+                                className="essay-flow-primary"
+                                onClick={handleApproveCoreIdea}
+                                disabled={disabled || coreIdeaLoading || !coreIdea.trim()}
+                            >
+                                {submitting ? 'Saving…' : 'This works → continue'}
+                            </button>
+                        </div>
+                    </div>
+                )}
 
-                        {/* Word-target picker (extension #1) */}
+                {step === 'voice' && (
+                    <div className="essay-flow-step">
+                        <h2 className="essay-flow-question">Voice & length</h2>
+                        <p className="essay-flow-hint">
+                            Last step. The council will lean into the voice you describe here.
+                        </p>
+
+                        <div className="essay-flow-section">
+                            <div className="essay-flow-section-label">Authors you admire</div>
+                            <input
+                                type="text"
+                                value={authorsText}
+                                onChange={(e) => setAuthorsText(e.target.value)}
+                                placeholder="e.g. Joan Didion, Ocean Vuong, James Baldwin"
+                                disabled={disabled}
+                                className="essay-flow-input"
+                            />
+                            <div className="essay-flow-word-target-summary">
+                                Up to 5. Comma-separated. Used as a stylistic anchor — the council
+                                won't quote or name them in your essay.
+                            </div>
+                        </div>
+
                         <div className="essay-flow-section">
                             <div className="essay-flow-section-label">Target length</div>
                             <div className="essay-flow-word-targets">
@@ -512,7 +654,6 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
                             </div>
                         </div>
 
-                        {/* Council disclosure (extension #1) */}
                         <div className="essay-flow-section">
                             <button
                                 type="button"
@@ -527,7 +668,7 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
                                 <span>
                                     {councilOpen
                                         ? 'Hide council settings'
-                                        : 'Customize council for this essay'}
+                                        : 'Customize the council for this essay'}
                                 </span>
                                 <span className="essay-flow-disclosure-hint">
                                     {councilOpen ? '' : '(uses your default if untouched)'}
@@ -546,28 +687,22 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
                         </div>
 
                         {error && <div className="essay-flow-error">{error}</div>}
-                        <div className="essay-flow-paths">
+                        <div className="essay-flow-actions">
                             <button
                                 type="button"
-                                className="essay-flow-path-card"
+                                className="essay-flow-link"
+                                onClick={() => setStep('core_idea')}
                                 disabled={disabled}
-                                onClick={() => handleChoosePath('interactive')}
                             >
-                                <div className="essay-flow-path-title">Help me write it</div>
-                                <div className="essay-flow-path-desc">
-                                    Chat through your ideas first. We'll ask a few questions, then write.
-                                </div>
+                                ← Back
                             </button>
                             <button
                                 type="button"
-                                className="essay-flow-path-card"
+                                className="essay-flow-primary"
+                                onClick={handleStartCouncil}
                                 disabled={disabled}
-                                onClick={() => handleChoosePath('draft')}
                             >
-                                <div className="essay-flow-path-title">I have a draft</div>
-                                <div className="essay-flow-path-desc">
-                                    Paste what you have — even rough notes or bullet points.
-                                </div>
+                                {submitting ? 'Saving…' : 'Run the council'}
                             </button>
                         </div>
                     </div>
@@ -577,7 +712,8 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
                     <div className="essay-flow-step">
                         <h2 className="essay-flow-question">Paste your draft</h2>
                         <p className="essay-flow-hint">
-                            Rough is fine — bullet points, half-sentences, anything you have.
+                            Rough is fine — bullet points, half-sentences, anything you have. The
+                            council will refine it without flattening your voice.
                         </p>
                         <textarea
                             ref={draftRef}
@@ -588,12 +724,51 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
                             disabled={disabled}
                             className="essay-flow-textarea essay-flow-textarea-large"
                         />
+
+                        <div className="essay-flow-section">
+                            <div className="essay-flow-section-label">Target length</div>
+                            <div className="essay-flow-word-targets">
+                                {WORD_TARGET_PRESETS.map((p) => (
+                                    <button
+                                        key={p.value}
+                                        type="button"
+                                        className={`essay-flow-chip ${
+                                            isPresetActive(p.value) ? 'active' : ''
+                                        }`}
+                                        onClick={() => handlePickPreset(p.value)}
+                                        disabled={disabled}
+                                    >
+                                        <span className="chip-main">{p.label}</span>
+                                        <span className="chip-sub">{p.sub}</span>
+                                    </button>
+                                ))}
+                                <div
+                                    className={`essay-flow-chip custom ${
+                                        customWordTarget ? 'active' : ''
+                                    }`}
+                                >
+                                    <input
+                                        type="number"
+                                        min={50}
+                                        max={5000}
+                                        step={50}
+                                        placeholder="custom"
+                                        value={customWordTarget}
+                                        onChange={(e) => handleCustomWordTarget(e.target.value)}
+                                        disabled={disabled}
+                                        className="essay-flow-chip-input"
+                                    />
+                                    <span className="chip-sub">words</span>
+                                </div>
+                            </div>
+                        </div>
+
                         {error && <div className="essay-flow-error">{error}</div>}
                         <div className="essay-flow-actions">
                             <button
                                 type="button"
                                 className="essay-flow-link"
-                                onClick={() => setStep('path')}
+                                onClick={() => setStep('topic')}
                                 disabled={disabled}
                             >
                                 ← Back
@@ -607,78 +782,6 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
                                 {submitting ? 'Saving…' : 'Run the council'}
                             </button>
                         </div>
-                    </div>
-                )}
-
-                {step === 'interactive' && (
-                    <div className="essay-flow-step">
-                        <div className="essay-flow-progress">
-                            Question {Math.min(exchanges.length + 1, INTERACTIVE_PROMPTS.length)} of{' '}
-                            {INTERACTIVE_PROMPTS.length}
-                        </div>
-
-                        {exchanges.length > 0 && (
-                            <div className="essay-flow-history">
-                                {exchanges.map((ex, i) => (
-                                    <div key={i} className="essay-flow-exchange">
-                                        <div className="essay-flow-exchange-q">{ex.question}</div>
-                                        <div className="essay-flow-exchange-a">{ex.answer}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {interactiveQuestion ? (
-                            <>
-                                <h2 className="essay-flow-question essay-flow-question-small">
-                                    {interactiveQuestion}
-                                </h2>
-                                <textarea
-                                    ref={interactiveRef}
-                                    value={currentAnswer}
-                                    onChange={(e) => setCurrentAnswer(e.target.value)}
-                                    placeholder="Type your answer…"
-                                    rows={4}
-                                    disabled={disabled}
-                                    className="essay-flow-textarea"
-                                />
-                                {error && <div className="essay-flow-error">{error}</div>}
-                                <div className="essay-flow-actions">
-                                    <button
-                                        type="button"
-                                        className="essay-flow-link"
-                                        onClick={handleReadyToWrite}
-                                        disabled={disabled || exchanges.length === 0}
-                                        title={
-                                            exchanges.length === 0
-                                                ? 'Answer at least one question first'
-                                                : 'Stop here and run the council'
-                                        }
-                                    >
-                                        Ready to write →
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="essay-flow-primary"
-                                        disabled={disabled || !currentAnswer.trim()}
-                                        onClick={handleAnswerInteractive}
-                                    >
-                                        {submitting ? 'Saving…' : 'Next'}
-                                    </button>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="essay-flow-actions">
-                                <button
-                                    type="button"
-                                    className="essay-flow-primary"
-                                    onClick={handleReadyToWrite}
-                                    disabled={disabled}
-                                >
-                                    {submitting ? 'Saving…' : 'Run the council'}
-                                </button>
-                            </div>
-                        )}
                     </div>
                 )}
             </div>

@@ -554,32 +554,119 @@ export const api = {
   },
 
   /**
-   * Get the user's voice profile (Phase 2).
-   * Returns: { rules: string[], reference_paragraphs: string[], inferred_style: string }
+   * Voice profile (per-user, Supabase-backed).
+   * Shape: {
+   *   rules: string[],
+   *   reference_paragraphs: string[],
+   *   inferred_style: string,
+   *   preferred_authors: string[],
+   *   pending_suggestions: [{ id, rule, source, created_at }]
+   * }
+   *
+   * Save body only accepts user-editable fields:
+   *   { rules?, reference_paragraphs?, inferred_style?, preferred_authors? }
+   * The pending_suggestions queue is owned by suggestRules / accept / reject.
    */
-  async getVoiceProfile() {
-    const response = await authedFetch(`${API_BASE}/api/voice-profile`);
-    if (!response.ok) {
-      throw new Error('Failed to get voice profile');
-    }
-    return response.json();
+  voice: {
+    async get(essayType = 'general') {
+      const url = `${API_BASE}/api/voice-profile?essay_type=${encodeURIComponent(essayType)}`;
+      const response = await authedFetch(url);
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to load voice profile'));
+      }
+      return response.json();
+    },
+    async save(body, essayType = 'general') {
+      const url = `${API_BASE}/api/voice-profile?essay_type=${encodeURIComponent(essayType)}`;
+      const response = await authedFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to save voice profile'));
+      }
+      return response.json();
+    },
+    async suggestRules({ source = 'reference_paragraphs', text = null, essayType = 'general' } = {}) {
+      const response = await authedFetch(`${API_BASE}/api/voice-profile/suggest-rules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source, text, essay_type: essayType }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to extract rule suggestions'));
+      }
+      return response.json();
+    },
+    async acceptSuggestion(suggestionId, essayType = 'general') {
+      const response = await authedFetch(`${API_BASE}/api/voice-profile/accept-suggestion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suggestion_id: suggestionId, essay_type: essayType }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to accept suggestion'));
+      }
+      return response.json();
+    },
+    async rejectSuggestion(suggestionId, essayType = 'general') {
+      const response = await authedFetch(`${API_BASE}/api/voice-profile/reject-suggestion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suggestion_id: suggestionId, essay_type: essayType }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to reject suggestion'));
+      }
+      return response.json();
+    },
   },
 
   /**
-   * Save the user's voice profile (Phase 2).
+   * Smart intake helpers (single-LLM-call, no council).
+   *   POST /api/intake/questions   → { questions: string[] }
+   *   POST /api/intake/core-idea   → { core_idea: string }
    */
+  intake: {
+    async questions({ topic, audience = '', essayType = 'general' }) {
+      const response = await authedFetch(`${API_BASE}/api/intake/questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, audience, essay_type: essayType }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to generate questions'));
+      }
+      return response.json();
+    },
+    async coreIdea({ topic, audience = '', qa = [], essayType = 'general', sessionId = null }) {
+      const response = await authedFetch(`${API_BASE}/api/intake/core-idea`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic,
+          audience,
+          qa,
+          essay_type: essayType,
+          session_id: sessionId,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to draft core idea'));
+      }
+      return response.json();
+    },
+  },
+
+  // Backwards-compatible thin wrappers for the legacy code paths that still
+  // call `api.getVoiceProfile()` directly. Will be deleted once /voice page
+  // migration in App.jsx is finished.
+  async getVoiceProfile() {
+    return this.voice.get();
+  },
   async saveVoiceProfile(profile) {
-    const response = await authedFetch(`${API_BASE}/api/voice-profile`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(profile),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to save voice profile');
-    }
-    return response.json();
+    return this.voice.save(profile);
   },
 
   /**

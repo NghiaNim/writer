@@ -1726,13 +1726,20 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
             <button className="cancel-button" onClick={onClose}>
               Close
             </button>
-            <button
-              className="save-button"
-              onClick={handleSave}
-              disabled={isSaving || !hasChanges}
-            >
-              {isSaving ? 'Saving...' : (success ? 'Saved!' : 'Save Changes')}
-            </button>
+            {/* The Voice and Council tabs are self-saving (they have their
+                own Save button inside the section). Showing the global
+                footer Save here just renders a permanently-disabled
+                duplicate, which the user cannot tell from the live
+                in-section button. */}
+            {activeSection !== 'voice' && activeSection !== 'council' && (
+              <button
+                className="save-button"
+                onClick={handleSave}
+                disabled={isSaving || !hasChanges}
+              >
+                {isSaving ? 'Saving...' : (success ? 'Saved!' : 'Save Changes')}
+              </button>
+            )}
           </div>
         </div>
       </div>

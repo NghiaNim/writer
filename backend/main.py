@@ -31,9 +31,202 @@ from .search import perform_web_search, SearchProvider
 from .sessions import router as sessions_router
 from .settings import get_settings, update_settings, Settings, DEFAULT_COUNCIL_MODELS, DEFAULT_CHAIRMAN_MODEL, AVAILABLE_MODELS
 from .supabase_client import get_supabase
-from .voice_profile import VoiceProfile, get_voice_profile, save_voice_profile
+from .voice_profile import (
+    VoiceProfile,
+    VoiceProfileSaveBody,
+    load_voice_profile,
+    save_voice_profile,
+    add_suggestions,
+    accept_suggestion,
+    reject_suggestion,
+)
+from .voice_library import pick_random_voice, get_voice_by_id
 
 app = FastAPI(title="LLM Council Plus API")
+
+
+# ---------------------------------------------------------------------------
+# Lightweight one-shot LLM helpers (intake + voice-rule extraction)
+# ---------------------------------------------------------------------------
+#
+# These are deliberately *not* run through the council. Each is a single
+# strict-JSON call to a fast model. Failures fall back to safe defaults so
+# the UI never deadlocks waiting on a flaky completion.
+
+
+def _safe_json_loads(s: str) -> Optional[Dict[str, Any]]:
+    """Pull the first valid JSON object out of an LLM response."""
+    if not s:
+        return None
+    try:
+        return json.loads(s)
+    except Exception:
+        pass
+    import re as _r
+
+    m = _r.search(r"\{.*\}", s, flags=_r.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except Exception:
+            return None
+    return None
+
+
+async def _generate_intake_questions(topic: str, audience: str, essay_type: str) -> List[str]:
+    """Generate 3-5 probing questions tailored to topic+audience.
+
+    Returns a list of strings. On any failure, falls back to a small set of
+    safe, generic prompts so the UI keeps moving.
+    """
+    audience_part = f" The intended audience is: {audience}." if audience else ""
+    sys_prompt = (
+        "You are an essay coach helping a student articulate the most interesting "
+        "version of an idea. Given a topic and audience, ask 3-5 short, "
+        "high-leverage questions that surface a non-obvious thesis. Each question "
+        "should be one sentence, conversational, and aimed at uncovering "
+        "concrete details, contradictions, or surprising stakes. Avoid generic "
+        "writing-class prompts. Avoid 'why is this important?'."
+    )
+    user_prompt = (
+        f"TOPIC: {topic}.{audience_part}\n"
+        f"ESSAY TYPE: {essay_type}.\n\n"
+        "Return STRICT JSON, no prose:\n"
+        '{"questions": ["...", "...", "..."]}'
+    )
+    from .council import query_model
+
+    try:
+        res = await query_model(
+            _INTAKE_MODEL,
+            [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            timeout=45.0,
+            temperature=0.7,
+        )
+    except Exception as e:
+        print(f"WARN: intake questions LLM call failed: {e}")
+        res = None
+
+    parsed = _safe_json_loads((res or {}).get("content", "")) if res else None
+    if isinstance(parsed, dict):
+        qs = parsed.get("questions")
+        if isinstance(qs, list):
+            cleaned = [str(q).strip() for q in qs if str(q).strip()]
+            if 3 <= len(cleaned) <= 7:
+                return cleaned[:5]
+
+    # Fallback prompts. Generic enough to never be wrong, weak enough that
+    # we'll see in logs when the LLM call regressed.
+    return [
+        "What's the strongest specific moment, scene, or example you'd build this around?",
+        "What's the non-obvious thing you want this audience to understand?",
+        "What would someone who already agrees with you still learn?",
+        "What contradiction or tension lives inside this topic for you?",
+        "What's one detail you'd be embarrassed to leave out?",
+    ]
+
+
+async def _generate_core_idea(
+    topic: str, audience: str, qa: List[Dict[str, str]]
+) -> str:
+    """Distill the user's intake answers into a 1-paragraph core-idea brief."""
+    audience_part = f"\nAUDIENCE: {audience}" if audience else ""
+    qa_block = "\n".join(
+        f"- Q: {(item or {}).get('question','').strip()}\n  A: {(item or {}).get('answer','').strip()}"
+        for item in qa
+        if (item or {}).get("answer")
+    ) or "(no answers provided)"
+
+    sys_prompt = (
+        "You are an essay coach. Given a topic, audience, and a short Q&A "
+        "from the writer, write one tight paragraph (4-6 sentences) that "
+        "captures the core idea, the non-obvious claim, and the most "
+        "promising specific example or scene. Write directly, no hedging, "
+        "no preamble, no headings. Sound like the writer's own thinking, "
+        "sharpened. Output the paragraph only."
+    )
+    user_prompt = (
+        f"TOPIC: {topic}{audience_part}\n\n"
+        f"Q&A:\n{qa_block}\n\n"
+        "Now write the core-idea paragraph."
+    )
+    from .council import query_model
+
+    try:
+        res = await query_model(
+            _INTAKE_MODEL,
+            [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            timeout=60.0,
+            temperature=0.8,
+        )
+    except Exception as e:
+        print(f"WARN: core-idea LLM call failed: {e}")
+        return ""
+
+    if not res or res.get("error"):
+        return ""
+    content = (res.get("content") or "").strip()
+    return content
+
+
+async def _extract_voice_rules_via_llm(samples: List[str]) -> Dict[str, Any]:
+    """Read user voice samples and return {rules, inferred_style}.
+
+    Rules are short, prescriptive, and concrete (e.g. "no em-dashes",
+    "lean shorter sentences", "avoid 'delve into'"). Inferred style is a
+    1-2 sentence summary.
+    """
+    joined = "\n\n---\n\n".join(s.strip() for s in samples if s and s.strip())
+    if not joined:
+        return {"rules": [], "inferred_style": ""}
+
+    sys_prompt = (
+        "You are a writing-style analyst. Given one or more samples of a "
+        "user's writing, extract 5-8 short, concrete style rules another "
+        "model could follow to imitate their voice. Each rule must be one "
+        "imperative sentence under 90 characters. Skip platitudes; favor "
+        "specific moves (sentence length, punctuation habits, rhythm, "
+        "favored words to use or avoid). Then write a 1-2 sentence "
+        "'inferred_style' summary."
+    )
+    user_prompt = (
+        f"SAMPLES:\n{joined}\n\n"
+        "Return STRICT JSON, no prose:\n"
+        '{"rules": ["...", "..."], "inferred_style": "..."}'
+    )
+    from .council import query_model
+
+    try:
+        res = await query_model(
+            _INTAKE_MODEL,
+            [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            timeout=60.0,
+            temperature=0.4,
+        )
+    except Exception as e:
+        print(f"WARN: voice rule extraction failed: {e}")
+        return {"rules": [], "inferred_style": ""}
+
+    parsed = _safe_json_loads((res or {}).get("content", "")) if res else None
+    if not isinstance(parsed, dict):
+        return {"rules": [], "inferred_style": ""}
+    rules = parsed.get("rules") or []
+    if not isinstance(rules, list):
+        rules = []
+    cleaned_rules = [str(r).strip() for r in rules if str(r).strip()]
+    style = parsed.get("inferred_style") or ""
+    if not isinstance(style, str):
+        style = str(style)
+    return {"rules": cleaned_rules[:8], "inferred_style": style.strip()}
 
 # Phase 1 (Supabase auth): /auth/signup, /auth/login, /auth/logout, /auth/me
 app.include_router(auth_router)
@@ -251,6 +444,48 @@ async def send_message_stream(
         raw_council_config
     )
 
+    # ------------------------------------------------------------------
+    # Resolve the invisible voice-library scaffold for this run.
+    # If the session already picked one, reuse it (so re-runs of the same
+    # session keep the same voice anchor). Otherwise pick at random,
+    # seeded by session_id when available so re-runs are deterministic.
+    # ------------------------------------------------------------------
+    library_voice: Optional[Dict[str, Any]] = None
+    library_voice_id: Optional[str] = None
+    pinned_voice_id: Optional[str] = None
+    if body.session_id:
+        try:
+            v_row = (
+                supabase.table("essay_sessions")
+                .select("voice_library_id")
+                .eq("id", body.session_id)
+                .eq("user_id", user.id)
+                .limit(1)
+                .execute()
+            )
+            if v_row.data:
+                pinned_voice_id = v_row.data[0].get("voice_library_id")
+        except Exception as e:
+            print(f"WARN: failed to load voice_library_id for session {body.session_id}: {e}")
+
+    if pinned_voice_id:
+        library_voice = get_voice_by_id(pinned_voice_id)
+        if library_voice:
+            library_voice_id = pinned_voice_id
+
+    if library_voice is None:
+        library_voice = pick_random_voice(seed=body.session_id)
+        if library_voice:
+            library_voice_id = library_voice.get("id")
+            # Pin to the session for future re-runs.
+            if body.session_id and library_voice_id:
+                try:
+                    supabase.table("essay_sessions").update(
+                        {"voice_library_id": library_voice_id}
+                    ).eq("id", body.session_id).eq("user_id", user.id).execute()
+                except Exception as e:
+                    print(f"WARN: failed to pin voice_library_id on session: {e}")
+
     async def event_generator():
         try:
             # Initialize variables for metadata
@@ -332,6 +567,8 @@ async def send_message_stream(
                 council_models=council_models,
                 council_personas=council_personas,
                 word_target=word_target,
+                user_id=user.id,
+                library_voice=library_voice,
             ):
                 if isinstance(item, int):
                     total_models = item
@@ -397,6 +634,8 @@ async def send_message_stream(
                     essay_mode=body.essay_mode,
                     chairman_model_override=chairman_override,
                     word_target=word_target,
+                    user_id=user.id,
+                    library_voice=library_voice,
                 )
                 yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
@@ -812,31 +1051,189 @@ async def update_app_settings(request: UpdateSettingsRequest):
 
 
 # ---------------------------------------------------------------------------
-# Voice Profile (Phase 2)
+# Voice Profile (per-user, Supabase-backed)
 # ---------------------------------------------------------------------------
+#
+# The voice profile holds:
+#   * rules                — user-curated, AI-suggested but user-approved
+#   * reference_paragraphs — user's own writing samples
+#   * inferred_style       — short LLM summary of their voice
+#   * preferred_authors    — names of writers they admire (intake Step 4)
+#   * pending_suggestions  — review queue: AI-suggested rules awaiting
+#                             accept / reject decisions
+#
+# Suggested rules NEVER auto-commit. Only `accept-suggestion` moves a
+# pending entry into the canonical `rules` list.
 
 
 @app.get("/api/voice-profile")
-async def api_get_voice_profile():
-    """Return the user's voice profile (rules, reference paragraphs, inferred style)."""
-    profile = get_voice_profile()
+async def api_get_voice_profile(
+    essay_type: str = "general",
+    user: AuthUser = Depends(get_current_user),
+):
+    profile = load_voice_profile(user.id, essay_type=essay_type)
     return profile.model_dump()
 
 
 @app.post("/api/voice-profile")
-async def api_save_voice_profile(profile: VoiceProfile):
-    """Persist the user's voice profile.
-
-    Request body matches `VoiceProfile`:
-        {
-          "rules": ["..."],
-          "reference_paragraphs": ["..."],
-          "inferred_style": "..."
-        }
-    Whitespace-only entries are dropped on save.
-    """
-    saved = save_voice_profile(profile)
+async def api_save_voice_profile(
+    body: VoiceProfileSaveBody,
+    essay_type: str = "general",
+    user: AuthUser = Depends(get_current_user),
+):
+    """Save user-editable fields. The pending review queue is owned by the
+    /api/voice-profile/suggest|accept|reject endpoints and never written
+    here."""
+    saved = save_voice_profile(user.id, body, essay_type=essay_type)
     return saved.model_dump()
+
+
+class SuggestRulesRequest(BaseModel):
+    """Body for POST /api/voice-profile/suggest-rules.
+
+    `source` controls what we feed the LLM:
+      - 'reference_paragraphs' — the user's own samples (default)
+      - 'sample_text'           — a one-shot pasted text in `text`
+    """
+
+    source: str = "reference_paragraphs"
+    text: Optional[str] = None
+    essay_type: str = "general"
+
+
+@app.post("/api/voice-profile/suggest-rules")
+async def api_suggest_rules(
+    body: SuggestRulesRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Run a single LLM extraction pass and append candidate rules to the
+    user's pending-review queue. Returns the updated profile."""
+    profile = load_voice_profile(user.id, essay_type=body.essay_type)
+    samples: List[str] = []
+    if body.source == "sample_text" and body.text:
+        samples = [body.text.strip()]
+    else:
+        samples = list(profile.reference_paragraphs)
+
+    if not samples:
+        raise HTTPException(
+            status_code=400,
+            detail="No reference paragraphs available. Add a sample first or pass `text`.",
+        )
+
+    suggested = await _extract_voice_rules_via_llm(samples)
+    updated = add_suggestions(
+        user.id,
+        suggested.get("rules", []),
+        source="reference_paragraphs" if body.source != "sample_text" else "manual",
+        essay_type=body.essay_type,
+    )
+
+    inferred_style = (suggested.get("inferred_style") or "").strip()
+    if inferred_style and not (updated.inferred_style or "").strip():
+        updated = save_voice_profile(
+            user.id,
+            VoiceProfileSaveBody(inferred_style=inferred_style),
+            essay_type=body.essay_type,
+        )
+
+    return updated.model_dump()
+
+
+class SuggestionDecisionRequest(BaseModel):
+    suggestion_id: str
+    essay_type: str = "general"
+
+
+@app.post("/api/voice-profile/accept-suggestion")
+async def api_accept_suggestion(
+    body: SuggestionDecisionRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    return accept_suggestion(
+        user.id, body.suggestion_id, essay_type=body.essay_type
+    ).model_dump()
+
+
+@app.post("/api/voice-profile/reject-suggestion")
+async def api_reject_suggestion(
+    body: SuggestionDecisionRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    return reject_suggestion(
+        user.id, body.suggestion_id, essay_type=body.essay_type
+    ).model_dump()
+
+
+# ---------------------------------------------------------------------------
+# Smart intake (Phase: smart-intake)
+# ---------------------------------------------------------------------------
+#
+# Two single-LLM-call helpers used by the new EssayFlow:
+#
+#   POST /api/intake/questions   — generate 3-5 tailored probing questions
+#                                  given (topic, audience). Single call,
+#                                  no council.
+#   POST /api/intake/core-idea   — given the answers, distill a 1-paragraph
+#                                  brief. Single call, no council.
+
+
+_INTAKE_MODEL = "openrouter:anthropic/claude-sonnet-4"
+
+
+class IntakeQuestionsRequest(BaseModel):
+    topic: str
+    audience: str = ""
+    essay_type: str = "general"
+
+
+@app.post("/api/intake/questions")
+async def api_intake_questions(
+    body: IntakeQuestionsRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    if not (body.topic or "").strip():
+        raise HTTPException(status_code=400, detail="topic is required")
+    questions = await _generate_intake_questions(
+        topic=body.topic.strip(),
+        audience=(body.audience or "").strip(),
+        essay_type=(body.essay_type or "general").strip() or "general",
+    )
+    return {"questions": questions}
+
+
+class IntakeCoreIdeaRequest(BaseModel):
+    topic: str
+    audience: str = ""
+    essay_type: str = "general"
+    qa: List[Dict[str, str]] = []  # [{"question": "...", "answer": "..."}]
+    session_id: Optional[str] = None
+
+
+@app.post("/api/intake/core-idea")
+async def api_intake_core_idea(
+    body: IntakeCoreIdeaRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    if not (body.topic or "").strip():
+        raise HTTPException(status_code=400, detail="topic is required")
+    brief = await _generate_core_idea(
+        topic=body.topic.strip(),
+        audience=(body.audience or "").strip(),
+        qa=body.qa or [],
+    )
+    if body.session_id and brief:
+        try:
+            get_supabase().table("essay_sessions").update(
+                {
+                    "core_idea": brief,
+                    "audience": (body.audience or "").strip() or None,
+                    "intake_questions": body.qa or [],
+                }
+            ).eq("id", body.session_id).eq("user_id", user.id).execute()
+        except Exception as e:
+            print(f"WARN: persist core_idea failed: {e}")
+    return {"core_idea": brief}
 
 
 @app.get("/api/models/direct")

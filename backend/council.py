@@ -8,7 +8,8 @@ from . import ollama_client
 from .config import get_council_models, get_chairman_model
 from .search import perform_web_search, SearchProvider
 from .settings import CouncilPersona, get_settings
-from .voice_profile import format_voice_profile_block
+from .voice_profile import format_voice_profile_block, load_voice_profile, VoiceProfile
+from .voice_library import format_library_voice_block
 from .prompts import (
     DEFAULT_COUNCIL_PERSONAS,
     PERSONAS_BY_KEY,
@@ -190,6 +191,9 @@ async def stage1_collect_responses(
     council_models: Optional[List[str]] = None,
     council_personas: Optional[List[CouncilPersona]] = None,
     word_target: Optional[int] = None,
+    user_id: Optional[str] = None,
+    essay_type: str = "general",
+    library_voice: Optional[Dict[str, Any]] = None,
 ) -> Any:
     """
     Stage 1: Collect individual responses from all council models.
@@ -221,9 +225,21 @@ async def stage1_collect_responses(
         search_context_block = STAGE1_SEARCH_CONTEXT_TEMPLATE.format(search_context=search_context)
 
     # Render the user's voice profile (empty string if not configured).
-    # Available to every persona so users can opt-in via custom templates;
-    # by default only The Voice Guardian's template references it.
-    voice_profile_block = format_voice_profile_block()
+    # Loaded per-user from Supabase. Available to every persona so users
+    # can opt-in via custom templates; by default only The Voice Guardian's
+    # template references it.
+    profile: Optional[VoiceProfile] = None
+    if user_id:
+        try:
+            profile = load_voice_profile(user_id, essay_type=essay_type)
+        except Exception as e:
+            logger.warning("voice profile load failed for user=%s: %s", user_id, e)
+    voice_profile_block = format_voice_profile_block(profile)
+
+    # Library-voice scaffolding (invisible to user). Borrowed for rhythm /
+    # cadence only — content stays the user's. Empty string if no library
+    # voice is provided.
+    library_voice_block = format_library_voice_block(library_voice)
 
     # Phase 4: tell every persona explicitly whether the input is a topic
     # to expand into an essay or a draft to refine.
@@ -249,6 +265,7 @@ async def stage1_collect_responses(
                 user_query=user_query,
                 search_context_block=search_context_block,
                 voice_profile_block=voice_profile_block,
+                library_voice_block=library_voice_block,
                 essay_mode_block=essay_mode_block,
                 word_target_block=word_target_block,
             )
@@ -273,11 +290,19 @@ async def stage1_collect_responses(
             return personas[idx].name
         return ""
 
+    def _temp_for_index(idx: int) -> float:
+        """Per-persona temperature override falls back to council_temp."""
+        if idx < len(personas):
+            t = getattr(personas[idx], "temperature", None)
+            if isinstance(t, (int, float)) and 0.0 <= float(t) <= 2.0:
+                return float(t)
+        return council_temp
+
     async def _query_safe(idx: int, m: str):
         prompt = _build_prompt_for_index(idx)
         messages = [{"role": "user", "content": prompt}]
         try:
-            return idx, m, await query_model(m, messages, temperature=council_temp)
+            return idx, m, await query_model(m, messages, temperature=_temp_for_index(idx))
         except Exception as e:
             return idx, m, {"error": True, "error_message": str(e)}
 
@@ -488,6 +513,9 @@ async def stage3_synthesize_final(
     essay_mode: str = "topic",
     chairman_model_override: Optional[str] = None,
     word_target: Optional[int] = None,
+    user_id: Optional[str] = None,
+    essay_type: str = "general",
+    library_voice: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Stage 3: Chairman synthesizes final response.
@@ -525,9 +553,20 @@ async def stage3_synthesize_final(
         search_context_block = f"Context from Web Search:\n{search_context}\n"
 
     # Render the user's voice profile so the Chairman applies every rule
-    # before returning the final essay (Phase 2). Empty string when no
-    # profile is configured.
-    voice_profile_block = format_voice_profile_block()
+    # before returning the final essay (Phase 2). Loaded per-user from
+    # Supabase. Empty string when no profile is configured.
+    profile: Optional[VoiceProfile] = None
+    if user_id:
+        try:
+            profile = load_voice_profile(user_id, essay_type=essay_type)
+        except Exception as e:
+            logger.warning(
+                "Chairman: voice profile load failed for user=%s: %s", user_id, e
+            )
+    voice_profile_block = format_voice_profile_block(profile)
+
+    # Library voice scaffolding (invisible to user).
+    library_voice_block = format_library_voice_block(library_voice)
 
     # Phase 4: tell the Chairman whether this is topic-mode (write fresh)
     # or draft-mode (refine the user's draft).
@@ -549,6 +588,7 @@ async def stage3_synthesize_final(
             stage2_text=stage2_text,
             search_context_block=search_context_block,
             voice_profile_block=voice_profile_block,
+            library_voice_block=library_voice_block,
             essay_mode_block=essay_mode_block,
             word_target_block=word_target_block,
         )

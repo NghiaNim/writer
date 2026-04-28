@@ -25,7 +25,8 @@ Hosted essay-writing app. Auth-required. All LLM calls go through OpenRouter.
 | `backend/council_config.py` | `/council-config` router — per-user default council (Supabase `user_council_config`). |
 | `backend/council.py` | 3-stage orchestration. `resolve_council_config()` resolves personas+models per call. |
 | `backend/prompts.py` | Default persona prompts; `format_word_target_block()`; `PERSONA_KEYS`. |
-| `backend/voice_profile.py` | Per-user voice profile read/write. |
+| `backend/voice_profile.py` | Per-user voice profile (Supabase-backed). Rules / reference paragraphs / inferred style / preferred authors / pending-review queue. |
+| `backend/voice_library.py` | Invisible voice scaffolding: random pick from `voice_library`, rendered into Stage 1 + Chairman prompts. |
 | `backend/storage.py` | Conversation persistence (file-based, `data/conversations/{id}.json`). |
 | `backend/supabase_client.py` | Single `get_supabase()` client. |
 
@@ -61,8 +62,14 @@ GET    /sessions/memory-check?topic=...          authed — silent past-essay lo
 GET    /sessions/{id}                            authed
 PATCH  /sessions/{id}                            authed — accepts word_target, council_config
 
-GET    /api/voice-profile?essay_type=general     authed
-POST   /api/voice-profile                        authed — runs LLM extraction on reference paragraphs
+GET    /api/voice-profile?essay_type=general     authed — full profile incl. pending_suggestions
+POST   /api/voice-profile?essay_type=general     authed — body: {rules?, reference_paragraphs?, inferred_style?, preferred_authors?}
+POST   /api/voice-profile/suggest-rules          authed — runs LLM extraction; appends to pending_suggestions
+POST   /api/voice-profile/accept-suggestion      authed — promotes pending → rules
+POST   /api/voice-profile/reject-suggestion      authed — drops a pending entry
+
+POST   /api/intake/questions                     authed — single LLM call: 3-5 probing questions for topic+audience
+POST   /api/intake/core-idea                     authed — single LLM call: 1-paragraph brief from topic+audience+Q&A
 
 GET    /api/models                               full live OpenRouter catalog
 GET    /api/conversations                        list metadata
@@ -76,13 +83,27 @@ PUT    /api/settings                             legacy/admin
 
 ## Runtime config resolution (the truth)
 
-For every streamed message in `/api/conversations/{id}/message/stream`, the backend resolves council + word target in this order:
+For every streamed message in `/api/conversations/{id}/message/stream`, the backend resolves config in this order:
 
-1. `essay_sessions.council_config` / `.word_target` (per-essay override from EssayFlow Step 3)
+1. `essay_sessions.council_config` / `.word_target` (per-essay override from EssayFlow Step 4)
 2. `user_council_config` row (per-user default — `Settings → Council`)
 3. `factory_council_config()` (hardcoded in `council_config.py`)
 
 Same precedence for `word_target`. `data/settings.json` is **not** consulted for council selection in the auth path — only as an index-based fallback for missing model strings inside `resolve_council_config`.
+
+### Voice scaffolding
+
+For every run, the backend also picks one row from `voice_library` (44 example essays) and injects it as `{library_voice_block}` into Stage 1 personas + Chairman as a tonal anchor. Selection is seeded by `session_id` so re-runs of the same essay reuse the same anchor. The chosen `voice_library_id` is pinned on `essay_sessions`. **Users never see library content.**
+
+User voice profile (`voice_profiles` table, per `(user_id, essay_type)`) injects as `{voice_profile_block}` and overrides any stylistic preference of either the council or the library voice.
+
+### Temperatures (creativity-tuned for personal essays)
+
+- Stage 1 personas: **0.95** (council_temperature)
+- Voice Guardian persona override: **0.65** (cooler so it doesn't invent rules)
+- Stage 2 (peer ranking): **0.3** (must stay deterministic for parsing)
+- Stage 3 (Chairman): **0.85** (chairman_temperature)
+- `CouncilPersona.temperature` is an optional per-persona override; falls back to council_temperature when None.
 
 ## Conventions to preserve
 

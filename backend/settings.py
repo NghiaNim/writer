@@ -79,11 +79,17 @@ class CouncilPersona(BaseModel):
     per-user / per-essay council_config to refer to a persona independent of
     its position in this list. Older settings.json files won't have it, so
     it stays optional.
+
+    `temperature` is an optional per-persona override. If None, the council
+    falls back to `Settings.council_temperature`. The Voice Guardian uses a
+    cooler default so it doesn't invent voice rules when riffing on the
+    user's profile.
     """
     key: Optional[str] = None
     name: str
     description: str = ""
     prompt: str
+    temperature: Optional[float] = None
 
 
 def _default_personas() -> List["CouncilPersona"]:
@@ -127,9 +133,13 @@ class Settings(BaseModel):
     council_models: List[str] = DEFAULT_COUNCIL_MODELS.copy()
     chairman_model: str = DEFAULT_CHAIRMAN_MODEL
     
-    # Temperature Settings
-    council_temperature: float = 0.5
-    chairman_temperature: float = 0.4
+    # Temperature Settings — tuned hot for personal-essay creativity.
+    # Stage 1 personas draft at 0.95 (very risk-taking); Voice Guardian
+    # overrides to 0.65 via its persona.temperature so it doesn't
+    # hallucinate voice rules. Stage 2 stays low so peer ranking parses
+    # reliably. Stage 3 (Chairman) at 0.85 leaves room for bold synthesis.
+    council_temperature: float = 0.95
+    chairman_temperature: float = 0.85
     stage2_temperature: float = 0.3  # Lower for consistent ranking output
     
     # Remote/Local filters

@@ -10,6 +10,7 @@ const inputStyle = {
     borderRadius: '6px',
     fontFamily: 'inherit',
     fontSize: '14px',
+    boxSizing: 'border-box',
 };
 
 const cardStyle = {
@@ -20,10 +21,32 @@ const cardStyle = {
     marginBottom: '8px',
 };
 
+const pendingCardStyle = {
+    padding: '12px 14px',
+    background: 'rgba(251, 191, 36, 0.08)',
+    border: '1px solid rgba(251, 191, 36, 0.28)',
+    borderRadius: '8px',
+    marginBottom: '8px',
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '10px',
+};
+
 const removeButtonStyle = {
     background: 'transparent',
     color: '#f87171',
     border: '1px solid rgba(248, 113, 113, 0.4)',
+    borderRadius: '6px',
+    padding: '4px 10px',
+    fontSize: '12px',
+    cursor: 'pointer',
+};
+
+const acceptButtonStyle = {
+    background: 'rgba(34, 197, 94, 0.12)',
+    color: '#86efac',
+    border: '1px solid rgba(34, 197, 94, 0.4)',
     borderRadius: '6px',
     padding: '4px 10px',
     fontSize: '12px',
@@ -51,19 +74,64 @@ const secondaryButtonStyle = {
     fontSize: '13px',
 };
 
+const sectionLabelStyle = {
+    fontFamily: 'var(--font-display, inherit)',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#cbd5e1',
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
+    margin: '24px 0 8px',
+};
+
+/**
+ * Voice page (per-user, Supabase-backed).
+ *
+ * Sections:
+ *   1. Rules            — canonical, user-editable list. Add / delete / inline edit.
+ *   2. Pending review   — AI-suggested rules awaiting Accept / Reject. Never auto-commit.
+ *   3. Reference samples — user pastes their own writing; "Suggest rules" turns them into pending suggestions.
+ *   4. Preferred authors — names captured during intake, also editable here.
+ *   5. Inferred style   — short LLM-written summary, editable.
+ *
+ * Manual save persists rules / reference_paragraphs / inferred_style /
+ * preferred_authors. The review queue endpoints (suggest / accept / reject)
+ * mutate state independently and re-fetch.
+ */
 export default function VoiceProfileSettings() {
     const [rules, setRules] = useState([]);
     const [referenceParagraphs, setReferenceParagraphs] = useState([]);
+    const [preferredAuthors, setPreferredAuthors] = useState([]);
     const [inferredStyle, setInferredStyle] = useState('');
+    const [pendingSuggestions, setPendingSuggestions] = useState([]);
     const [savedSnapshot, setSavedSnapshot] = useState(null);
 
     const [newRule, setNewRule] = useState('');
     const [newParagraph, setNewParagraph] = useState('');
+    const [newAuthor, setNewAuthor] = useState('');
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [suggesting, setSuggesting] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
+
+    const computeSnapshot = (data) =>
+        JSON.stringify({
+            rules: data.rules || [],
+            reference_paragraphs: data.reference_paragraphs || [],
+            preferred_authors: data.preferred_authors || [],
+            inferred_style: data.inferred_style || '',
+        });
+
+    const applyProfile = (data) => {
+        setRules(data.rules || []);
+        setReferenceParagraphs(data.reference_paragraphs || []);
+        setPreferredAuthors(data.preferred_authors || []);
+        setInferredStyle(data.inferred_style || '');
+        setPendingSuggestions(data.pending_suggestions || []);
+        setSavedSnapshot(computeSnapshot(data));
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -71,18 +139,10 @@ export default function VoiceProfileSettings() {
             setLoading(true);
             setError(null);
             try {
-                const data = await api.getVoiceProfile();
-                if (cancelled) return;
-                setRules(data.rules || []);
-                setReferenceParagraphs(data.reference_paragraphs || []);
-                setInferredStyle(data.inferred_style || '');
-                setSavedSnapshot(JSON.stringify({
-                    rules: data.rules || [],
-                    reference_paragraphs: data.reference_paragraphs || [],
-                    inferred_style: data.inferred_style || '',
-                }));
-            } catch (err) {
-                if (!cancelled) setError('Failed to load voice profile');
+                const data = await api.voice.get();
+                if (!cancelled) applyProfile(data);
+            } catch (e) {
+                if (!cancelled) setError(e.message || 'Could not load voice profile.');
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -92,319 +152,383 @@ export default function VoiceProfileSettings() {
         };
     }, []);
 
-    const currentSnapshot = JSON.stringify({
+    const isDirty = savedSnapshot !== null && savedSnapshot !== computeSnapshot({
         rules,
         reference_paragraphs: referenceParagraphs,
+        preferred_authors: preferredAuthors,
         inferred_style: inferredStyle,
     });
-    const isDirty = savedSnapshot !== null && currentSnapshot !== savedSnapshot;
 
-    const handleAddRule = () => {
-        const trimmed = newRule.trim();
-        if (!trimmed) return;
-        setRules(prev => [...prev, trimmed]);
+    // ----- Rules -----
+    const addRule = () => {
+        const v = newRule.trim();
+        if (!v) return;
+        setRules((prev) => [...prev, v]);
         setNewRule('');
     };
 
-    const handleEditRule = (index, value) => {
-        setRules(prev => {
-            const next = [...prev];
-            next[index] = value;
-            return next;
-        });
-    };
+    const removeRule = (idx) => setRules((prev) => prev.filter((_, i) => i !== idx));
+    const editRule = (idx, value) =>
+        setRules((prev) => prev.map((r, i) => (i === idx ? value : r)));
 
-    const handleRemoveRule = (index) => {
-        setRules(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const handleAddParagraph = () => {
-        const trimmed = newParagraph.trim();
-        if (!trimmed) return;
-        setReferenceParagraphs(prev => [...prev, trimmed]);
+    // ----- Reference paragraphs -----
+    const addParagraph = () => {
+        const v = newParagraph.trim();
+        if (!v) return;
+        setReferenceParagraphs((prev) => [...prev, v]);
         setNewParagraph('');
     };
+    const removeParagraph = (idx) =>
+        setReferenceParagraphs((prev) => prev.filter((_, i) => i !== idx));
 
-    const handleRemoveParagraph = (index) => {
-        setReferenceParagraphs(prev => prev.filter((_, i) => i !== index));
+    // ----- Preferred authors -----
+    const addAuthor = () => {
+        const v = newAuthor.trim();
+        if (!v) return;
+        if (preferredAuthors.length >= 5) return;
+        setPreferredAuthors((prev) => [...prev, v]);
+        setNewAuthor('');
     };
+    const removeAuthor = (idx) =>
+        setPreferredAuthors((prev) => prev.filter((_, i) => i !== idx));
 
+    // ----- Save -----
     const handleSave = async () => {
         setSaving(true);
         setError(null);
         setSuccess(false);
         try {
-            const payload = {
-                rules: rules.map(r => r.trim()).filter(Boolean),
-                reference_paragraphs: referenceParagraphs.map(p => p.trim()).filter(Boolean),
-                inferred_style: inferredStyle.trim(),
-            };
-            const saved = await api.saveVoiceProfile(payload);
-            setRules(saved.rules || []);
-            setReferenceParagraphs(saved.reference_paragraphs || []);
-            setInferredStyle(saved.inferred_style || '');
-            setSavedSnapshot(JSON.stringify({
-                rules: saved.rules || [],
-                reference_paragraphs: saved.reference_paragraphs || [],
-                inferred_style: saved.inferred_style || '',
-            }));
+            const updated = await api.voice.save({
+                rules,
+                reference_paragraphs: referenceParagraphs,
+                preferred_authors: preferredAuthors,
+                inferred_style: inferredStyle,
+            });
+            applyProfile(updated);
             setSuccess(true);
-            setTimeout(() => setSuccess(false), 3000);
-        } catch (err) {
-            setError('Failed to save voice profile');
+            setTimeout(() => setSuccess(false), 2000);
+        } catch (e) {
+            setError(e.message || 'Could not save voice profile.');
         } finally {
             setSaving(false);
         }
     };
 
-    const handleAddRuleKey = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleAddRule();
+    // ----- Review queue -----
+    const handleSuggestRules = async () => {
+        if (!referenceParagraphs.length) {
+            setError('Add at least one reference paragraph before asking for suggestions.');
+            return;
+        }
+        setSuggesting(true);
+        setError(null);
+        try {
+            const updated = await api.voice.suggestRules({ source: 'reference_paragraphs' });
+            applyProfile(updated);
+        } catch (e) {
+            setError(e.message || 'Could not get suggestions.');
+        } finally {
+            setSuggesting(false);
+        }
+    };
+
+    const handleAccept = async (id) => {
+        try {
+            const updated = await api.voice.acceptSuggestion(id);
+            applyProfile(updated);
+        } catch (e) {
+            setError(e.message || 'Could not accept suggestion.');
+        }
+    };
+
+    const handleReject = async (id) => {
+        try {
+            const updated = await api.voice.rejectSuggestion(id);
+            applyProfile(updated);
+        } catch (e) {
+            setError(e.message || 'Could not reject suggestion.');
         }
     };
 
     if (loading) {
-        return (
-            <section className="settings-section">
-                <h3>My Voice</h3>
-                <p className="section-description">Loading voice profile...</p>
-            </section>
-        );
+        return <div style={{ color: '#94a3b8' }}>Loading voice profile…</div>;
     }
 
     return (
-        <section className="settings-section">
-            <h3>My Voice</h3>
-            <p className="section-description">
-                Your personal writing voice. The Voice Guardian council member and the Chairman
-                apply these rules to every essay. The Chairman is explicitly instructed to walk
-                through each rule before returning the final draft.
-            </p>
-
-            {/* RULES */}
-            <div className="subsection" style={{ marginTop: '20px' }}>
-                <h4 style={{ margin: '0 0 6px 0' }}>Voice rules</h4>
-                <p className="section-description" style={{ marginTop: 0 }}>
-                    Short, concrete dos and don'ts. Examples: "Never use em-dashes", "Avoid the
-                    word utilize", "Keep sentences under 25 words where possible".
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ marginBottom: '8px' }}>
+                <h2 style={{ margin: 0, fontSize: '20px', color: '#e2e8f0' }}>My Voice</h2>
+                <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#94a3b8' }}>
+                    The council leans into this profile when writing. Add rules you want it to
+                    follow, drop in samples of your real writing, and accept any suggestions you
+                    agree with.
                 </p>
-
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                    <input
-                        type="text"
-                        value={newRule}
-                        placeholder="e.g. Never use em-dashes"
-                        onChange={(e) => setNewRule(e.target.value)}
-                        onKeyDown={handleAddRuleKey}
-                        style={inputStyle}
-                    />
-                    <button
-                        type="button"
-                        onClick={handleAddRule}
-                        disabled={!newRule.trim()}
-                        style={{
-                            ...primaryButtonStyle,
-                            opacity: newRule.trim() ? 1 : 0.5,
-                            cursor: newRule.trim() ? 'pointer' : 'not-allowed',
-                            whiteSpace: 'nowrap',
-                        }}
-                    >
-                        + Add rule
-                    </button>
-                </div>
-
-                {rules.length === 0 ? (
-                    <p className="section-description" style={{ fontStyle: 'italic' }}>
-                        No rules yet. The Voice Guardian and Chairman will fall back to the default
-                        anti-AI-speak rules until you add some.
-                    </p>
-                ) : (
-                    <div>
-                        {rules.map((rule, idx) => (
-                            <div
-                                key={idx}
-                                style={{
-                                    ...cardStyle,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                }}
-                            >
-                                <input
-                                    type="text"
-                                    value={rule}
-                                    onChange={(e) => handleEditRule(idx, e.target.value)}
-                                    style={{
-                                        ...inputStyle,
-                                        background: 'rgba(0,0,0,0.15)',
-                                    }}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => handleRemoveRule(idx)}
-                                    style={removeButtonStyle}
-                                    title="Remove rule"
-                                >
-                                    Remove
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
             </div>
 
-            {/* REFERENCE PARAGRAPHS */}
-            <div className="subsection" style={{ marginTop: '32px' }}>
-                <h4 style={{ margin: '0 0 6px 0' }}>Paragraphs you've written</h4>
-                <p className="section-description" style={{ marginTop: 0 }}>
-                    Optional. Paste paragraphs you've actually written. Council members will match
-                    your cadence, vocabulary, and rhythm — not your topic.
-                </p>
-
-                <textarea
-                    value={newParagraph}
-                    onChange={(e) => setNewParagraph(e.target.value)}
-                    placeholder="Paste a paragraph you've written..."
-                    rows={5}
+            {error && (
+                <div
                     style={{
-                        ...inputStyle,
-                        marginBottom: '8px',
-                        resize: 'vertical',
-                    }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-                    <button
-                        type="button"
-                        onClick={handleAddParagraph}
-                        disabled={!newParagraph.trim()}
-                        style={{
-                            ...primaryButtonStyle,
-                            opacity: newParagraph.trim() ? 1 : 0.5,
-                            cursor: newParagraph.trim() ? 'pointer' : 'not-allowed',
-                        }}
-                    >
-                        + Add paragraph
-                    </button>
-                </div>
-
-                {referenceParagraphs.length === 0 ? (
-                    <p className="section-description" style={{ fontStyle: 'italic' }}>
-                        No reference paragraphs saved yet.
-                    </p>
-                ) : (
-                    <div>
-                        {referenceParagraphs.map((para, idx) => (
-                            <div key={idx} style={cardStyle}>
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        marginBottom: '8px',
-                                    }}
-                                >
-                                    <strong style={{ fontSize: '12px', opacity: 0.7 }}>
-                                        Sample {idx + 1}
-                                    </strong>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemoveParagraph(idx)}
-                                        style={removeButtonStyle}
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                                <p
-                                    style={{
-                                        margin: 0,
-                                        whiteSpace: 'pre-wrap',
-                                        fontFamily: 'var(--font-content, serif)',
-                                        fontSize: '14px',
-                                        lineHeight: 1.5,
-                                        color: '#e2e8f0',
-                                    }}
-                                >
-                                    {para}
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* INFERRED STYLE (advanced/optional) */}
-            <details
-                style={{
-                    marginTop: '32px',
-                    padding: '12px 14px',
-                    background: 'rgba(255,255,255,0.03)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                }}
-            >
-                <summary
-                    style={{
-                        cursor: 'pointer',
-                        fontWeight: 600,
+                        padding: '9px 12px',
+                        background: 'rgba(248, 113, 113, 0.08)',
+                        color: '#fca5a5',
+                        border: '1px solid rgba(248, 113, 113, 0.25)',
+                        borderRadius: '6px',
                         fontSize: '13px',
-                        opacity: 0.8,
                     }}
                 >
-                    Inferred style notes (optional)
-                </summary>
-                <p
-                    className="section-description"
-                    style={{ marginTop: '8px', marginBottom: '8px' }}
-                >
-                    Free-form notes about your style. Reserved for future "infer my style"
-                    automation; you can write your own notes here for now.
-                </p>
-                <textarea
-                    value={inferredStyle}
-                    onChange={(e) => setInferredStyle(e.target.value)}
-                    placeholder="e.g. Tends toward dry humor; opens with concrete details rather than abstractions."
-                    rows={4}
-                    style={{
-                        ...inputStyle,
-                        resize: 'vertical',
-                    }}
-                />
-            </details>
-
-            {/* SAVE BAR */}
-            <div
-                style={{
-                    marginTop: '24px',
-                    paddingTop: '16px',
-                    borderTop: '1px solid rgba(255,255,255,0.08)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    flexWrap: 'wrap',
-                }}
-            >
-                <div style={{ minHeight: '20px', fontSize: '13px' }}>
-                    {error && <span style={{ color: '#f87171' }}>{error}</span>}
-                    {success && <span style={{ color: '#4ade80' }}>Voice profile saved.</span>}
-                    {!error && !success && isDirty && (
-                        <span style={{ color: '#fbbf24', opacity: 0.85 }}>Unsaved changes</span>
-                    )}
+                    {error}
                 </div>
-                <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={saving || !isDirty}
+            )}
+            {success && (
+                <div
                     style={{
-                        ...primaryButtonStyle,
-                        opacity: saving || !isDirty ? 0.5 : 1,
-                        cursor: saving || !isDirty ? 'not-allowed' : 'pointer',
+                        padding: '9px 12px',
+                        background: 'rgba(34, 197, 94, 0.08)',
+                        color: '#86efac',
+                        border: '1px solid rgba(34, 197, 94, 0.25)',
+                        borderRadius: '6px',
+                        fontSize: '13px',
                     }}
                 >
-                    {saving ? 'Saving...' : 'Save voice profile'}
+                    Saved.
+                </div>
+            )}
+
+            {/* ---- Rules ---- */}
+            <div style={sectionLabelStyle}>Rules ({rules.length})</div>
+            {rules.length === 0 && (
+                <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
+                    No rules yet. Add concrete style instructions like "no em-dashes" or "lean
+                    shorter sentences".
+                </div>
+            )}
+            {rules.map((rule, idx) => (
+                <div key={idx} style={cardStyle}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                        <input
+                            type="text"
+                            value={rule}
+                            onChange={(e) => editRule(idx, e.target.value)}
+                            style={{ ...inputStyle, flex: 1 }}
+                        />
+                        <button
+                            type="button"
+                            style={removeButtonStyle}
+                            onClick={() => removeRule(idx)}
+                        >
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            ))}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <input
+                    type="text"
+                    value={newRule}
+                    onChange={(e) => setNewRule(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addRule()}
+                    placeholder='e.g. "no em-dashes" or "avoid the word delve"'
+                    style={{ ...inputStyle, flex: 1 }}
+                />
+                <button type="button" style={secondaryButtonStyle} onClick={addRule}>
+                    Add rule
                 </button>
             </div>
-        </section>
+
+            {/* ---- Pending review queue ---- */}
+            <div style={sectionLabelStyle}>
+                Pending suggestions ({pendingSuggestions.length})
+            </div>
+            {pendingSuggestions.length === 0 ? (
+                <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
+                    Nothing pending. After you add reference samples below, hit "Suggest rules
+                    from my samples" to populate this queue.
+                </div>
+            ) : (
+                pendingSuggestions.map((s) => (
+                    <div key={s.id} style={pendingCardStyle}>
+                        <div style={{ flex: 1, color: '#fde68a' }}>
+                            <div style={{ fontSize: '13px', lineHeight: 1.4 }}>{s.rule}</div>
+                            <div
+                                style={{
+                                    marginTop: '4px',
+                                    fontSize: '11px',
+                                    color: 'rgba(253, 230, 138, 0.65)',
+                                }}
+                            >
+                                from {s.source || 'unknown'}
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                                type="button"
+                                style={acceptButtonStyle}
+                                onClick={() => handleAccept(s.id)}
+                            >
+                                Accept
+                            </button>
+                            <button
+                                type="button"
+                                style={removeButtonStyle}
+                                onClick={() => handleReject(s.id)}
+                            >
+                                Reject
+                            </button>
+                        </div>
+                    </div>
+                ))
+            )}
+
+            {/* ---- Reference paragraphs ---- */}
+            <div style={sectionLabelStyle}>
+                Reference samples ({referenceParagraphs.length})
+            </div>
+            <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
+                Paste a paragraph of your own writing. The council uses these as voice anchors,
+                and "Suggest rules" extracts concrete rules from them.
+            </div>
+            {referenceParagraphs.map((para, idx) => (
+                <div key={idx} style={cardStyle}>
+                    <div
+                        style={{
+                            color: '#e2e8f0',
+                            fontFamily: 'var(--font-content, serif)',
+                            whiteSpace: 'pre-wrap',
+                            fontSize: '14px',
+                            lineHeight: 1.5,
+                            marginBottom: '8px',
+                        }}
+                    >
+                        {para}
+                    </div>
+                    <button
+                        type="button"
+                        style={removeButtonStyle}
+                        onClick={() => removeParagraph(idx)}
+                    >
+                        Remove
+                    </button>
+                </div>
+            ))}
+            <textarea
+                value={newParagraph}
+                onChange={(e) => setNewParagraph(e.target.value)}
+                placeholder="Paste a paragraph of your own writing…"
+                rows={4}
+                style={{ ...inputStyle, fontFamily: 'var(--font-content, serif)' }}
+            />
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                <button type="button" style={secondaryButtonStyle} onClick={addParagraph}>
+                    Add sample
+                </button>
+                <button
+                    type="button"
+                    style={primaryButtonStyle}
+                    onClick={handleSuggestRules}
+                    disabled={suggesting || !referenceParagraphs.length}
+                >
+                    {suggesting ? 'Reading samples…' : 'Suggest rules from my samples'}
+                </button>
+            </div>
+
+            {/* ---- Preferred authors ---- */}
+            <div style={sectionLabelStyle}>
+                Authors I admire ({preferredAuthors.length}/5)
+            </div>
+            <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
+                Up to 5. The council uses these as a stylistic anchor — it won't quote or name
+                them in your essay.
+            </div>
+            <div
+                style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                    marginBottom: '6px',
+                }}
+            >
+                {preferredAuthors.map((a, idx) => (
+                    <span
+                        key={idx}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                            borderRadius: '999px',
+                            color: '#e2e8f0',
+                            fontSize: '13px',
+                        }}
+                    >
+                        {a}
+                        <button
+                            type="button"
+                            onClick={() => removeAuthor(idx)}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#cbd5e1',
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontSize: '14px',
+                            }}
+                            aria-label={`Remove ${a}`}
+                        >
+                            ×
+                        </button>
+                    </span>
+                ))}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                    type="text"
+                    value={newAuthor}
+                    onChange={(e) => setNewAuthor(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addAuthor()}
+                    placeholder="e.g. Joan Didion"
+                    style={{ ...inputStyle, flex: 1 }}
+                    disabled={preferredAuthors.length >= 5}
+                />
+                <button
+                    type="button"
+                    style={secondaryButtonStyle}
+                    onClick={addAuthor}
+                    disabled={preferredAuthors.length >= 5}
+                >
+                    Add
+                </button>
+            </div>
+
+            {/* ---- Inferred style ---- */}
+            <div style={sectionLabelStyle}>Inferred style summary</div>
+            <textarea
+                value={inferredStyle}
+                onChange={(e) => setInferredStyle(e.target.value)}
+                placeholder="A 1-2 sentence description of your voice. Auto-filled when you ask for rule suggestions; editable."
+                rows={3}
+                style={{ ...inputStyle, fontFamily: 'inherit' }}
+            />
+
+            {/* ---- Save ---- */}
+            <div
+                style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '8px',
+                    marginTop: '24px',
+                }}
+            >
+                <button
+                    type="button"
+                    style={primaryButtonStyle}
+                    onClick={handleSave}
+                    disabled={saving || !isDirty}
+                >
+                    {saving ? 'Saving…' : isDirty ? 'Save changes' : 'Saved'}
+                </button>
+            </div>
+        </div>
     );
 }
