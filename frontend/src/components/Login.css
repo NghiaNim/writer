@@ -184,19 +184,6 @@
     font-weight: 500;
 }
 
-.login-error-meta {
-    font-size: 11px;
-    color: rgba(252, 165, 165, 0.7);
-}
-
-.login-error-meta code {
-    background: rgba(0, 0, 0, 0.2);
-    padding: 1px 4px;
-    border-radius: 3px;
-    font-family: var(--font-code);
-    font-size: 10.5px;
-}
-
 .login-status {
     margin: 0 0 12px;
     padding: 8px 12px;
@@ -216,22 +203,6 @@
     background: rgba(248, 113, 113, 0.08);
     color: #fca5a5;
     border: 1px solid rgba(248, 113, 113, 0.25);
-}
-
-.login-api-hint {
-    margin-top: 10px;
-    text-align: center;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.35);
-}
-
-.login-api-hint code {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 1px 5px;
-    border-radius: 3px;
-    font-family: var(--font-code);
-    font-size: 10.5px;
-    color: rgba(255, 255, 255, 0.55);
 }
 
 .login-info {

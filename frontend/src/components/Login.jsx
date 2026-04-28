@@ -181,9 +181,6 @@ export default function Login() {
                     {displayError && (
                         <div className="login-error" role="alert">
                             <div className="login-error-msg">{displayError}</div>
-                            <div className="login-error-meta">
-                                Tried: <code>{API_BASE}</code>
-                            </div>
                         </div>
                     )}
 
@@ -191,10 +188,6 @@ export default function Login() {
                         {loading ? 'Working...' : buttonLabel}
                     </button>
                 </form>
-
-                <div className="login-api-hint">
-                    Backend: <code>{API_BASE}</code>
-                </div>
 
                 <div className="login-footer">
                     {mode === 'login' ? (
