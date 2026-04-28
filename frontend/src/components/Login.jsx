@@ -106,9 +106,9 @@ export default function Login() {
         <div className="login-screen">
             <div className="login-card">
                 <div className="login-header">
-                    <h1 className="login-title">Essay Coach</h1>
+                    <h1 className="login-title">MidnightCoffee</h1>
                     <p className="login-subtitle">
-                        Your council of writers, in one place.
+                        Your writing companion, in one place.
                     </p>
                 </div>
 
