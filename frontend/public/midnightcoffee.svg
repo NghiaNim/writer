@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MidnightCoffee icon">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="cup" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fde68a" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bg)" />
+  <path d="M38 12a8 8 0 1 0 8 8 10 10 0 1 1-8-8Z" fill="#e2e8f0" />
+  <path d="M18 24h26a0 0 0 0 1 0 0v14a8 8 0 0 1-8 8H26a8 8 0 0 1-8-8V24a0 0 0 0 1 0 0Z" fill="url(#cup)" />
+  <path d="M44 28h4a6 6 0 0 1 0 12h-4" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" />
+  <path d="M24 18c0 3 3 3 3 6M31 18c0 3 3 3 3 6" fill="none" stroke="#f8fafc" stroke-width="2" stroke-linecap="round" />
+</svg>

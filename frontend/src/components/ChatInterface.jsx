@@ -122,7 +122,7 @@ export default function ChatInterface({
         return (
             <div className="chat-interface">
                 <div className="empty-state">
-                    <h1>Welcome to LLM Council <span className="plus-text">Plus</span></h1>
+                    <h1>Welcome to MidnightCoffee</h1>
                     <p className="hero-message">
                         The Council is ready to deliberate. <button className="config-link" onClick={() => onOpenSettings('council')}>Configure it</button>
                     </p>
@@ -144,7 +144,7 @@ export default function ChatInterface({
                 {(!conversation || conversation.messages.length === 0) ? (
                     <div className="hero-container">
                         <div className="hero-content">
-                            <h1>Welcome to LLM Council <span className="text-gradient">Plus</span></h1>
+                            <h1>Welcome to MidnightCoffee</h1>
                             <p className="hero-subtitle">
                                 The Council is ready to deliberate. <button className="config-link" onClick={() => onOpenSettings('council')}>Configure it</button>
                             </p>
@@ -157,7 +157,7 @@ export default function ChatInterface({
                     conversation.messages.map((msg, index) => (
                         <div key={`${conversation.id}-msg-${index}`} className={`message ${msg.role}`}>
                             <div className="message-role">
-                                {msg.role === 'user' ? 'Your Question to the Council' : 'LLM Council'}
+                                {msg.role === 'user' ? 'Your Question to the Council' : 'MidnightCoffee'}
                             </div>
 
                             <div className="message-content">
