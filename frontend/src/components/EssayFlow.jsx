@@ -76,6 +76,7 @@ export default function EssayFlow({
     isBusy = false,
     handoffError = null,
     onDismissHandoffError,
+    onOpenVoiceSettings,
 }) {
     // Steps: 'topic' -> 'questions' -> 'core_idea' -> 'voice' (-> submit)
     //                  | 'draft' (alternate path from Step 1)
@@ -616,6 +617,21 @@ export default function EssayFlow({
                         <p className="essay-flow-hint">
                             Last step. The council will lean into the voice you describe here.
                         </p>
+                        {onOpenVoiceSettings ? (
+                            <p className="essay-flow-hint essay-flow-voice-settings-callout">
+                                <button
+                                    type="button"
+                                    className="essay-flow-link"
+                                    onClick={onOpenVoiceSettings}
+                                >
+                                    Open saved voice rules
+                                </button>{' '}
+                                <span className="essay-flow-word-target-summary">
+                                    — persistent rules and reference paragraphs (Settings → My Voice)
+                                    apply to every essay, including this one.
+                                </span>
+                            </p>
+                        ) : null}
 
                         <div className="essay-flow-section">
                             <div className="essay-flow-section-label">Authors you admire</div>

@@ -833,6 +833,7 @@ function AppShell() {
   };
 
   const handleMobileOpenSettings = () => {
+    setSettingsInitialSection('council');
     setShowSettings(true);
     setSidebarOpen(false); // Close sidebar on mobile
   };
@@ -881,6 +882,7 @@ function AppShell() {
           isBusy={isLoading}
           handoffError={streamHandoffError}
           onDismissHandoffError={() => setStreamHandoffError(null)}
+          onOpenVoiceSettings={() => handleOpenSettings('voice')}
         />
       ) : (
         <ChatInterface

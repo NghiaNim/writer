@@ -238,6 +238,15 @@ export default function ChatInterface({
                                     ? 'The council will write from scratch.'
                                     : 'The council will refine your draft and preserve your voice.'}
                             </span>
+                            <button
+                                type="button"
+                                className="config-link essay-voice-rules-link"
+                                onClick={() => onOpenSettings('voice')}
+                                disabled={isLoading}
+                                title="Open Settings → My Voice: rules and reference paragraphs for every essay"
+                            >
+                                Voice rules
+                            </button>
                         </div>
 
                         <div className="input-row-top">
