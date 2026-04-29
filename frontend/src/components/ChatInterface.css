@@ -271,6 +271,83 @@
   z-index: 50;
 }
 
+.input-area-composer-collapsed {
+  max-width: 420px;
+}
+
+.input-composer-collapsed-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px !important;
+}
+
+.composer-collapsed-hint {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.composer-expand-btn {
+  flex-shrink: 0;
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #bfdbfe;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.composer-expand-btn:hover {
+  background: rgba(59, 130, 246, 0.22);
+}
+
+.composer-minimize-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 2px 2px 10px;
+  margin: 0 0 2px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.composer-minimize-hint {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+  flex: 1;
+  min-width: 140px;
+}
+
+.composer-minimize-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #94a3b8;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.composer-minimize-btn:hover {
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.55);
+}
+
 /* Legacy input-container removed */
 
 .input-container:focus-within {

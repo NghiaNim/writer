@@ -80,8 +80,15 @@ export default function ChatInterface({
 }) {
     const [input, setInput] = useState('');
     const [webSearch, setWebSearch] = useState(false);
+    const [composerCollapsed, setComposerCollapsed] = useState(false);
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
+
+    useEffect(() => {
+        if (!isLoading) {
+            setComposerCollapsed(false);
+        }
+    }, [isLoading]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -190,7 +197,9 @@ export default function ChatInterface({
             </div>
 
             {/* Floating Command Capsule */}
-            <div className="input-area">
+            <div
+                className={`input-area ${composerCollapsed && isLoading ? 'input-area-composer-collapsed' : ''}`}
+            >
                 {/* Legacy settings.json often has empty council_models while Supabase
                     config is valid — never block the composer during an active run. */}
                 {!councilConfigured && !isLoading ? (
@@ -202,11 +211,48 @@ export default function ChatInterface({
                             <button className="config-link" onClick={() => onOpenSettings('council')}>Configure Council</button>
                         </span>
                     </div>
+                ) : isLoading && composerCollapsed ? (
+                    <div className="input-container input-composer-collapsed-strip">
+                        <button
+                            type="button"
+                            className="composer-expand-btn"
+                            onClick={() => setComposerCollapsed(false)}
+                            title="Show topic/draft input and mode controls"
+                        >
+                            Show composer
+                        </button>
+                        <span className="composer-collapsed-hint">
+                            Drafting in progress
+                        </span>
+                        <button
+                            type="button"
+                            className="send-button stop-button"
+                            onClick={onAbort}
+                            title="Stop generation"
+                        >
+                            ⏹
+                        </button>
+                    </div>
                 ) : (
                     <form
                         className={`input-container essay-input essay-input-${essayMode}`}
                         onSubmit={handleSubmit}
                     >
+                        {isLoading ? (
+                            <div className="composer-minimize-bar">
+                                <span className="composer-minimize-hint">
+                                    Hide this panel to see council status above.
+                                </span>
+                                <button
+                                    type="button"
+                                    className="composer-minimize-btn"
+                                    onClick={() => setComposerCollapsed(true)}
+                                    title="Collapse the composer while the council runs"
+                                >
+                                    Hide composer
+                                </button>
+                            </div>
+                        ) : null}
                         {/* Phase 4: Topic / Draft mode toggle on top */}
                         <div className="essay-mode-toggle" role="tablist" aria-label="Essay input mode">
                             <button
