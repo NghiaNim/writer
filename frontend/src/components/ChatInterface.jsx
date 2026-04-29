@@ -191,7 +191,9 @@ export default function ChatInterface({
 
             {/* Floating Command Capsule */}
             <div className="input-area">
-                {!councilConfigured ? (
+                {/* Legacy settings.json often has empty council_models while Supabase
+                    config is valid — never block the composer during an active run. */}
+                {!councilConfigured && !isLoading ? (
                     <div className="input-container config-required">
                         <span className="config-message">
                             ⚠️ Council not ready.

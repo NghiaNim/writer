@@ -9,6 +9,35 @@ import { api, warmUpBackend } from './api';
 import './App.css';
 import './components/StageCopyButtons.css';
 
+/** Matches backend council-config validation (≥2 enabled personas + models + chairman). */
+function isUserCouncilReady(cc) {
+  if (!cc?.personas || !(cc.chairman_model || '').trim()) return false;
+  const enabled = cc.personas.filter((p) => p.enabled);
+  if (enabled.length < 2) return false;
+  return enabled.every((p) => (p.model || '').trim() !== '');
+}
+
+function councilGridModelsFromConfig(cc) {
+  if (!cc?.personas) return [];
+  return cc.personas
+    .filter((p) => p.enabled && (p.model || '').trim())
+    .map((p) => p.model);
+}
+
+async function syncCouncilFromUserConfig(setters) {
+  const { setCouncilModels, setChairmanModel, setCouncilConfigured } = setters;
+  try {
+    const cc = await api.councilConfig.get();
+    setCouncilModels(councilGridModelsFromConfig(cc));
+    setChairmanModel(cc.chairman_model || null);
+    setCouncilConfigured(isUserCouncilReady(cc));
+  } catch (e) {
+    console.error('Failed to load user council config:', e);
+    // Avoid flashing "Council not ready" on transient errors — hosted app uses
+    // Supabase rows, not legacy settings.json council_models.
+  }
+}
+
 function AppShell() {
   const { user, logout } = useAuth();
   const [conversations, setConversations] = useState([]);
@@ -75,13 +104,11 @@ function AppShell() {
       // off rather than perpetually "testing").
       setOllamaStatus({ connected: false, lastConnected: null, testing: false });
 
-      // Council configuration is per-user in Supabase now (user_council_config).
-      // The legacy data/settings.json council_models are only a fallback.
-      const models = settings.council_models || [];
-      const chairman = settings.chairman_model || '';
-      setCouncilModels(models);
-      setChairmanModel(chairman);
-      setCouncilConfigured(true);
+      await syncCouncilFromUserConfig({
+        setCouncilModels,
+        setChairmanModel,
+        setCouncilConfigured,
+      });
     } catch (error) {
       console.error('Failed to check initial setup:', error);
     }
@@ -92,16 +119,12 @@ function AppShell() {
     setShowSettings(false);
     try {
       const settings = await api.getSettings();
-      const models = settings.council_models || [];
-      const chairman = settings.chairman_model || '';
-
-      setCouncilModels(models);
-      setChairmanModel(chairman);
       setSearchProvider(settings.search_provider || 'duckduckgo');
-
-      const hasCouncilMembers = models.some(m => m && m.trim() !== '');
-      const hasChairman = chairman && chairman.trim() !== '';
-      setCouncilConfigured(hasCouncilMembers && hasChairman);
+      await syncCouncilFromUserConfig({
+        setCouncilModels,
+        setChairmanModel,
+        setCouncilConfigured,
+      });
     } catch (error) {
       console.error('Error after closing settings:', error);
     }

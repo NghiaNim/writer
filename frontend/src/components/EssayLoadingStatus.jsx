@@ -63,6 +63,7 @@ export default function EssayLoadingStatus({ loading, progress, aborted }) {
     const stage = pickStage({ loading });
     const messages = useMemo(() => MESSAGES[stage] || MESSAGES.idle, [stage]);
     const [messageIdx, setMessageIdx] = useState(0);
+    const [minimized, setMinimized] = useState(false);
 
     useEffect(() => {
         // Reset to first message whenever the stage changes
@@ -88,6 +89,30 @@ export default function EssayLoadingStatus({ loading, progress, aborted }) {
         progressLabel = `${stage2Progress.count}/${stage2Progress.total} reviews in`;
     }
 
+    if (minimized) {
+        return (
+            <div className={`essay-loading-status essay-loading-status--compact ${aborted ? 'aborted' : ''}`}>
+                <button
+                    type="button"
+                    className="essay-loading-compact-inner"
+                    onClick={() => setMinimized(false)}
+                    aria-expanded={false}
+                    title="Expand progress details"
+                >
+                    <span className="essay-loading-dot" aria-hidden="true" />
+                    <span className="essay-loading-stage">{stageLabel}</span>
+                    {progressLabel && (
+                        <span className="essay-loading-progress">{progressLabel}</span>
+                    )}
+                    <span className="essay-loading-compact-msg">{messages[messageIdx]}</span>
+                    <span className="essay-loading-expand-hint" aria-hidden="true">
+                        ▼
+                    </span>
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className={`essay-loading-status ${aborted ? 'aborted' : ''}`}>
             <div className="essay-loading-bar">
@@ -96,6 +121,15 @@ export default function EssayLoadingStatus({ loading, progress, aborted }) {
                 {progressLabel && (
                     <span className="essay-loading-progress">{progressLabel}</span>
                 )}
+                <button
+                    type="button"
+                    className="essay-loading-minimize"
+                    onClick={() => setMinimized(true)}
+                    aria-expanded={true}
+                    title="Hide this panel to see persona progress above. The council is still running."
+                >
+                    Minimize
+                </button>
             </div>
             <div className="essay-loading-line">
                 <span className="essay-loading-prompt">&gt;</span>
@@ -103,8 +137,8 @@ export default function EssayLoadingStatus({ loading, progress, aborted }) {
                 <span className="essay-loading-cursor" aria-hidden="true">_</span>
             </div>
             <div className="essay-loading-hint">
-                The council is deliberating in private. You'll see only the final essay when it's
-                ready.
+                Live status while members draft privately — final essay appears below when ready.
+                You can minimize this bar anytime.
             </div>
         </div>
     );

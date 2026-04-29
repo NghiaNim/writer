@@ -64,6 +64,72 @@
   font-weight: 500;
 }
 
+.essay-loading-minimize {
+  flex-shrink: 0;
+  margin-left: 8px;
+  background: transparent;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.essay-loading-minimize:hover {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.essay-loading-status--compact {
+  padding: 12px 16px;
+}
+
+.essay-loading-compact-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.essay-loading-compact-inner:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+.essay-loading-compact-inner .essay-loading-stage {
+  flex-shrink: 0;
+}
+
+.essay-loading-compact-msg {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: #e2e8f0;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.essay-loading-expand-hint {
+  flex-shrink: 0;
+  opacity: 0.55;
+  font-size: 10px;
+}
+
 .essay-loading-line {
   display: flex;
   align-items: baseline;
