@@ -25,33 +25,24 @@ function hexToRgb(hex) {
 
 export default function Stage2({ rankings, labelToModel, aggregateRankings, startTime, endTime }) {
     const [activeTab, setActiveTab] = useState(0);
-
-    // Reset activeTab if it becomes out of bounds (e.g., during streaming)
-    useEffect(() => {
-        if (rankings && rankings.length > 0 && activeTab >= rankings.length) {
-            setActiveTab(rankings.length - 1);
-        }
-    }, [rankings, activeTab]);
-
-    if (!rankings || rankings.length === 0) {
-        return null;
-    }
-
-    // Ensure activeTab is within bounds
-    const safeActiveTab = Math.min(activeTab, rankings.length - 1);
-    const currentRanking = rankings[safeActiveTab] || {};
-    const hasError = currentRanking?.error || false;
-
-    // Get visuals for current tab
-    const currentVisuals = getModelVisuals(currentRanking?.model);
-
-    // Copy functionality
     const [isCopied, setIsCopied] = useState(false);
 
     // Reset copy state when tab changes
     useEffect(() => {
         setIsCopied(false);
     }, [activeTab]);
+
+    if (!rankings || rankings.length === 0) {
+        return null;
+    }
+
+    // safeActiveTab clamps activeTab if rankings shrink (e.g. during streaming)
+    const safeActiveTab = Math.min(activeTab, rankings.length - 1);
+    const currentRanking = rankings[safeActiveTab] || {};
+    const hasError = currentRanking?.error || false;
+
+    // Get visuals for current tab
+    const currentVisuals = getModelVisuals(currentRanking?.model);
 
     const handleCopy = async () => {
         const ranking = currentRanking?.ranking;

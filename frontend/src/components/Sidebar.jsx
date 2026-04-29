@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import './Sidebar.css';
 
 export default function Sidebar({
@@ -16,12 +16,13 @@ export default function Sidebar({
   const [confirmingDelete, setConfirmingDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Filter conversations by title
-  const filteredConversations = conversations.filter(conv => {
-    if (!searchQuery.trim()) return true;
-    const title = conv.title || 'New Conversation';
-    return title.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) return conversations;
+    const q = searchQuery.toLowerCase();
+    return conversations.filter(conv =>
+      (conv.title || 'New Conversation').toLowerCase().includes(q)
+    );
+  }, [conversations, searchQuery]);
 
   const handleAbortClick = (e) => {
     e.stopPropagation();

@@ -189,6 +189,75 @@ async def _generate_core_idea(
     return content
 
 
+_REFINEMENT_ESSAY_MAX_CHARS = 14_000
+
+
+async def _generate_refinement_suggestions(
+    essay_text: str, original_brief: str
+) -> List[Dict[str, str]]:
+    """5–7 essay-specific refinement ideas. Single LLM call; empty list on failure."""
+    essay = (essay_text or "").strip()
+    if not essay:
+        return []
+    if len(essay) > _REFINEMENT_ESSAY_MAX_CHARS:
+        essay = (
+            essay[:_REFINEMENT_ESSAY_MAX_CHARS]
+            + "\n\n[... excerpt truncated for processing ...]"
+        )
+
+    brief = (original_brief or "").strip()
+    brief_part = (
+        f"\nORIGINAL INTAKE OR BRIEF (context only):\n{brief}\n" if brief else ""
+    )
+
+    sys_prompt = (
+        "You help a writer revise an essay. Given the essay (and optional brief), "
+        "propose 5–7 DISTINCT refinement directions that are specific to THIS piece. "
+        "Each idea must tie to something concrete in the text: a paragraph, example, "
+        "claim, image, or through-line — never vague writing-class platitudes like "
+        "'add more detail' without naming where. Mix structure, stakes, voice, and "
+        "clarity as appropriate.\n"
+        "Chip labels: at most 6 words, no trailing period."
+    )
+    user_prompt = (
+        f"ESSAY:\n{essay}\n"
+        f"{brief_part}\n"
+        "Return STRICT JSON only, no markdown fences:\n"
+        '{"suggestions":[{"label":"...","instruction":"1–3 sentences: clear edit instruction for another LLM; name specifics from the essay."}]}'
+    )
+    from .council import query_model
+
+    try:
+        res = await query_model(
+            _INTAKE_MODEL,
+            [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            timeout=55.0,
+            temperature=0.65,
+        )
+    except Exception as e:
+        print(f"WARN: refinement suggestions LLM call failed: {e}")
+        res = None
+
+    parsed = _safe_json_loads((res or {}).get("content", "")) if res else None
+    out: List[Dict[str, str]] = []
+    if isinstance(parsed, dict):
+        items = parsed.get("suggestions")
+        if isinstance(items, list):
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                label = str(item.get("label") or "").strip()
+                inst = str(item.get("instruction") or "").strip()
+                if label and inst and len(label) <= 88:
+                    out.append({"label": label, "instruction": inst})
+    if 4 <= len(out) <= 12:
+        return out[:7]
+    return []
+
+
 async def _extract_voice_rules_via_llm(samples: List[str]) -> Dict[str, Any]:
     """Read user voice samples and return {rules, inferred_style}.
 
@@ -521,8 +590,8 @@ async def send_message_stream(
             storage.add_user_message(conversation_id, body.content)
 
             posthog.capture(
-                user.id,
                 "council_started",
+                distinct_id=user.id,
                 properties={
                     "execution_mode": body.execution_mode,
                     "essay_mode": body.essay_mode,
@@ -585,8 +654,8 @@ async def send_message_stream(
                 search_intent = search_result.get("intent", "unknown")
                 yield f"data: {json.dumps({'type': 'search_complete', 'data': {'search_query': search_query, 'extracted_query': extracted_query, 'search_context': search_context, 'provider': provider.value, 'intent': search_intent}})}\n\n"
                 posthog.capture(
-                    user.id,
                     "web_search_performed",
+                    distinct_id=user.id,
                     properties={
                         "provider": provider.value,
                         "search_intent": search_intent,
@@ -629,8 +698,8 @@ async def send_message_stream(
                 error_msg = 'All models failed to respond in Stage 1, likely due to rate limits or API errors. Please try again or adjust your model selection.'
                 storage.add_error_message(conversation_id, error_msg)
                 posthog.capture(
-                    user.id,
                     "council_error",
+                    distinct_id=user.id,
                     properties={"reason": "all_models_failed", "execution_mode": body.execution_mode},
                 )
                 yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
@@ -743,8 +812,8 @@ async def send_message_stream(
                     so_what_answer=session_so_what,
                 )
                 posthog.capture(
-                    user.id,
                     "essay_saved",
+                    distinct_id=user.id,
                     properties={
                         "essay_mode": body.essay_mode,
                         "essay_type": session_essay_type or "general",
@@ -753,8 +822,8 @@ async def send_message_stream(
                 )
 
             posthog.capture(
-                user.id,
                 "council_completed",
+                distinct_id=user.id,
                 properties={
                     "execution_mode": body.execution_mode,
                     "stage1_count": len(stage1_results),
@@ -1176,8 +1245,8 @@ async def api_save_voice_profile(
     here."""
     saved = save_voice_profile(user.id, body, essay_type=essay_type)
     posthog.capture(
-        user.id,
         "voice_profile_saved",
+        distinct_id=user.id,
         properties={"essay_type": essay_type},
     )
     return saved.model_dump()
@@ -1359,8 +1428,8 @@ async def api_intake_questions(
         essay_type=(body.essay_type or "general").strip() or "general",
     )
     posthog.capture(
-        user.id,
         "intake_started",
+        distinct_id=user.id,
         properties={
             "essay_type": (body.essay_type or "general"),
             "has_audience": bool((body.audience or "").strip()),

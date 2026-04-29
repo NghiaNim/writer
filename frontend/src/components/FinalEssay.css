@@ -42,6 +42,13 @@
   opacity: 0.5;
 }
 
+.final-essay-version {
+  color: #a5b4fc;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
 .byline-model {
   display: inline-flex;
   align-items: center;

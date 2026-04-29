@@ -147,6 +147,143 @@
   width: 100%;
 }
 
+.messages-area--essay-refinement {
+  padding-bottom: 280px;
+}
+
+.chat-interface--refinement .essay-feedback-strip {
+  bottom: 248px;
+}
+
+@media (max-width: 768px) {
+  .chat-interface--refinement .essay-feedback-strip {
+    bottom: 260px;
+  }
+
+  .messages-area--essay-refinement {
+    padding-bottom: 300px;
+  }
+}
+
+.message.essay-draft-focused .message-content {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.45);
+  border-radius: 16px;
+}
+
+.essay-refinement-dock .refinement-dock-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.essay-refinement-dock .refinement-dock-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.essay-refinement-dock .refinement-dock-title {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.essay-refinement-dock .refinement-dock-sub {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.45;
+  color: #94a3b8;
+  max-width: 52ch;
+}
+
+.essay-draft-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 12px;
+}
+
+.essay-draft-nav-label {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: #c7d2fe;
+  min-width: 120px;
+  text-align: center;
+}
+
+.essay-draft-nav-btn {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #bfdbfe;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.essay-draft-nav-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.essay-draft-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.refinement-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.refinement-chip {
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #e0e7ff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.refinement-chip:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.22);
+}
+
+.refinement-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.refinement-loading-hint {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: #94a3b8;
+  font-style: italic;
+  padding: 8px 4px 12px;
+}
+
+.refinement-prompt-input {
+  min-height: 88px !important;
+}
+
 /* --- Chat Interface Styles --- */
 
 .chat-interface {

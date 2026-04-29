@@ -85,9 +85,10 @@ function AppShell() {
   // empty hero with no explanation.
   const [streamHandoffError, setStreamHandoffError] = useState(null);
 
-  // Check initial configuration on mount
+  // Load settings + conversations on mount
   useEffect(() => {
     checkInitialSetup();
+    loadConversations();
   }, []);
 
   const checkInitialSetup = async () => {
@@ -134,11 +135,6 @@ function AppShell() {
     setSettingsInitialSection(section || 'council');
     setShowSettings(true);
   };
-
-  // Load conversations on mount
-  useEffect(() => {
-    loadConversations();
-  }, []);
 
   // Auto-save execution mode preference when changed
   useEffect(() => {
@@ -728,8 +724,6 @@ function AppShell() {
               break;
 
             case 'complete':
-              // Stream complete, reload conversations list
-              loadConversations();
               setIsLoading(false);
               break;
 
@@ -898,6 +892,7 @@ function AppShell() {
         <ChatInterface
           conversation={currentConversation}
           conversationId={currentConversationId}
+          sessionId={currentSessionId}
           onSendMessage={handleSendMessage}
           onAbort={handleAbort}
           onRegenerate={handleRegenerate}

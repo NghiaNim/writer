@@ -159,8 +159,8 @@ async def signup(body: SignupRequest):
     if user is not None:
         user_id = str(user.id)
         posthog.capture(
-            user_id,
             "user_signed_up",
+            distinct_id=user_id,
             properties={"signup_method": "email"},
         )
 
@@ -202,8 +202,8 @@ async def login(body: LoginRequest):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     posthog.capture(
-        str(user.id),
         "user_logged_in",
+        distinct_id=str(user.id),
         properties={"login_method": "email"},
     )
 

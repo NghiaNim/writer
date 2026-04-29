@@ -1,5 +1,5 @@
 import StageTimer from './StageTimer';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import SearchContext from './SearchContext';
 import Stage1, { Stage1Skeleton } from './Stage1';
@@ -60,9 +60,82 @@ function shouldUseEssayUX(msg, currentExecutionMode) {
     return mode === 'full';
 }
 
+function stage3EssayText(msg) {
+    if (!msg?.stage3) return '';
+    const r = msg.stage3.response;
+    return typeof r === 'string' ? r : String(r || '');
+}
+
+function getLatestCompletedEssayText(messages) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const m = messages[i];
+        if (m.role === 'assistant' && stage3EssayText(m).trim()) {
+            return stage3EssayText(m);
+        }
+    }
+    return '';
+}
+
+function getOriginalEssayBrief(messages) {
+    const first = messages.find((m) => m.role === 'user');
+    return typeof first?.content === 'string' ? first.content : '';
+}
+
+/** Bundles the latest essay + original brief so the council can refine without server-side history. */
+function buildRefinementPayload(messages, instruction) {
+    const latest = getLatestCompletedEssayText(messages);
+    const brief = getOriginalEssayBrief(messages);
+    const trimmed = (instruction || '').trim();
+    return [
+        '## Refinement instruction',
+        'Apply the following to the essay under "Current essay". Keep voice and structure unless asked otherwise.',
+        trimmed,
+        '',
+        '## Current essay (revise this)',
+        latest,
+        '',
+        '## Original intake (context only)',
+        brief,
+    ].join('\n');
+}
+
+const REFINEMENT_SUGGESTIONS = [
+    {
+        label: 'Sharpen the hook',
+        instruction:
+            'Rewrite the opening so the hook is sharper and more specific; align the rest of the essay with the new opening.',
+    },
+    {
+        label: 'Tighten length',
+        instruction:
+            'Cut roughly 15–20% of the length without losing the main argument. Remove repetition and tighten sentences.',
+    },
+    {
+        label: 'More concrete detail',
+        instruction:
+            'Add concrete, sensory, or specific examples where the essay is overly abstract. No generic filler.',
+    },
+    {
+        label: 'Warmer, personal tone',
+        instruction:
+            'Shift tone slightly toward a warmer, more personal voice while keeping the argument clear and honest.',
+    },
+    {
+        label: 'Stronger ending',
+        instruction:
+            'Rewrite the closing paragraph so it lands with more force and clearer stakes. Do not introduce unrelated new topics.',
+    },
+    {
+        label: 'Stress-test claims',
+        instruction:
+            'Find vague or overstated claims, qualify or strengthen them, and briefly acknowledge one plausible counterargument.',
+    },
+];
+
 export default function ChatInterface({
     conversation,
     conversationId = null,
+    sessionId = null,
     onSendMessage,
     onAbort,
     onRegenerate,
@@ -90,6 +163,24 @@ export default function ChatInterface({
     const [saveFactFromFeedback, setSaveFactFromFeedback] = useState(false);
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
+    const [focusedDraftSlot, setFocusedDraftSlot] = useState(0);
+
+    const draftMessageIndices = useMemo(() => {
+        const list = conversation?.messages || [];
+        return list
+            .map((m, i) =>
+                m.role === 'assistant' && stage3EssayText(m).trim() ? i : null
+            )
+            .filter((i) => i != null);
+    }, [conversation]);
+
+    const draftNavKey = draftMessageIndices.join(',');
+
+    const showRefinementDock =
+        Boolean(conversation) &&
+        executionMode === 'full' &&
+        draftMessageIndices.length > 0 &&
+        councilConfigured;
 
     useEffect(() => {
         if (!isLoading) {
@@ -105,12 +196,26 @@ export default function ChatInterface({
         setSaveFactFromFeedback(false);
     }, [conversationId]);
 
+    useEffect(() => {
+        if (draftMessageIndices.length === 0) return;
+        setFocusedDraftSlot(draftMessageIndices.length - 1);
+    }, [conversationId, draftNavKey]);
+
+    useEffect(() => {
+        if (!conversation?.id || draftMessageIndices.length === 0) return;
+        const mi = draftMessageIndices[focusedDraftSlot];
+        if (mi == null) return;
+        document
+            .getElementById(`essay-msg-${conversation.id}-${mi}`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, [focusedDraftSlot, conversation?.id, draftNavKey]);
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    // Only auto-scroll if user is already near the bottom
-    // This prevents interrupting reading when new content arrives
+    // Only auto-scroll when message count changes (not on every streamed token)
+    const messageCount = conversation?.messages?.length ?? 0;
     useEffect(() => {
         if (!messagesContainerRef.current) return;
 
@@ -118,18 +223,25 @@ export default function ChatInterface({
         const isNearBottom =
             container.scrollHeight - container.scrollTop - container.clientHeight < 150;
 
-        // Auto-scroll only if user is already at/near bottom
         if (isNearBottom) {
             scrollToBottom();
         }
-    }, [conversation]);
+    }, [messageCount]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (input.trim() && !isLoading) {
+        if (!input.trim() || isLoading) return;
+        const list = conversation?.messages || [];
+        if (showRefinementDock) {
+            if (!getLatestCompletedEssayText(list).trim()) return;
+            onSendMessage(buildRefinementPayload(list, input.trim()), webSearch, {
+                essayMode: 'draft',
+                sessionId: sessionId || undefined,
+            });
+        } else {
             onSendMessage(input, webSearch);
-            setInput('');
         }
+        setInput('');
     };
 
     const handleKeyDown = (e) => {
@@ -162,6 +274,22 @@ export default function ChatInterface({
     const msgs = conversation.messages || [];
     const lastIdx = msgs.length - 1;
     const lastMsg = lastIdx >= 0 ? msgs[lastIdx] : null;
+
+    const sendRefinementSuggestion = (instruction) => {
+        if (!instruction?.trim() || isLoading) return;
+        if (!getLatestCompletedEssayText(msgs).trim()) return;
+        onSendMessage(buildRefinementPayload(msgs, instruction.trim()), webSearch, {
+            essayMode: 'draft',
+            sessionId: sessionId || undefined,
+        });
+    };
+
+    const goPrevDraft = () => setFocusedDraftSlot((s) => Math.max(0, s - 1));
+    const goNextDraft = () =>
+        setFocusedDraftSlot((s) =>
+            Math.min(draftMessageIndices.length - 1, s + 1)
+        );
+
     const essayFeedbackKey =
         conversationId &&
         lastMsg?.role === 'assistant' &&
@@ -216,9 +344,14 @@ export default function ChatInterface({
     };
 
     return (
-        <div className="chat-interface">
+        <div
+            className={`chat-interface${showRefinementDock ? ' chat-interface--refinement' : ''}`}
+        >
             {/* Messages Area */}
-            <div className="messages-area" ref={messagesContainerRef}>
+            <div
+                className={`messages-area${showRefinementDock ? ' messages-area--essay-refinement' : ''}`}
+                ref={messagesContainerRef}
+            >
                 {(!conversation || conversation.messages.length === 0) ? (
                     <div className="hero-container">
                         <div className="hero-content">
@@ -232,8 +365,27 @@ export default function ChatInterface({
                         </div>
                     </div>
                 ) : (
-                    conversation.messages.map((msg, index) => (
-                        <div key={`${conversation.id}-msg-${index}`} className={`message ${msg.role}`}>
+                    conversation.messages.map((msg, index) => {
+                        const versionLabelForAssistant =
+                            showRefinementDock && draftMessageIndices.length > 1 && msg.role === 'assistant'
+                                ? (() => {
+                                      const pos = draftMessageIndices.indexOf(index);
+                                      return pos >= 0
+                                          ? `Draft ${pos + 1} of ${draftMessageIndices.length}`
+                                          : null;
+                                  })()
+                                : null;
+                        const isFocusedDraft =
+                            showRefinementDock &&
+                            draftMessageIndices.length > 1 &&
+                            index === draftMessageIndices[focusedDraftSlot];
+
+                        return (
+                        <div
+                            key={`${conversation.id}-msg-${index}`}
+                            id={`essay-msg-${conversation.id}-${index}`}
+                            className={`message ${msg.role}${isFocusedDraft ? ' essay-draft-focused' : ''}`}
+                        >
                             <div className="message-role">
                                 {msg.role === 'user' ? 'Your Question to the Council' : 'MidnightCoffee'}
                             </div>
@@ -256,11 +408,13 @@ export default function ChatInterface({
                                         onRegenerate={onRegenerate}
                                         activeCouncil={activeCouncil}
                                         activeWordTarget={activeWordTarget}
+                                        essayVersionLabel={versionLabelForAssistant}
                                     />
                                 )}
                             </div>
                         </div>
-                    ))
+                    );
+                    })
                 )}
 
                 {/* Bottom Spacer for floating input */}
@@ -350,12 +504,18 @@ export default function ChatInterface({
                             type="button"
                             className="composer-expand-btn"
                             onClick={() => setComposerCollapsed(false)}
-                            title="Show topic/draft input and mode controls"
+                            title={
+                                showRefinementDock
+                                    ? 'Show refinement controls'
+                                    : 'Show topic/draft input and mode controls'
+                            }
                         >
-                            Show composer
+                            {showRefinementDock ? 'Show refinement' : 'Show composer'}
                         </button>
                         <span className="composer-collapsed-hint">
-                            Drafting in progress
+                            {showRefinementDock
+                                ? 'Council is updating your essay'
+                                : 'Drafting in progress'}
                         </span>
                         <button
                             type="button"
@@ -366,6 +526,151 @@ export default function ChatInterface({
                             ⏹
                         </button>
                     </div>
+                ) : showRefinementDock ? (
+                    <form
+                        className="input-container essay-input essay-refinement-dock"
+                        onSubmit={handleSubmit}
+                    >
+                        {isLoading ? (
+                            <div className="composer-minimize-bar">
+                                <span className="composer-minimize-hint">
+                                    Hide this panel to read earlier drafts above.
+                                </span>
+                                <button
+                                    type="button"
+                                    className="composer-minimize-btn"
+                                    onClick={() => setComposerCollapsed(true)}
+                                    title="Collapse while the council runs"
+                                >
+                                    Hide composer
+                                </button>
+                            </div>
+                        ) : null}
+
+                        {draftMessageIndices.length > 1 ? (
+                            <div
+                                className="essay-draft-nav"
+                                role="navigation"
+                                aria-label="Essay draft versions"
+                            >
+                                <button
+                                    type="button"
+                                    className="essay-draft-nav-btn"
+                                    onClick={goPrevDraft}
+                                    disabled={isLoading || focusedDraftSlot <= 0}
+                                >
+                                    ← Previous
+                                </button>
+                                <span className="essay-draft-nav-label">
+                                    Draft {focusedDraftSlot + 1} of {draftMessageIndices.length}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="essay-draft-nav-btn"
+                                    onClick={goNextDraft}
+                                    disabled={
+                                        isLoading ||
+                                        focusedDraftSlot >= draftMessageIndices.length - 1
+                                    }
+                                >
+                                    Next →
+                                </button>
+                            </div>
+                        ) : null}
+
+                        <div className="refinement-dock-header">
+                            <div className="refinement-dock-header-text">
+                                <span className="refinement-dock-title">Refine this essay</span>
+                                <span className="refinement-dock-sub">
+                                    One thread on your topic—the council revises your latest draft below.
+                                    Prompts apply to the most recent essay in this conversation.
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                className="config-link essay-voice-rules-link"
+                                onClick={() => onOpenSettings('voice')}
+                                disabled={isLoading}
+                                title="Open Settings → My Voice"
+                            >
+                                Voice rules
+                            </button>
+                        </div>
+
+                        {!isLoading ? (
+                            <div
+                                className="refinement-suggestions"
+                                role="group"
+                                aria-label="Quick refinement ideas"
+                            >
+                                {REFINEMENT_SUGGESTIONS.map(({ label, instruction }) => (
+                                    <button
+                                        key={label}
+                                        type="button"
+                                        className="refinement-chip"
+                                        disabled={isLoading}
+                                        onClick={() => sendRefinementSuggestion(instruction)}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="refinement-loading-hint">
+                                Council is updating your essay…
+                            </div>
+                        )}
+
+                        <div className="input-row-top">
+                            <label
+                                className={`search-toggle ${webSearch ? 'active' : ''}`}
+                                title="Toggle web search for this refinement"
+                            >
+                                <input
+                                    type="checkbox"
+                                    className="search-checkbox"
+                                    checked={webSearch}
+                                    onChange={() => setWebSearch(!webSearch)}
+                                    disabled={isLoading}
+                                />
+                                <span className="search-icon">🌐</span>
+                                {webSearch && <span className="search-label">Search On</span>}
+                            </label>
+
+                            <textarea
+                                className="message-input refinement-prompt-input"
+                                placeholder={
+                                    isLoading
+                                        ? 'Council is deliberating…'
+                                        : 'Your refinement (e.g. “Make the turn in paragraph 3 more explicit”)'
+                                }
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                disabled={isLoading}
+                                rows={3}
+                                style={{
+                                    height: 'auto',
+                                    minHeight: '88px',
+                                }}
+                            />
+
+                            {isLoading ? (
+                                <button
+                                    type="button"
+                                    className="send-button stop-button"
+                                    onClick={onAbort}
+                                    title="Stop generation"
+                                >
+                                    ⏹
+                                </button>
+                            ) : (
+                                <button type="submit" className="send-button" disabled={!input.trim()}>
+                                    ➤
+                                </button>
+                            )}
+                        </div>
+                    </form>
                 ) : (
                     <form
                         className={`input-container essay-input essay-input-${essayMode}`}
@@ -509,6 +814,7 @@ function AssistantMessageBody({
     onRegenerate,
     activeCouncil = null,
     activeWordTarget = null,
+    essayVersionLabel = null,
 }) {
     const useEssay = shouldUseEssayUX(msg, currentExecutionMode);
     const isStreaming =
@@ -590,6 +896,7 @@ function AssistantMessageBody({
                         councilNotes={councilNotes}
                         onRegenerate={onRegenerate}
                         canRegenerate={Boolean(onRegenerate) && !isLoading && isLastMessage}
+                        versionLabel={essayVersionLabel}
                     />
                 )}
 

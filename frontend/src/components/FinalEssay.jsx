@@ -17,6 +17,7 @@ export default function FinalEssay({
     councilNotes,
     onRegenerate,
     canRegenerate = false,
+    versionLabel = null,
 }) {
     const [isCopied, setIsCopied] = useState(false);
     const [showNotes, setShowNotes] = useState(false);
@@ -47,6 +48,12 @@ export default function FinalEssay({
             <div className="final-essay-meta">
                 <div className="final-essay-byline">
                     <span className="byline-label">Final essay</span>
+                    {versionLabel ? (
+                        <>
+                            <span className="byline-sep">·</span>
+                            <span className="final-essay-version">{versionLabel}</span>
+                        </>
+                    ) : null}
                     <span className="byline-sep">·</span>
                     <span className="byline-model">
                         synthesized by <strong>{shortName}</strong>
