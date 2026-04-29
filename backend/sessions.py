@@ -63,6 +63,7 @@ class UpdateSessionRequest(BaseModel):
     status: Optional[str] = None
     word_target: Optional[int] = Field(None, ge=50, le=5000)
     council_config: Optional[Dict[str, Any]] = None
+    conversation_id: Optional[str] = None
 
 
 class SessionRow(BaseModel):
@@ -77,6 +78,7 @@ class SessionRow(BaseModel):
     status: str = "in_progress"
     word_target: Optional[int] = None
     council_config: Optional[Dict[str, Any]] = None
+    conversation_id: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -112,6 +114,7 @@ def _coerce_session(row: Dict[str, Any]) -> SessionRow:
         status=row.get("status") or "in_progress",
         word_target=row.get("word_target"),
         council_config=row.get("council_config"),
+        conversation_id=row.get("conversation_id"),
         created_at=str(row["created_at"]) if row.get("created_at") else None,
         updated_at=str(row["updated_at"]) if row.get("updated_at") else None,
     )

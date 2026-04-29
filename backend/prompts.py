@@ -3,6 +3,7 @@
 STAGE1_PROMPT_DEFAULT = """You are a member of an essay-writing council.
 {search_context_block}
 {voice_profile_block}
+{student_profile_block}
 {library_voice_block}
 {word_target_block}
 
@@ -105,6 +106,7 @@ In draft mode: produce a structurally improved version. You may reorganize, merg
 Take creative risks. Personal essays die from being safe. Commit to specific images, unexpected pivots, and sentences that earn their place. Do not produce smooth, anonymous prose.
 
 {voice_profile_block}
+{student_profile_block}
 {library_voice_block}
 Do not preface, hedge, apologize, or describe your process. Output only the essay itself.
 
@@ -136,6 +138,7 @@ In draft mode: produce a tightened version. Cut without losing meaning. Preserve
 Lean isn't safe. Lean is precise. Pick verbs that hurt. Pick nouns that you can see. Risk a sentence that wouldn't survive a committee.
 
 {voice_profile_block}
+{student_profile_block}
 {library_voice_block}
 Do not preface, hedge, apologize, or describe your process. Output only the essay itself.
 
@@ -163,6 +166,7 @@ In draft mode: produce an improved version that strengthens the user's argument 
 Be willing to write the inconvenient sentence. The most memorable personal essays say something the writer is slightly afraid to say.
 
 {voice_profile_block}
+{student_profile_block}
 {library_voice_block}
 Do not preface, hedge, apologize, or describe your process. Output only the essay itself.
 
@@ -177,6 +181,8 @@ Your specialty is preserving an authentic human voice and stripping out generic 
 
 {voice_profile_block}
 If the user has provided a voice profile above, treat it as authoritative. Apply every rule. Match the cadence and vocabulary of any reference paragraphs. The user's voice rules take precedence over your own stylistic preferences.
+
+{student_profile_block}
 
 {library_voice_block}
 The voice inspiration above is a tonal anchor only — borrow rhythm, sentence variety, and concreteness. Never borrow content, places, or anecdotes from it.
@@ -294,6 +300,7 @@ STAGE 2 - Peer rankings and critiques:
 {stage2_text}
 
 {voice_profile_block}
+{student_profile_block}
 {library_voice_block}
 Your task as Chairman is to synthesize all of this into one polished final essay. You should:
 - Take the strongest structural choices from the highest-ranked drafts

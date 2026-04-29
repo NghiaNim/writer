@@ -167,6 +167,11 @@ export default function VoiceProfileSettings() {
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
 
+    const [profileFacts, setProfileFacts] = useState([]);
+    const [newProfileFact, setNewProfileFact] = useState('');
+    const [factsLoading, setFactsLoading] = useState(true);
+    const [factBusy, setFactBusy] = useState(false);
+
     const computeSnapshot = (data) =>
         JSON.stringify({
             rules: data.rules || [],
@@ -196,6 +201,24 @@ export default function VoiceProfileSettings() {
                 if (!cancelled) setError(e.message || 'Could not load voice profile.');
             } finally {
                 if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            setFactsLoading(true);
+            try {
+                const res = await api.userFacts.list();
+                if (!cancelled) setProfileFacts(res.facts || []);
+            } catch {
+                if (!cancelled) setProfileFacts([]);
+            } finally {
+                if (!cancelled) setFactsLoading(false);
             }
         })();
         return () => {
@@ -260,6 +283,33 @@ export default function VoiceProfileSettings() {
     };
     const removeAuthor = (idx) =>
         setPreferredAuthors((prev) => prev.filter((_, i) => i !== idx));
+
+    const handleAddProfileFact = async () => {
+        const v = newProfileFact.trim();
+        if (!v) return;
+        setFactBusy(true);
+        try {
+            const row = await api.userFacts.create(v, 'manual');
+            setProfileFacts((prev) => [row, ...prev]);
+            setNewProfileFact('');
+        } catch (e) {
+            setError(e.message || 'Could not save fact.');
+        } finally {
+            setFactBusy(false);
+        }
+    };
+
+    const handleRemoveProfileFact = async (id) => {
+        setFactBusy(true);
+        try {
+            await api.userFacts.delete(id);
+            setProfileFacts((prev) => prev.filter((f) => f.id !== id));
+        } catch (e) {
+            setError(e.message || 'Could not delete fact.');
+        } finally {
+            setFactBusy(false);
+        }
+    };
 
     // ----- Save -----
     const handleSave = async () => {
@@ -715,6 +765,55 @@ export default function VoiceProfileSettings() {
                         disabled={preferredAuthors.length >= 5 || !newAuthor.trim()}
                     >
                         Add
+                    </button>
+                </div>
+            </Panel>
+
+            <Panel
+                title="Profile facts"
+                count={profileFacts.length}
+                helper="Concrete things the council should remember about you (achievements, background, constraints). Injected into every run alongside voice rules."
+            >
+                {factsLoading ? (
+                    <div style={{ color: colors.textMuted, fontSize: '13px' }}>Loading facts…</div>
+                ) : profileFacts.length === 0 ? (
+                    <p style={{ margin: 0, fontSize: '13px', color: colors.textMuted }}>
+                        No saved facts yet. Add a few below (e.g. Olympic gold medalist in rowing, 2024).
+                    </p>
+                ) : (
+                    <ul style={{ margin: '0 0 12px', paddingLeft: '18px', color: colors.text }}>
+                        {profileFacts.map((f) => (
+                            <li key={f.id} style={{ marginBottom: '8px' }}>
+                                <span style={{ marginRight: '8px' }}>{f.fact_text}</span>
+                                <button
+                                    type="button"
+                                    style={removeButtonStyle}
+                                    onClick={() => handleRemoveProfileFact(f.id)}
+                                    disabled={factBusy}
+                                >
+                                    Remove
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                        type="text"
+                        value={newProfileFact}
+                        onChange={(e) => setNewProfileFact(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddProfileFact()}
+                        placeholder="e.g. First-generation college student; grew up in rural Maine"
+                        style={{ ...inputStyle, flex: 1 }}
+                        disabled={factBusy}
+                    />
+                    <button
+                        type="button"
+                        style={secondaryButtonStyle}
+                        onClick={handleAddProfileFact}
+                        disabled={factBusy || !newProfileFact.trim()}
+                    >
+                        Add fact
                     </button>
                 </div>
             </Panel>

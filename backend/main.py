@@ -3,7 +3,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import os
 import uuid
@@ -402,12 +402,17 @@ async def send_message_stream(
     supabase = get_supabase()
     raw_council_config: Optional[Dict[str, Any]] = None
     word_target: Optional[int] = None
+    session_topic: Optional[str] = None
+    session_so_what: Optional[str] = None
+    session_essay_type: Optional[str] = None
 
     if body.session_id:
         try:
             session_row = (
                 supabase.table("essay_sessions")
-                .select("council_config, word_target")
+                .select(
+                    "council_config, word_target, topic, so_what_answer, essay_type"
+                )
                 .eq("id", body.session_id)
                 .eq("user_id", user.id)
                 .limit(1)
@@ -417,6 +422,9 @@ async def send_message_stream(
                 row = session_row.data[0]
                 raw_council_config = row.get("council_config")
                 word_target = row.get("word_target")
+                session_topic = row.get("topic")
+                session_so_what = row.get("so_what_answer")
+                session_essay_type = row.get("essay_type")
         except Exception as e:
             print(f"WARN: failed to load session {body.session_id} for council config: {e}")
 
@@ -671,6 +679,31 @@ async def send_message_stream(
                 stage3_result if body.execution_mode == "full" else None,
                 metadata
             )
+
+            if body.execution_mode == "full" and stage3_result:
+                from .essay_memory import derive_topic_from_message, upsert_completed_essay
+
+                fe = stage3_result.get("response")
+                if fe is None:
+                    fe = stage3_result.get("content")
+                if fe is None:
+                    fe = ""
+                if not isinstance(fe, str):
+                    fe = str(fe)
+                topic_val = (session_topic or "").strip() or derive_topic_from_message(
+                    body.content
+                )
+                upsert_completed_essay(
+                    user_id=user.id,
+                    conversation_id=conversation_id,
+                    session_id=body.session_id,
+                    essay_mode=body.essay_mode,
+                    word_target=word_target,
+                    topic=topic_val,
+                    full_essay=fe.strip(),
+                    essay_type=session_essay_type,
+                    so_what_answer=session_so_what,
+                )
 
             # Send completion event
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
@@ -1163,6 +1196,70 @@ async def api_reject_suggestion(
     return reject_suggestion(
         user.id, body.suggestion_id, essay_type=body.essay_type
     ).model_dump()
+
+
+class EssayMemoryFeedbackBody(BaseModel):
+    conversation_id: str = Field(..., min_length=1)
+    rating: Optional[int] = Field(None, ge=1, le=5)
+    feedback_text: Optional[str] = None
+
+
+@app.post("/api/essay-memory/feedback")
+async def api_essay_memory_feedback(
+    body: EssayMemoryFeedbackBody,
+    user: AuthUser = Depends(get_current_user),
+):
+    from .essay_memory import save_essay_feedback
+
+    ok = save_essay_feedback(
+        user_id=user.id,
+        conversation_id=body.conversation_id.strip(),
+        rating=body.rating,
+        feedback_text=body.feedback_text,
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=404,
+            detail="No saved essay found for this conversation yet.",
+        )
+    return {"ok": True}
+
+
+class UserFactBody(BaseModel):
+    fact_text: str = Field(..., min_length=1, max_length=8000)
+    source: Optional[str] = "manual"
+
+
+@app.post("/api/user-facts")
+async def api_create_user_fact(
+    body: UserFactBody,
+    user: AuthUser = Depends(get_current_user),
+):
+    from .user_facts import add_user_fact
+
+    row = add_user_fact(user.id, body.fact_text, source=body.source or "manual")
+    if not row:
+        raise HTTPException(status_code=400, detail="Could not save fact")
+    return row
+
+
+@app.get("/api/user-facts")
+async def api_list_user_facts(user: AuthUser = Depends(get_current_user)):
+    from .user_facts import list_user_facts
+
+    return {"facts": list_user_facts(user.id)}
+
+
+@app.delete("/api/user-facts/{fact_id}")
+async def api_delete_user_fact(
+    fact_id: str,
+    user: AuthUser = Depends(get_current_user),
+):
+    from .user_facts import delete_user_fact
+
+    if not delete_user_fact(user.id, fact_id):
+        raise HTTPException(status_code=404, detail="Fact not found")
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

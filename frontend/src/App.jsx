@@ -314,6 +314,16 @@ function AppShell() {
       setCurrentCouncil(activeCouncil);
       setCurrentWordTarget(typeof wordTarget === 'number' ? wordTarget : null);
 
+      if (sessionId) {
+        try {
+          await api.sessions.update(sessionId, {
+            conversation_id: newConv.id,
+          });
+        } catch (e) {
+          console.warn('Failed to link session to conversation:', e);
+        }
+      }
+
       await handleSendMessage(message, false, {
         essayMode: chosenMode,
         conversationId: newConv.id,
@@ -887,6 +897,7 @@ function AppShell() {
       ) : (
         <ChatInterface
           conversation={currentConversation}
+          conversationId={currentConversationId}
           onSendMessage={handleSendMessage}
           onAbort={handleAbort}
           onRegenerate={handleRegenerate}

@@ -62,6 +62,7 @@ function shouldUseEssayUX(msg, currentExecutionMode) {
 
 export default function ChatInterface({
     conversation,
+    conversationId = null,
     onSendMessage,
     onAbort,
     onRegenerate,
@@ -81,6 +82,12 @@ export default function ChatInterface({
     const [input, setInput] = useState('');
     const [webSearch, setWebSearch] = useState(false);
     const [composerCollapsed, setComposerCollapsed] = useState(false);
+    const [essayFeedbackDoneKey, setEssayFeedbackDoneKey] = useState(null);
+    const [feedbackRating, setFeedbackRating] = useState(null);
+    const [feedbackNotes, setFeedbackNotes] = useState('');
+    const [feedbackSaving, setFeedbackSaving] = useState(false);
+    const [feedbackError, setFeedbackError] = useState(null);
+    const [saveFactFromFeedback, setSaveFactFromFeedback] = useState(false);
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
 
@@ -89,6 +96,14 @@ export default function ChatInterface({
             setComposerCollapsed(false);
         }
     }, [isLoading]);
+
+    useEffect(() => {
+        setEssayFeedbackDoneKey(null);
+        setFeedbackRating(null);
+        setFeedbackNotes('');
+        setFeedbackError(null);
+        setSaveFactFromFeedback(false);
+    }, [conversationId]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -144,6 +159,62 @@ export default function ChatInterface({
         );
     }
 
+    const msgs = conversation.messages || [];
+    const lastIdx = msgs.length - 1;
+    const lastMsg = lastIdx >= 0 ? msgs[lastIdx] : null;
+    const essayFeedbackKey =
+        conversationId &&
+        lastMsg?.role === 'assistant' &&
+        lastMsg?.stage3 &&
+        !isLoading &&
+        shouldUseEssayUX(lastMsg, executionMode)
+            ? `${conversationId}-${lastIdx}`
+            : null;
+    const showEssayFeedbackBar =
+        Boolean(essayFeedbackKey) && essayFeedbackDoneKey !== essayFeedbackKey;
+
+    const dismissEssayFeedback = (submitted) => {
+        if (essayFeedbackKey) {
+            setEssayFeedbackDoneKey(essayFeedbackKey);
+        }
+        if (!submitted) {
+            setFeedbackRating(null);
+            setFeedbackNotes('');
+        }
+        setFeedbackError(null);
+    };
+
+    const submitEssayFeedback = async () => {
+        if (!conversationId) return;
+        if (feedbackRating == null && !feedbackNotes.trim()) {
+            setFeedbackError('Choose a star rating or add a short note.');
+            return;
+        }
+        setFeedbackError(null);
+        setFeedbackSaving(true);
+        try {
+            await api.essayMemory.submitFeedback(conversationId, {
+                rating: feedbackRating,
+                feedbackText: feedbackNotes.trim(),
+            });
+            if (saveFactFromFeedback && feedbackNotes.trim()) {
+                try {
+                    await api.userFacts.create(feedbackNotes.trim(), 'feedback');
+                } catch (e) {
+                    console.warn('Could not save profile fact:', e);
+                }
+            }
+            dismissEssayFeedback(true);
+            setFeedbackRating(null);
+            setFeedbackNotes('');
+            setSaveFactFromFeedback(false);
+        } catch (e) {
+            setFeedbackError(e.message || 'Could not send feedback.');
+        } finally {
+            setFeedbackSaving(false);
+        }
+    };
+
     return (
         <div className="chat-interface">
             {/* Messages Area */}
@@ -195,6 +266,68 @@ export default function ChatInterface({
                 {/* Bottom Spacer for floating input */}
                 <div ref={messagesEndRef} style={{ height: '20px' }} />
             </div>
+
+            {showEssayFeedbackBar ? (
+                <div className="essay-feedback-strip">
+                    <div className="essay-feedback-strip-inner">
+                        <h3 className="essay-feedback-title">How was this essay run?</h3>
+                        <p className="essay-feedback-sub">
+                            Quick feedback helps us improve. Your rating is optional if you add a note.
+                        </p>
+                        <div className="essay-feedback-stars" role="group" aria-label="Rating 1 to 5">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                                <button
+                                    key={n}
+                                    type="button"
+                                    className={`essay-feedback-star ${feedbackRating === n ? 'active' : ''}`}
+                                    onClick={() => setFeedbackRating(n)}
+                                    aria-pressed={feedbackRating === n}
+                                >
+                                    ★
+                                </button>
+                            ))}
+                        </div>
+                        <textarea
+                            className="essay-feedback-textarea"
+                            rows={2}
+                            placeholder="Anything we should know? (optional)"
+                            value={feedbackNotes}
+                            onChange={(e) => setFeedbackNotes(e.target.value)}
+                            disabled={feedbackSaving}
+                        />
+                        <label className="essay-feedback-fact-label">
+                            <input
+                                type="checkbox"
+                                checked={saveFactFromFeedback}
+                                onChange={(e) => setSaveFactFromFeedback(e.target.checked)}
+                                disabled={feedbackSaving || !feedbackNotes.trim()}
+                            />
+                            Save my note as a profile fact for future essays
+                        </label>
+                        {feedbackError ? (
+                            <div className="essay-feedback-error">{feedbackError}</div>
+                        ) : null}
+                        <div className="essay-feedback-actions">
+                            <button
+                                type="button"
+                                className="essay-feedback-skip"
+                                onClick={() => dismissEssayFeedback(false)}
+                                disabled={feedbackSaving}
+                            >
+                                Skip
+                            </button>
+                            <button
+                                type="button"
+                                className="essay-feedback-submit"
+                                onClick={submitEssayFeedback}
+                                disabled={feedbackSaving}
+                            >
+                                {feedbackSaving ? 'Sending…' : 'Submit feedback'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             {/* Floating Command Capsule */}
             <div

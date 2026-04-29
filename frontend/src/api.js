@@ -623,6 +623,54 @@ export const api = {
     },
   },
 
+  essayMemory: {
+    async submitFeedback(conversationId, { rating = null, feedbackText = '' } = {}) {
+      const response = await authedFetch(`${API_BASE}/api/essay-memory/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          rating: rating ?? null,
+          feedback_text: feedbackText || null,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Could not save feedback'));
+      }
+      return response.json();
+    },
+  },
+
+  userFacts: {
+    async list() {
+      const response = await authedFetch(`${API_BASE}/api/user-facts`);
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to load facts'));
+      }
+      return response.json();
+    },
+    async create(factText, source = 'manual') {
+      const response = await authedFetch(`${API_BASE}/api/user-facts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fact_text: factText, source }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to save fact'));
+      }
+      return response.json();
+    },
+    async delete(factId) {
+      const response = await authedFetch(`${API_BASE}/api/user-facts/${encodeURIComponent(factId)}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to delete fact'));
+      }
+      return response.json();
+    },
+  },
+
   /**
    * Smart intake helpers (single-LLM-call, no council).
    *   POST /api/intake/questions   → { questions: string[] }

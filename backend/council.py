@@ -10,6 +10,7 @@ from .search import perform_web_search, SearchProvider
 from .settings import CouncilPersona, get_settings
 from .voice_profile import format_voice_profile_block, load_voice_profile, VoiceProfile
 from .voice_library import format_library_voice_block
+from .user_facts import load_recent_user_facts, format_student_profile_block
 from .prompts import (
     DEFAULT_COUNCIL_PERSONAS,
     PERSONAS_BY_KEY,
@@ -236,6 +237,9 @@ async def stage1_collect_responses(
             logger.warning("voice profile load failed for user=%s: %s", user_id, e)
     voice_profile_block = format_voice_profile_block(profile)
 
+    rows = load_recent_user_facts(user_id) if user_id else []
+    student_profile_block = format_student_profile_block(rows)
+
     # Library-voice scaffolding (invisible to user). Borrowed for rhythm /
     # cadence only — content stays the user's. Empty string if no library
     # voice is provided.
@@ -265,6 +269,7 @@ async def stage1_collect_responses(
                 user_query=user_query,
                 search_context_block=search_context_block,
                 voice_profile_block=voice_profile_block,
+                student_profile_block=student_profile_block,
                 library_voice_block=library_voice_block,
                 essay_mode_block=essay_mode_block,
                 word_target_block=word_target_block,
@@ -565,6 +570,9 @@ async def stage3_synthesize_final(
             )
     voice_profile_block = format_voice_profile_block(profile)
 
+    fact_rows = load_recent_user_facts(user_id) if user_id else []
+    student_profile_block = format_student_profile_block(fact_rows)
+
     # Library voice scaffolding (invisible to user).
     library_voice_block = format_library_voice_block(library_voice)
 
@@ -588,6 +596,7 @@ async def stage3_synthesize_final(
             stage2_text=stage2_text,
             search_context_block=search_context_block,
             voice_profile_block=voice_profile_block,
+            student_profile_block=student_profile_block,
             library_voice_block=library_voice_block,
             essay_mode_block=essay_mode_block,
             word_target_block=word_target_block,
