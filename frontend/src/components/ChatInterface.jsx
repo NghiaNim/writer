@@ -157,6 +157,7 @@ export default function ChatInterface({
     const [composerCollapsed, setComposerCollapsed] = useState(false);
     const [essayFeedbackDoneKey, setEssayFeedbackDoneKey] = useState(null);
     const [feedbackRating, setFeedbackRating] = useState(null);
+    const [feedbackHoverRating, setFeedbackHoverRating] = useState(null);
     const [feedbackNotes, setFeedbackNotes] = useState('');
     const [feedbackSaving, setFeedbackSaving] = useState(false);
     const [feedbackError, setFeedbackError] = useState(null);
@@ -281,14 +282,14 @@ export default function ChatInterface({
         setFocusedDraftSlot(draftMessageIndices.length - 1);
     }, [conversationId, draftNavKey]);
 
+    // Scroll to top when switching drafts — the focused draft is now the only
+    // visible one so we want to read it from the beginning, not mid-page.
     useEffect(() => {
-        if (!conversation?.id || draftMessageIndices.length === 0) return;
-        const mi = draftMessageIndices[focusedDraftSlot];
-        if (mi == null) return;
-        document
-            .getElementById(`essay-msg-${conversation.id}-${mi}`)
-            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, [focusedDraftSlot, conversation?.id, draftNavKey]);
+        if (!showRefinementDock || draftMessageIndices.length <= 1) return;
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = 0;
+        }
+    }, [focusedDraftSlot]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -379,6 +380,7 @@ export default function ChatInterface({
             setFeedbackRating(null);
             setFeedbackNotes('');
         }
+        setFeedbackHoverRating(null);
         setFeedbackError(null);
     };
 
@@ -436,25 +438,26 @@ export default function ChatInterface({
                     </div>
                 ) : (
                     conversation.messages.map((msg, index) => {
+                        // When multiple drafts exist, only show the focused draft
+                        // and the single user message that preceded it.
+                        if (showRefinementDock && draftMessageIndices.length > 1) {
+                            const focusedDraftIdx = draftMessageIndices[focusedDraftSlot];
+                            const promptIdx = focusedDraftIdx > 0 ? focusedDraftIdx - 1 : null;
+                            if (index !== focusedDraftIdx && index !== promptIdx) {
+                                return null;
+                            }
+                        }
+
                         const versionLabelForAssistant =
                             showRefinementDock && draftMessageIndices.length > 1 && msg.role === 'assistant'
-                                ? (() => {
-                                      const pos = draftMessageIndices.indexOf(index);
-                                      return pos >= 0
-                                          ? `Draft ${pos + 1} of ${draftMessageIndices.length}`
-                                          : null;
-                                  })()
+                                ? `Draft ${focusedDraftSlot + 1} of ${draftMessageIndices.length}`
                                 : null;
-                        const isFocusedDraft =
-                            showRefinementDock &&
-                            draftMessageIndices.length > 1 &&
-                            index === draftMessageIndices[focusedDraftSlot];
 
                         return (
                         <div
                             key={`${conversation.id}-msg-${index}`}
                             id={`essay-msg-${conversation.id}-${index}`}
-                            className={`message ${msg.role}${isFocusedDraft ? ' essay-draft-focused' : ''}`}
+                            className={`message ${msg.role}`}
                         >
                             <div className="message-role">
                                 {msg.role === 'user' ? 'Your Question to the Council' : 'MidnightCoffee'}
@@ -505,13 +508,19 @@ export default function ChatInterface({
                             {feedbackRating == null && !feedbackNotes ? (
                                 <div className="essay-feedback-compact-row">
                                     <span className="essay-feedback-compact-label">How was this run?</span>
-                                    <div className="essay-feedback-stars" role="group" aria-label="Rating 1 to 5">
+                                    <div
+                                        className="essay-feedback-stars"
+                                        role="group"
+                                        aria-label="Rating 1 to 5"
+                                        onMouseLeave={() => setFeedbackHoverRating(null)}
+                                    >
                                         {[1, 2, 3, 4, 5].map((n) => (
                                             <button
                                                 key={n}
                                                 type="button"
-                                                className={`essay-feedback-star ${feedbackRating === n ? 'active' : ''}`}
+                                                className={`essay-feedback-star ${n <= (feedbackHoverRating ?? feedbackRating ?? 0) ? 'active' : ''}`}
                                                 onClick={() => setFeedbackRating(n)}
+                                                onMouseEnter={() => setFeedbackHoverRating(n)}
                                                 aria-pressed={feedbackRating === n}
                                             >
                                                 ★
@@ -531,13 +540,19 @@ export default function ChatInterface({
                                 <>
                                     <div className="essay-feedback-compact-row">
                                         <span className="essay-feedback-compact-label">How was this run?</span>
-                                        <div className="essay-feedback-stars" role="group" aria-label="Rating 1 to 5">
+                                        <div
+                                            className="essay-feedback-stars"
+                                            role="group"
+                                            aria-label="Rating 1 to 5"
+                                            onMouseLeave={() => setFeedbackHoverRating(null)}
+                                        >
                                             {[1, 2, 3, 4, 5].map((n) => (
                                                 <button
                                                     key={n}
                                                     type="button"
-                                                    className={`essay-feedback-star ${feedbackRating === n ? 'active' : ''}`}
+                                                    className={`essay-feedback-star ${n <= (feedbackHoverRating ?? feedbackRating ?? 0) ? 'active' : ''}`}
                                                     onClick={() => setFeedbackRating(n)}
+                                                    onMouseEnter={() => setFeedbackHoverRating(n)}
                                                     aria-pressed={feedbackRating === n}
                                                 >
                                                     ★

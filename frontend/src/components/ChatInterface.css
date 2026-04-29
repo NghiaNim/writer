@@ -475,17 +475,13 @@
 .essay-feedback-star {
   background: transparent;
   border: none;
-  color: #475569;
+  color: #374151;
   font-size: 19px;
   line-height: 1;
   cursor: pointer;
   padding: 2px 3px;
   border-radius: 4px;
-  transition: color 0.1s;
-}
-
-.essay-feedback-star:hover {
-  color: #94a3b8;
+  transition: color 0.08s;
 }
 
 .essay-feedback-star.active {
