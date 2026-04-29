@@ -117,7 +117,6 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
 
   // Ref for chairman select to focus on validation error
@@ -136,46 +135,30 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     setActiveSection(initialSection);
   }, [initialSection]);
 
-  // Check for changes
-  useEffect(() => {
-    if (!settings) return;
-
-    const checkChanges = () => {
-      if (selectedSearchProvider !== settings.search_provider) return true;
-      if (searchKeywordExtraction !== (settings.search_keyword_extraction || 'direct')) return true;
-      if (fullContentResults !== (settings.full_content_results ?? 3)) return true;
-      if (searchResultCount !== (settings.search_result_count ?? 8)) return true;
-      if (searchHybridMode !== (settings.search_hybrid_mode ?? true)) return true;
-      if (showFreeOnly !== (settings.show_free_only ?? false)) return true;
-
-      // Enabled Providers
-      if (JSON.stringify(enabledProviders) !== JSON.stringify(settings.enabled_providers)) return true;
-      if (JSON.stringify(directProviderToggles) !== JSON.stringify(settings.direct_provider_toggles)) return true;
-
-      // Council Configuration (unified)
-      if (JSON.stringify(councilModels) !== JSON.stringify(settings.council_models)) return true;
-      if (chairmanModel !== settings.chairman_model) return true;
-      if (councilTemperature !== (settings.council_temperature ?? 0.5)) return true;
-      if (chairmanTemperature !== (settings.chairman_temperature ?? 0.4)) return true;
-      if (stage2Temperature !== (settings.stage2_temperature ?? 0.3)) return true;
-
-      // Remote/Local filters
-      if (JSON.stringify(councilMemberFilters) !== JSON.stringify(settings.council_member_filters || {})) return true;
-      if (chairmanFilter !== (settings.chairman_filter || 'remote')) return true;
-      // Prompts
-      if (prompts.stage1_prompt !== settings.stage1_prompt) return true;
-      if (prompts.stage2_prompt !== settings.stage2_prompt) return true;
-      if (prompts.stage3_prompt !== settings.stage3_prompt) return true;
-
-      // Council personas
-      if (JSON.stringify(councilPersonas) !== JSON.stringify(settings.council_personas || [])) return true;
-
-      // Note: API keys are auto-saved on test, so we don't check them here
-
-      return false;
-    };
-
-    setHasChanges(checkChanges());
+  // Derived dirty-check — useMemo avoids the extra setState render cycle that
+  // the old useEffect+setHasChanges pattern caused.
+  const hasChanges = useMemo(() => {
+    if (!settings) return false;
+    if (selectedSearchProvider !== settings.search_provider) return true;
+    if (searchKeywordExtraction !== (settings.search_keyword_extraction || 'direct')) return true;
+    if (fullContentResults !== (settings.full_content_results ?? 3)) return true;
+    if (searchResultCount !== (settings.search_result_count ?? 8)) return true;
+    if (searchHybridMode !== (settings.search_hybrid_mode ?? true)) return true;
+    if (showFreeOnly !== (settings.show_free_only ?? false)) return true;
+    if (JSON.stringify(enabledProviders) !== JSON.stringify(settings.enabled_providers)) return true;
+    if (JSON.stringify(directProviderToggles) !== JSON.stringify(settings.direct_provider_toggles)) return true;
+    if (JSON.stringify(councilModels) !== JSON.stringify(settings.council_models)) return true;
+    if (chairmanModel !== settings.chairman_model) return true;
+    if (councilTemperature !== (settings.council_temperature ?? 0.5)) return true;
+    if (chairmanTemperature !== (settings.chairman_temperature ?? 0.4)) return true;
+    if (stage2Temperature !== (settings.stage2_temperature ?? 0.3)) return true;
+    if (JSON.stringify(councilMemberFilters) !== JSON.stringify(settings.council_member_filters || {})) return true;
+    if (chairmanFilter !== (settings.chairman_filter || 'remote')) return true;
+    if (prompts.stage1_prompt !== settings.stage1_prompt) return true;
+    if (prompts.stage2_prompt !== settings.stage2_prompt) return true;
+    if (prompts.stage3_prompt !== settings.stage3_prompt) return true;
+    if (JSON.stringify(councilPersonas) !== JSON.stringify(settings.council_personas || [])) return true;
+    return false;
   }, [
     settings,
     selectedSearchProvider,
@@ -194,7 +177,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     councilMemberFilters,
     chairmanFilter,
     prompts,
-    councilPersonas
+    councilPersonas,
   ]);
 
   // Helper to determine if filters need to switch based on availability

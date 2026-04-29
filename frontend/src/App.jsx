@@ -246,7 +246,7 @@ function AppShell() {
   const handleDeleteConversation = async (id) => {
     try {
       await api.deleteConversation(id);
-      setConversations(conversations.filter(c => c.id !== id));
+      setConversations(prev => prev.filter(c => c.id !== id));
       if (id === currentConversationId) {
         setCurrentConversationId(null);
         setCurrentConversation(null);

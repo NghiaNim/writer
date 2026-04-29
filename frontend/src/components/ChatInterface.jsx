@@ -163,7 +163,11 @@ export default function ChatInterface({
     const [saveFactFromFeedback, setSaveFactFromFeedback] = useState(false);
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
+    const conversationRef = useRef(conversation);
     const [focusedDraftSlot, setFocusedDraftSlot] = useState(0);
+    const [refinementDockCollapsed, setRefinementDockCollapsed] = useState(false);
+    const [dynamicSuggestions, setDynamicSuggestions] = useState([]);
+    const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
     const draftMessageIndices = useMemo(() => {
         const list = conversation?.messages || [];
@@ -182,6 +186,29 @@ export default function ChatInterface({
         draftMessageIndices.length > 0 &&
         councilConfigured;
 
+    const essayFeedbackKey = useMemo(() => {
+        if (!conversationId || !conversation?.messages?.length) return null;
+        const m = conversation.messages;
+        const li = m.length - 1;
+        const lm = m[li];
+        if (
+            lm?.role !== 'assistant' ||
+            !lm?.stage3 ||
+            isLoading ||
+            !shouldUseEssayUX(lm, executionMode)
+        ) {
+            return null;
+        }
+        return `${conversationId}-${li}`;
+    }, [conversation, conversationId, isLoading, executionMode]);
+
+    const showEssayFeedbackBar =
+        Boolean(essayFeedbackKey) && essayFeedbackDoneKey !== essayFeedbackKey;
+
+    useEffect(() => {
+        conversationRef.current = conversation;
+    }, [conversation]);
+
     useEffect(() => {
         if (!isLoading) {
             setComposerCollapsed(false);
@@ -194,7 +221,60 @@ export default function ChatInterface({
         setFeedbackNotes('');
         setFeedbackError(null);
         setSaveFactFromFeedback(false);
+        setRefinementDockCollapsed(false);
+        setDynamicSuggestions([]);
     }, [conversationId]);
+
+    useEffect(() => {
+        if (showEssayFeedbackBar && showRefinementDock) {
+            setRefinementDockCollapsed(true);
+        }
+    }, [showEssayFeedbackBar, showRefinementDock]);
+
+    useEffect(() => {
+        if (!showRefinementDock || isLoading || !conversationId) {
+            return undefined;
+        }
+        const conv = conversationRef.current;
+        const essay = getLatestCompletedEssayText(conv?.messages || []);
+        if (!essay.trim()) {
+            return undefined;
+        }
+        const brief = getOriginalEssayBrief(conv?.messages || []);
+        let cancelled = false;
+        setSuggestionsLoading(true);
+        api.refinement
+            .suggestions({ essayText: essay, originalBrief: brief })
+            .then((r) => {
+                const list = r?.suggestions;
+                if (
+                    cancelled ||
+                    !Array.isArray(list) ||
+                    list.length < 3
+                ) {
+                    if (!cancelled) setDynamicSuggestions([]);
+                    return;
+                }
+                const cleaned = list
+                    .map((item) => ({
+                        label: String(item?.label || '').trim(),
+                        instruction: String(item?.instruction || '').trim(),
+                    }))
+                    .filter((x) => x.label && x.instruction);
+                if (!cancelled) {
+                    setDynamicSuggestions(cleaned.length >= 3 ? cleaned : []);
+                }
+            })
+            .catch(() => {
+                if (!cancelled) setDynamicSuggestions([]);
+            })
+            .finally(() => {
+                if (!cancelled) setSuggestionsLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [showRefinementDock, isLoading, conversationId, draftNavKey]);
 
     useEffect(() => {
         if (draftMessageIndices.length === 0) return;
@@ -272,8 +352,6 @@ export default function ChatInterface({
     }
 
     const msgs = conversation.messages || [];
-    const lastIdx = msgs.length - 1;
-    const lastMsg = lastIdx >= 0 ? msgs[lastIdx] : null;
 
     const sendRefinementSuggestion = (instruction) => {
         if (!instruction?.trim() || isLoading) return;
@@ -290,16 +368,8 @@ export default function ChatInterface({
             Math.min(draftMessageIndices.length - 1, s + 1)
         );
 
-    const essayFeedbackKey =
-        conversationId &&
-        lastMsg?.role === 'assistant' &&
-        lastMsg?.stage3 &&
-        !isLoading &&
-        shouldUseEssayUX(lastMsg, executionMode)
-            ? `${conversationId}-${lastIdx}`
-            : null;
-    const showEssayFeedbackBar =
-        Boolean(essayFeedbackKey) && essayFeedbackDoneKey !== essayFeedbackKey;
+    const suggestionChips =
+        dynamicSuggestions.length >= 3 ? dynamicSuggestions : REFINEMENT_SUGGESTIONS;
 
     const dismissEssayFeedback = (submitted) => {
         if (essayFeedbackKey) {
@@ -421,72 +491,96 @@ export default function ChatInterface({
                 <div ref={messagesEndRef} style={{ height: '20px' }} />
             </div>
 
-            {showEssayFeedbackBar ? (
-                <div className="essay-feedback-strip">
-                    <div className="essay-feedback-strip-inner">
-                        <h3 className="essay-feedback-title">How was this essay run?</h3>
-                        <p className="essay-feedback-sub">
-                            Quick feedback helps us improve. Your rating is optional if you add a note.
-                        </p>
-                        <div className="essay-feedback-stars" role="group" aria-label="Rating 1 to 5">
-                            {[1, 2, 3, 4, 5].map((n) => (
-                                <button
-                                    key={n}
-                                    type="button"
-                                    className={`essay-feedback-star ${feedbackRating === n ? 'active' : ''}`}
-                                    onClick={() => setFeedbackRating(n)}
-                                    aria-pressed={feedbackRating === n}
-                                >
-                                    ★
-                                </button>
-                            ))}
-                        </div>
-                        <textarea
-                            className="essay-feedback-textarea"
-                            rows={2}
-                            placeholder="Anything we should know? (optional)"
-                            value={feedbackNotes}
-                            onChange={(e) => setFeedbackNotes(e.target.value)}
-                            disabled={feedbackSaving}
-                        />
-                        <label className="essay-feedback-fact-label">
-                            <input
-                                type="checkbox"
-                                checked={saveFactFromFeedback}
-                                onChange={(e) => setSaveFactFromFeedback(e.target.checked)}
-                                disabled={feedbackSaving || !feedbackNotes.trim()}
-                            />
-                            Save my note as a profile fact for future essays
-                        </label>
-                        {feedbackError ? (
-                            <div className="essay-feedback-error">{feedbackError}</div>
-                        ) : null}
-                        <div className="essay-feedback-actions">
-                            <button
-                                type="button"
-                                className="essay-feedback-skip"
-                                onClick={() => dismissEssayFeedback(false)}
-                                disabled={feedbackSaving}
-                            >
-                                Skip
-                            </button>
-                            <button
-                                type="button"
-                                className="essay-feedback-submit"
-                                onClick={submitEssayFeedback}
-                                disabled={feedbackSaving}
-                            >
-                                {feedbackSaving ? 'Sending…' : 'Submit feedback'}
-                            </button>
+            {/* Floating Command Capsule — above feedback strip so “How was this run?” stays visible */}
+            <div
+                className={`input-area ${
+                    !showRefinementDock && composerCollapsed && isLoading
+                        ? 'input-area-composer-collapsed'
+                        : ''
+                }`}
+            >
+                {showEssayFeedbackBar ? (
+                    <div className="essay-feedback-strip">
+                        <div className="essay-feedback-strip-inner">
+                            {feedbackRating == null && !feedbackNotes ? (
+                                <div className="essay-feedback-compact-row">
+                                    <span className="essay-feedback-compact-label">How was this run?</span>
+                                    <div className="essay-feedback-stars" role="group" aria-label="Rating 1 to 5">
+                                        {[1, 2, 3, 4, 5].map((n) => (
+                                            <button
+                                                key={n}
+                                                type="button"
+                                                className={`essay-feedback-star ${feedbackRating === n ? 'active' : ''}`}
+                                                onClick={() => setFeedbackRating(n)}
+                                                aria-pressed={feedbackRating === n}
+                                            >
+                                                ★
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="essay-feedback-skip"
+                                        onClick={() => dismissEssayFeedback(false)}
+                                        disabled={feedbackSaving}
+                                    >
+                                        Skip
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="essay-feedback-compact-row">
+                                        <span className="essay-feedback-compact-label">How was this run?</span>
+                                        <div className="essay-feedback-stars" role="group" aria-label="Rating 1 to 5">
+                                            {[1, 2, 3, 4, 5].map((n) => (
+                                                <button
+                                                    key={n}
+                                                    type="button"
+                                                    className={`essay-feedback-star ${feedbackRating === n ? 'active' : ''}`}
+                                                    onClick={() => setFeedbackRating(n)}
+                                                    aria-pressed={feedbackRating === n}
+                                                >
+                                                    ★
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <textarea
+                                        className="essay-feedback-textarea"
+                                        rows={2}
+                                        placeholder="Anything we should know? (optional)"
+                                        value={feedbackNotes}
+                                        onChange={(e) => setFeedbackNotes(e.target.value)}
+                                        disabled={feedbackSaving}
+                                        autoFocus
+                                    />
+                                    {feedbackError ? (
+                                        <div className="essay-feedback-error">{feedbackError}</div>
+                                    ) : null}
+                                    <div className="essay-feedback-actions">
+                                        <button
+                                            type="button"
+                                            className="essay-feedback-skip"
+                                            onClick={() => dismissEssayFeedback(false)}
+                                            disabled={feedbackSaving}
+                                        >
+                                            Skip
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="essay-feedback-submit"
+                                            onClick={submitEssayFeedback}
+                                            disabled={feedbackSaving}
+                                        >
+                                            {feedbackSaving ? 'Sending…' : 'Submit feedback'}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
-                </div>
-            ) : null}
+                ) : null}
 
-            {/* Floating Command Capsule */}
-            <div
-                className={`input-area ${composerCollapsed && isLoading ? 'input-area-composer-collapsed' : ''}`}
-            >
                 {/* Legacy settings.json often has empty council_models while Supabase
                     config is valid — never block the composer during an active run. */}
                 {!councilConfigured && !isLoading ? (
@@ -498,25 +592,43 @@ export default function ChatInterface({
                             <button className="config-link" onClick={() => onOpenSettings('council')}>Configure Council</button>
                         </span>
                     </div>
-                ) : isLoading && composerCollapsed ? (
+                ) : showRefinementDock && refinementDockCollapsed ? (
+                    <div className="input-container input-composer-collapsed-strip">
+                        <button
+                            type="button"
+                            className="composer-expand-btn"
+                            onClick={() => setRefinementDockCollapsed(false)}
+                            title="Show refinement panel"
+                        >
+                            Expand refinement
+                        </button>
+                        <span className="composer-collapsed-hint">
+                            {isLoading
+                                ? 'Council is updating your essay'
+                                : 'Refinement hidden — more room to read'}
+                        </span>
+                        {isLoading ? (
+                            <button
+                                type="button"
+                                className="send-button stop-button"
+                                onClick={onAbort}
+                                title="Stop generation"
+                            >
+                                ⏹
+                            </button>
+                        ) : null}
+                    </div>
+                ) : !showRefinementDock && isLoading && composerCollapsed ? (
                     <div className="input-container input-composer-collapsed-strip">
                         <button
                             type="button"
                             className="composer-expand-btn"
                             onClick={() => setComposerCollapsed(false)}
-                            title={
-                                showRefinementDock
-                                    ? 'Show refinement controls'
-                                    : 'Show topic/draft input and mode controls'
-                            }
+                            title="Show topic/draft input and mode controls"
                         >
-                            {showRefinementDock ? 'Show refinement' : 'Show composer'}
+                            Show composer
                         </button>
-                        <span className="composer-collapsed-hint">
-                            {showRefinementDock
-                                ? 'Council is updating your essay'
-                                : 'Drafting in progress'}
-                        </span>
+                        <span className="composer-collapsed-hint">Drafting in progress</span>
                         <button
                             type="button"
                             className="send-button stop-button"
@@ -539,10 +651,10 @@ export default function ChatInterface({
                                 <button
                                     type="button"
                                     className="composer-minimize-btn"
-                                    onClick={() => setComposerCollapsed(true)}
-                                    title="Collapse while the council runs"
+                                    onClick={() => setRefinementDockCollapsed(true)}
+                                    title="Hide refinement panel"
                                 >
-                                    Hide composer
+                                    Hide refinement
                                 </button>
                             </div>
                         ) : null}
@@ -586,35 +698,55 @@ export default function ChatInterface({
                                     Prompts apply to the most recent essay in this conversation.
                                 </span>
                             </div>
-                            <button
-                                type="button"
-                                className="config-link essay-voice-rules-link"
-                                onClick={() => onOpenSettings('voice')}
-                                disabled={isLoading}
-                                title="Open Settings → My Voice"
-                            >
-                                Voice rules
-                            </button>
+                            <div className="refinement-dock-header-actions">
+                                <button
+                                    type="button"
+                                    className="refinement-dock-collapse-btn"
+                                    onClick={() => setRefinementDockCollapsed(true)}
+                                    disabled={isLoading}
+                                    title="Hide refinement panel"
+                                >
+                                    Hide
+                                </button>
+                                <button
+                                    type="button"
+                                    className="config-link essay-voice-rules-link"
+                                    onClick={() => onOpenSettings('voice')}
+                                    disabled={isLoading}
+                                    title="Open Settings → My Voice"
+                                >
+                                    Voice rules
+                                </button>
+                            </div>
                         </div>
 
                         {!isLoading ? (
-                            <div
-                                className="refinement-suggestions"
-                                role="group"
-                                aria-label="Quick refinement ideas"
-                            >
-                                {REFINEMENT_SUGGESTIONS.map(({ label, instruction }) => (
-                                    <button
-                                        key={label}
-                                        type="button"
-                                        className="refinement-chip"
-                                        disabled={isLoading}
-                                        onClick={() => sendRefinementSuggestion(instruction)}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
+                            suggestionsLoading ? (
+                                <div
+                                    className="refinement-suggestions refinement-suggestions--loading"
+                                    role="status"
+                                >
+                                    Tailoring suggestions to your essay…
+                                </div>
+                            ) : (
+                                <div
+                                    className="refinement-suggestions"
+                                    role="group"
+                                    aria-label="Suggested refinements"
+                                >
+                                    {suggestionChips.map(({ label, instruction }, idx) => (
+                                        <button
+                                            key={`${label}-${idx}`}
+                                            type="button"
+                                            className="refinement-chip"
+                                            disabled={isLoading}
+                                            onClick={() => sendRefinementSuggestion(instruction)}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )
                         ) : (
                             <div className="refinement-loading-hint">
                                 Council is updating your essay…

@@ -707,6 +707,26 @@ export const api = {
     },
   },
 
+  /**
+   * Essay-specific refinement chip ideas (single LLM call, auth-required).
+   */
+  refinement: {
+    async suggestions({ essayText, originalBrief = '' }) {
+      const response = await authedFetch(`${API_BASE}/api/refinement-suggestions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          essay_text: essayText,
+          original_brief: originalBrief,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to generate suggestions'));
+      }
+      return response.json();
+    },
+  },
+
   // Backwards-compatible thin wrappers for the legacy code paths that still
   // call `api.getVoiceProfile()` directly. Will be deleted once /voice page
   // migration in App.jsx is finished.
@@ -783,24 +803,36 @@ export const api = {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
 
+    // Buffer incomplete lines across chunk boundaries so large JSON payloads
+    // (e.g. stage1_complete with all responses) are never silently dropped.
+    let buffer = '';
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? ''; // keep the potentially incomplete trailing line
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = line.slice(6);
             try {
-              const event = JSON.parse(data);
+              const event = JSON.parse(line.slice(6));
               onEvent(event.type, event);
             } catch (e) {
               console.error('Failed to parse SSE event:', e);
             }
           }
+        }
+      }
+      // Flush any remaining complete event in the buffer
+      if (buffer.startsWith('data: ')) {
+        try {
+          const event = JSON.parse(buffer.slice(6));
+          onEvent(event.type, event);
+        } catch (e) {
+          console.error('Failed to parse SSE event (buffer flush):', e);
         }
       }
     } finally {

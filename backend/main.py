@@ -211,19 +211,28 @@ async def _generate_refinement_suggestions(
     )
 
     sys_prompt = (
-        "You help a writer revise an essay. Given the essay (and optional brief), "
-        "propose 5–7 DISTINCT refinement directions that are specific to THIS piece. "
-        "Each idea must tie to something concrete in the text: a paragraph, example, "
-        "claim, image, or through-line — never vague writing-class platitudes like "
-        "'add more detail' without naming where. Mix structure, stakes, voice, and "
-        "clarity as appropriate.\n"
-        "Chip labels: at most 6 words, no trailing period."
+        "You are an editorial coach reviewing a specific essay. Read every word.\n"
+        "Produce exactly 6 distinct, surgical refinement instructions for another LLM editor.\n\n"
+        "RULES — every instruction must follow this structure:\n"
+        "1. Quote a specific phrase, sentence, or section from the essay in quotation marks.\n"
+        "2. One sentence diagnosing what is weak, vague, or underdeveloped there.\n"
+        "3. Two to three sentences prescribing the exact change: what to cut, rewrite, add, or restructure — be specific about location and method.\n"
+        "4. One sentence naming the intended effect on the reader.\n"
+        "Total: 4–6 sentences per instruction. Never write generic advice ('add more detail', 'improve transitions') without first quoting the essay.\n\n"
+        "Cover these six dimensions, one each:\n"
+        "  A. Opening hook — is the first sentence doing enough work?\n"
+        "  B. Central argument or thesis — is the core claim clear and defensible?\n"
+        "  C. Evidence or specificity — where is the essay too abstract or relying on assertion?\n"
+        "  D. Voice and tone — where does the writing feel flat, generic, or inconsistent with the rest?\n"
+        "  E. Structure or transitions — where does the logic stumble or a section feel out of order?\n"
+        "  F. Ending — does the final paragraph earn its landing?\n\n"
+        "Chip labels: 3–5 words, start with an imperative verb (e.g. 'Rewrite the opening hook'), no trailing period."
     )
     user_prompt = (
         f"ESSAY:\n{essay}\n"
         f"{brief_part}\n"
-        "Return STRICT JSON only, no markdown fences:\n"
-        '{"suggestions":[{"label":"...","instruction":"1–3 sentences: clear edit instruction for another LLM; name specifics from the essay."}]}'
+        "Return STRICT JSON only — no markdown fences, no commentary:\n"
+        '{"suggestions":[{"label":"Imperative verb + 3-4 words","instruction":"Quote from essay. Diagnosis. Precise prescription (2-3 sentences). Intended effect."}]}'
     )
     from .council import query_model
 
@@ -253,7 +262,7 @@ async def _generate_refinement_suggestions(
                 inst = str(item.get("instruction") or "").strip()
                 if label and inst and len(label) <= 88:
                     out.append({"label": label, "instruction": inst})
-    if 4 <= len(out) <= 12:
+    if 3 <= len(out) <= 12:
         return out[:7]
     return []
 
@@ -1470,6 +1479,31 @@ async def api_intake_core_idea(
         except Exception as e:
             print(f"WARN: persist core_idea failed: {e}")
     return {"core_idea": brief}
+
+
+class RefinementSuggestionsRequest(BaseModel):
+    essay_text: str
+    original_brief: str = ""
+
+
+@app.post("/api/refinement-suggestions")
+async def api_refinement_suggestions(
+    body: RefinementSuggestionsRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Single LLM call: essay-specific refinement chips for the dock."""
+    if not (body.essay_text or "").strip():
+        raise HTTPException(status_code=400, detail="essay_text is required")
+    suggestions = await _generate_refinement_suggestions(
+        essay_text=body.essay_text.strip(),
+        original_brief=(body.original_brief or "").strip(),
+    )
+    posthog.capture(
+        "refinement_suggestions",
+        distinct_id=user.id,
+        properties={"count": len(suggestions)},
+    )
+    return {"suggestions": suggestions}
 
 
 @app.get("/api/models/direct")
