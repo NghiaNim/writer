@@ -71,7 +71,12 @@ function buildInteractiveMessage({ topic, audience, qa, coreIdea, authors }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function EssayFlow({ onComplete, isBusy = false }) {
+export default function EssayFlow({
+    onComplete,
+    isBusy = false,
+    handoffError = null,
+    onDismissHandoffError,
+}) {
     // Steps: 'topic' -> 'questions' -> 'core_idea' -> 'voice' (-> submit)
     //                  | 'draft' (alternate path from Step 1)
     const [step, setStep] = useState('topic');
@@ -421,6 +426,21 @@ export default function EssayFlow({ onComplete, isBusy = false }) {
     return (
         <div className="essay-flow">
             <div className="essay-flow-card">
+                {handoffError && (
+                    <div className="essay-flow-handoff-error" role="alert">
+                        <span>{handoffError}</span>
+                        {onDismissHandoffError ? (
+                            <button
+                                type="button"
+                                className="essay-flow-memory-dismiss"
+                                onClick={onDismissHandoffError}
+                                aria-label="Dismiss"
+                            >
+                                ×
+                            </button>
+                        ) : null}
+                    </div>
+                )}
                 {showTopicChip && (
                     <div className="essay-flow-topic-chip" title={topic}>
                         Topic: <span>{topic}</span>

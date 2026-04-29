@@ -48,6 +48,13 @@ function AppShell() {
   const abortControllerRef = useRef(null);
   const requestIdRef = useRef(0);
   const isInitialMount = useRef(true);
+  // After EssayFlow creates a conversation, GET /api/conversations/:id would
+  // return messages:[] until the stream persists — that fetch would clobber
+  // optimistic UI. Skip exactly one load for that id hand-off.
+  const skipNextConversationFetchRef = useRef(false);
+  // Shown when the post-intake stream fails so the user isn't dropped on an
+  // empty hero with no explanation.
+  const [streamHandoffError, setStreamHandoffError] = useState(null);
 
   // Check initial configuration on mount
   useEffect(() => {
@@ -162,11 +169,15 @@ function AppShell() {
     }
   };
 
-  // Load conversation details when selected
+  // Load conversation details when selected (skip one fetch after EssayFlow
+  // creates a row — see skipNextConversationFetchRef).
   useEffect(() => {
-    if (currentConversationId) {
-      loadConversation(currentConversationId);
+    if (!currentConversationId) return;
+    if (skipNextConversationFetchRef.current) {
+      skipNextConversationFetchRef.current = false;
+      return;
     }
+    loadConversation(currentConversationId);
   }, [currentConversationId]);
 
   const loadConversations = async (retryCount = 0) => {
@@ -196,6 +207,7 @@ function AppShell() {
     // conversation row is created on the backend AFTER EssayFlow's Step 3
     // completes. Bumping the key forces a fresh EssayFlow component (clears
     // any in-progress topic / so-what / draft state from a previous run).
+    setStreamHandoffError(null);
     setEssayFlowKey((k) => k + 1);
     setEssayFlowVisible(true);
     setCurrentConversationId(null);
@@ -241,18 +253,23 @@ function AppShell() {
     wordTarget,
     councilConfig,
   }) => {
+    setStreamHandoffError(null);
+    let newConv = null;
     try {
-      const newConv = await api.createConversation();
+      newConv = await api.createConversation();
+      // Prevent useEffect(loadConversation) from replacing optimistic messages
+      // with the empty server file before the stream persists.
+      skipNextConversationFetchRef.current = true;
       setConversations((prev) => [
         { id: newConv.id, created_at: newConv.created_at, message_count: 0 },
         ...prev,
       ]);
       setCurrentConversationId(newConv.id);
-      // Seed a non-null currentConversation so handleSendMessage's optimistic
-      // updates have something to spread into.
+      // Seed matches POST /api/conversations response shape so spreads are safe.
       setCurrentConversation({
         id: newConv.id,
         created_at: newConv.created_at,
+        title: newConv.title || 'New Conversation',
         messages: [],
       });
       setEssayMode(chosenMode);
@@ -274,15 +291,32 @@ function AppShell() {
       setCurrentCouncil(activeCouncil);
       setCurrentWordTarget(typeof wordTarget === 'number' ? wordTarget : null);
 
-      handleSendMessage(message, false, {
+      await handleSendMessage(message, false, {
         essayMode: chosenMode,
         conversationId: newConv.id,
         sessionId,
+        propagateError: true,
       });
     } catch (error) {
       console.error('Failed to start essay session:', error);
-      // Surface the error in the EssayFlow card by re-throwing — caller
-      // doesn't await us right now, so we just log for safety.
+      if (newConv?.id) {
+        setConversations((prev) => prev.filter((c) => c.id !== newConv.id));
+        try {
+          await api.deleteConversation(newConv.id);
+        } catch {
+          /* best-effort cleanup */
+        }
+      }
+      const msg =
+        error?.message ||
+        'Could not start the council run. Check your connection and try again.';
+      setStreamHandoffError(msg);
+      // Let the user retry intake without starting from a broken empty chat.
+      setEssayFlowKey((k) => k + 1);
+      setEssayFlowVisible(true);
+      setCurrentConversationId(null);
+      setCurrentConversation(null);
+      setCurrentSessionId(null);
     }
   };
 
@@ -299,9 +333,11 @@ function AppShell() {
     // Phase 3: accept an explicit conversationId so EssayFlow can hand off
     // immediately after creating the conversation, without waiting for
     // currentConversationId to propagate through React state.
-    const targetConversationId = options.conversationId || currentConversationId;
+    const { propagateError = false, ...streamOptions } = options;
+    const targetConversationId =
+      streamOptions.conversationId || currentConversationId;
     if (!targetConversationId) return;
-    const requestEssayMode = options.essayMode || essayMode;
+    const requestEssayMode = streamOptions.essayMode || essayMode;
 
     // Assign unique ID to this request to prevent race conditions
     const currentRequestId = ++requestIdRef.current;
@@ -310,6 +346,7 @@ function AppShell() {
     abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
+    let streamError = null;
     try {
       // Optimistically add user message to UI
       const userMessage = { role: 'user', content };
@@ -354,9 +391,9 @@ function AppShell() {
       // Send message with streaming. `sessionId` (extension #1) lets the
       // backend pull word_target + council_config off the matching session.
       // We persist the active session id for regenerate to pick up too.
-      const requestSessionId = options.sessionId || currentSessionId;
-      if (options.sessionId) {
-        setCurrentSessionId(options.sessionId);
+      const requestSessionId = streamOptions.sessionId || currentSessionId;
+      if (streamOptions.sessionId) {
+        setCurrentSessionId(streamOptions.sessionId);
       }
       await api.sendMessageStream(
         targetConversationId,
@@ -665,13 +702,21 @@ function AppShell() {
 
             case 'error':
               console.error('Stream error:', event.message);
+              streamError = new Error(
+                event.message || 'The council run failed partway through.'
+              );
               setIsLoading(false);
               break;
 
             default:
               console.log('Unknown event type:', eventType);
           }
-        }, abortControllerRef.current?.signal);
+        },
+        abortControllerRef.current?.signal
+      );
+      if (streamError) {
+        throw streamError;
+      }
     } catch (error) {
       // Handle aborted requests - mark message as aborted
       if (error.name === 'AbortError') {
@@ -712,6 +757,9 @@ function AppShell() {
         messages: prev.messages.slice(0, -2),
       }));
       setIsLoading(false);
+      if (propagateError) {
+        throw error;
+      }
     } finally {
       // Only clear the controller if this is still the current request
       // This prevents race conditions if user rapidly sends multiple messages
@@ -746,6 +794,7 @@ function AppShell() {
     if (!lastUserContent) return;
     handleSendMessage(lastUserContent, false, {
       essayMode: lastAssistantEssayMode || essayMode,
+      sessionId: currentSessionId,
     });
   };
 
@@ -807,6 +856,8 @@ function AppShell() {
           key={essayFlowKey}
           onComplete={handleEssayFlowComplete}
           isBusy={isLoading}
+          handoffError={streamHandoffError}
+          onDismissHandoffError={() => setStreamHandoffError(null)}
         />
       ) : (
         <ChatInterface
