@@ -13,4 +13,5 @@ dependencies = [
     "ddgs>=8.0.0",
     "yake>=0.4.8",
     "supabase>=2.7.0",
+    "posthog>=7.13.1",
 ]

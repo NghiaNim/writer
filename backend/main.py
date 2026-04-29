@@ -1,5 +1,8 @@
 """FastAPI backend for LLM Council."""
 
+from contextlib import asynccontextmanager
+
+import posthog
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -42,7 +45,18 @@ from .voice_profile import (
 )
 from .voice_library import pick_random_voice, get_voice_by_id
 
-app = FastAPI(title="LLM Council Plus API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: initialize and flush PostHog."""
+    posthog.api_key = os.environ.get("POSTHOG_PROJECT_TOKEN", "")
+    posthog.host = os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com")
+    posthog.enable_exception_autocapture = True
+    yield
+    posthog.flush()
+
+
+app = FastAPI(title="LLM Council Plus API", lifespan=lifespan)
 
 
 # ---------------------------------------------------------------------------
@@ -506,6 +520,17 @@ async def send_message_stream(
             # Add user message
             storage.add_user_message(conversation_id, body.content)
 
+            posthog.capture(
+                user.id,
+                "council_started",
+                properties={
+                    "execution_mode": body.execution_mode,
+                    "essay_mode": body.essay_mode,
+                    "web_search_enabled": body.web_search,
+                    "is_first_message": is_first_message,
+                },
+            )
+
             # Start title generation in parallel (don't await yet)
             title_task = None
             if is_first_message:
@@ -559,6 +584,14 @@ async def send_message_stream(
                 extracted_query = search_result["extracted_query"]
                 search_intent = search_result.get("intent", "unknown")
                 yield f"data: {json.dumps({'type': 'search_complete', 'data': {'search_query': search_query, 'extracted_query': extracted_query, 'search_context': search_context, 'provider': provider.value, 'intent': search_intent}})}\n\n"
+                posthog.capture(
+                    user.id,
+                    "web_search_performed",
+                    properties={
+                        "provider": provider.value,
+                        "search_intent": search_intent,
+                    },
+                )
                 await asyncio.sleep(0.05)
 
             # Stage 1: Collect responses
@@ -595,6 +628,11 @@ async def send_message_stream(
             if not any(r for r in stage1_results if not r.get('error')):
                 error_msg = 'All models failed to respond in Stage 1, likely due to rate limits or API errors. Please try again or adjust your model selection.'
                 storage.add_error_message(conversation_id, error_msg)
+                posthog.capture(
+                    user.id,
+                    "council_error",
+                    properties={"reason": "all_models_failed", "execution_mode": body.execution_mode},
+                )
                 yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
                 return # Stop further processing
 
@@ -704,6 +742,25 @@ async def send_message_stream(
                     essay_type=session_essay_type,
                     so_what_answer=session_so_what,
                 )
+                posthog.capture(
+                    user.id,
+                    "essay_saved",
+                    properties={
+                        "essay_mode": body.essay_mode,
+                        "essay_type": session_essay_type or "general",
+                        "has_word_target": word_target is not None,
+                    },
+                )
+
+            posthog.capture(
+                user.id,
+                "council_completed",
+                properties={
+                    "execution_mode": body.execution_mode,
+                    "stage1_count": len(stage1_results),
+                    "web_search_used": bool(search_context),
+                },
+            )
 
             # Send completion event
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
@@ -1118,6 +1175,11 @@ async def api_save_voice_profile(
     /api/voice-profile/suggest|accept|reject endpoints and never written
     here."""
     saved = save_voice_profile(user.id, body, essay_type=essay_type)
+    posthog.capture(
+        user.id,
+        "voice_profile_saved",
+        properties={"essay_type": essay_type},
+    )
     return saved.model_dump()
 
 
@@ -1295,6 +1357,14 @@ async def api_intake_questions(
         topic=body.topic.strip(),
         audience=(body.audience or "").strip(),
         essay_type=(body.essay_type or "general").strip() or "general",
+    )
+    posthog.capture(
+        user.id,
+        "intake_started",
+        properties={
+            "essay_type": (body.essay_type or "general"),
+            "has_audience": bool((body.audience or "").strip()),
+        },
     )
     return {"questions": questions}
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+import posthog
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
@@ -155,6 +156,14 @@ async def signup(body: SignupRequest):
     session = getattr(result, "session", None)
     user = getattr(result, "user", None)
 
+    if user is not None:
+        user_id = str(user.id)
+        posthog.capture(
+            user_id,
+            "user_signed_up",
+            properties={"signup_method": "email"},
+        )
+
     # If email confirmation is enabled in the Supabase project, signup returns
     # a user but no session. The frontend handles this case explicitly.
     if session is None:
@@ -191,6 +200,12 @@ async def login(body: LoginRequest):
     user = getattr(result, "user", None)
     if session is None or user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    posthog.capture(
+        str(user.id),
+        "user_logged_in",
+        properties={"login_method": "email"},
+    )
 
     return AuthResponse(
         access_token=session.access_token,
