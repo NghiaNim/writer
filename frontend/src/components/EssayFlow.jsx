@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import CouncilConfig from './CouncilConfig';
+import MicButton from './common/MicButton';
 import './EssayFlow.css';
 
 // Word-target presets for the Step 4 picker. Tuned for college admissions /
@@ -532,11 +533,20 @@ export default function EssayFlow({
                         <div className="essay-flow-history expand">
                             {questions.map((q, i) => (
                                 <div key={i} className="essay-flow-exchange">
-                                    <div className="essay-flow-exchange-q">{q}</div>
+                                    <div className="essay-flow-exchange-q-row">
+                                        <div className="essay-flow-exchange-q">{q}</div>
+                                        <MicButton
+                                            value={answers[i] || ''}
+                                            onChange={(next) => handleAnswerChange(i, next)}
+                                            disabled={disabled}
+                                            size="sm"
+                                            title="Talk through your answer"
+                                        />
+                                    </div>
                                     <textarea
                                         value={answers[i] || ''}
                                         onChange={(e) => handleAnswerChange(i, e.target.value)}
-                                        placeholder="Type a sentence or two…"
+                                        placeholder="Type a sentence or two… or tap the mic to talk it through."
                                         rows={2}
                                         disabled={disabled}
                                         className="essay-flow-textarea"
@@ -579,15 +589,26 @@ export default function EssayFlow({
                                 Drafting your core idea…
                             </div>
                         ) : (
-                            <textarea
-                                ref={coreIdeaRef}
-                                value={coreIdea}
-                                onChange={(e) => setCoreIdea(e.target.value)}
-                                placeholder="Your core idea will appear here once drafted…"
-                                rows={8}
-                                disabled={disabled}
-                                className="essay-flow-textarea"
-                            />
+                            <div className="essay-flow-textarea-with-mic">
+                                <textarea
+                                    ref={coreIdeaRef}
+                                    value={coreIdea}
+                                    onChange={(e) => setCoreIdea(e.target.value)}
+                                    placeholder="Your core idea will appear here once drafted…"
+                                    rows={8}
+                                    disabled={disabled}
+                                    className="essay-flow-textarea"
+                                />
+                                <div className="essay-flow-textarea-mic">
+                                    <MicButton
+                                        value={coreIdea}
+                                        onChange={setCoreIdea}
+                                        disabled={disabled}
+                                        size="sm"
+                                        title="Talk through changes to your core idea"
+                                    />
+                                </div>
+                            </div>
                         )}
                         {error && <div className="essay-flow-error">{error}</div>}
                         <div className="essay-flow-actions">

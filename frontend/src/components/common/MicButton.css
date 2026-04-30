@@ -1,0 +1,145 @@
+/* MicButton — voice dictation control. Lives next to a text input;
+   toggles speech recognition on click. */
+
+.mic-button-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.mic-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #cbd5e1;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: background-color 120ms ease, border-color 120ms ease,
+    color 120ms ease, box-shadow 120ms ease;
+  flex-shrink: 0;
+}
+
+.mic-button--md {
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+}
+
+.mic-button--sm {
+  width: 28px;
+  height: 28px;
+  font-size: 13px;
+}
+
+.mic-button:hover:not(:disabled) {
+  background: rgba(51, 65, 85, 0.9);
+  color: #f1f5f9;
+  border-color: rgba(148, 163, 184, 0.55);
+}
+
+.mic-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mic-button--listening {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #fee2e2;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+  animation: mic-listening-pulse 1.6s ease-in-out infinite;
+}
+
+.mic-button--listening:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.28);
+  color: #ffffff;
+}
+
+@keyframes mic-listening-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.05);
+  }
+}
+
+.mic-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.mic-button-pulse {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mic-button-dot {
+  width: 3px;
+  height: 12px;
+  background: currentColor;
+  border-radius: 2px;
+  animation: mic-dot-bounce 0.9s ease-in-out infinite;
+}
+
+.mic-button-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.mic-button-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes mic-dot-bounce {
+  0%,
+  100% {
+    transform: scaleY(0.6);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scaleY(1.2);
+    opacity: 1;
+  }
+}
+
+/* Interim transcript bubble — appears above the button while user is
+   speaking and the recognizer hasn't yet committed the words. */
+.mic-button-interim {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  max-width: 320px;
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-style: italic;
+  white-space: normal;
+  pointer-events: none;
+  z-index: 30;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.mic-button-error {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  max-width: 320px;
+  padding: 6px 10px;
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 8px;
+  color: #fecaca;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  z-index: 30;
+}

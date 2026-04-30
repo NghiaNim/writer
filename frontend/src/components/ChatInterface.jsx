@@ -11,6 +11,7 @@ import ExecutionModeToggle from './ExecutionModeToggle';
 import EssayLoadingStatus from './EssayLoadingStatus';
 import FinalEssay from './FinalEssay';
 import { api } from '../api';
+import MicButton from './common/MicButton';
 import './ChatInterface.css';
 
 const PERSONA_NAME_BY_KEY = {
@@ -945,6 +946,13 @@ export default function ChatInterface({
                                 }}
                             />
 
+                            <MicButton
+                                value={input}
+                                onChange={setInput}
+                                disabled={isLoading}
+                                title="Talk through what you want changed"
+                            />
+
                             {isLoading ? (
                                 <button
                                     type="button"
@@ -1054,6 +1062,17 @@ export default function ChatInterface({
                                     height: 'auto',
                                     minHeight: essayMode === 'draft' ? '140px' : '48px',
                                 }}
+                            />
+
+                            <MicButton
+                                value={input}
+                                onChange={setInput}
+                                disabled={isLoading}
+                                title={
+                                    essayMode === 'draft'
+                                        ? 'Talk through your draft'
+                                        : 'Talk through your essay topic'
+                                }
                             />
 
                             {isLoading ? (
