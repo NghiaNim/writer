@@ -1,5 +1,6 @@
 """Google Gemini provider implementation."""
 
+import os
 import httpx
 from typing import List, Dict, Any
 from .base import LLMProvider
@@ -7,12 +8,20 @@ from ..settings import get_settings
 
 class GoogleProvider(LLMProvider):
     """Google Gemini API provider."""
-    
+
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-    
+
     def _get_api_key(self) -> str:
         settings = get_settings()
-        return settings.google_api_key or ""
+        # Settings UI takes priority. Fall back to env vars so server-side
+        # utility callers (e.g. the memory extractor) work without forcing
+        # the user to save the key through the Settings UI.
+        return (
+            settings.google_api_key
+            or os.environ.get("GEMINI_API_KEY")
+            or os.environ.get("GOOGLE_API_KEY")
+            or ""
+        )
 
     async def query(self, model_id: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7) -> Dict[str, Any]:
         api_key = self._get_api_key()

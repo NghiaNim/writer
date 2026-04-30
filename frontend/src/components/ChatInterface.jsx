@@ -170,6 +170,18 @@ export default function ChatInterface({
     const [dynamicSuggestions, setDynamicSuggestions] = useState([]);
     const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
+    // Rule-proposal flow: when the user TYPES a custom refinement (not a chip)
+    // and the resulting essay finishes, ask if they want to save the
+    // instruction as a durable rule for future essays. Chip clicks are
+    // skipped — they're already-canned and not the user's own wording.
+    const [pendingRuleText, setPendingRuleText] = useState(null);
+    const [pendingRuleAtCount, setPendingRuleAtCount] = useState(0);
+    const [ruleProposalState, setRuleProposalState] = useState('idle');
+    // 'idle' | 'asking' | 'saving' | 'saved' | 'dismissed' | 'error'
+    const [ruleProposalRule, setRuleProposalRule] = useState(null);
+    const [ruleProposalError, setRuleProposalError] = useState(null);
+    const prevLoadingRef = useRef(isLoading);
+
     const draftMessageIndices = useMemo(() => {
         const list = conversation?.messages || [];
         return list
@@ -224,7 +236,23 @@ export default function ChatInterface({
         setSaveFactFromFeedback(false);
         setRefinementDockCollapsed(false);
         setDynamicSuggestions([]);
+        setPendingRuleText(null);
+        setPendingRuleAtCount(0);
+        setRuleProposalState('idle');
+        setRuleProposalRule(null);
+        setRuleProposalError(null);
     }, [conversationId]);
+
+    // When isLoading flips from true -> false AND a new draft has arrived
+    // since we captured pendingRuleText, surface the rule-proposal prompt.
+    useEffect(() => {
+        const prev = prevLoadingRef.current;
+        prevLoadingRef.current = isLoading;
+        if (!prev || isLoading) return;
+        if (!pendingRuleText) return;
+        if (draftMessageIndices.length <= pendingRuleAtCount) return;
+        setRuleProposalState('asking');
+    }, [isLoading, draftMessageIndices.length, pendingRuleText, pendingRuleAtCount]);
 
     useEffect(() => {
         if (showEssayFeedbackBar && showRefinementDock) {
@@ -315,6 +343,13 @@ export default function ChatInterface({
         const list = conversation?.messages || [];
         if (showRefinementDock) {
             if (!getLatestCompletedEssayText(list).trim()) return;
+            // Capture the user's exact phrasing so we can offer to save it
+            // as a rule once this refinement finishes streaming.
+            setPendingRuleText(input.trim());
+            setPendingRuleAtCount(draftMessageIndices.length);
+            setRuleProposalState('idle');
+            setRuleProposalRule(null);
+            setRuleProposalError(null);
             onSendMessage(buildRefinementPayload(list, input.trim()), webSearch, {
                 essayMode: 'draft',
                 sessionId: sessionId || undefined,
@@ -357,10 +392,35 @@ export default function ChatInterface({
     const sendRefinementSuggestion = (instruction) => {
         if (!instruction?.trim() || isLoading) return;
         if (!getLatestCompletedEssayText(msgs).trim()) return;
+        // Chip clicks intentionally don't trigger the rule-proposal prompt
+        // — the chip text is canned advice, not the user's own preference.
+        // Clear any prior pending instruction so a stale typed-in proposal
+        // doesn't pop up after a chip refinement finishes.
+        setPendingRuleText(null);
+        setRuleProposalState('idle');
         onSendMessage(buildRefinementPayload(msgs, instruction.trim()), webSearch, {
             essayMode: 'draft',
             sessionId: sessionId || undefined,
         });
+    };
+
+    const handleSaveAsRule = async () => {
+        if (!pendingRuleText) return;
+        setRuleProposalState('saving');
+        setRuleProposalError(null);
+        try {
+            const res = await api.voice.proposeRuleFromRefinement(pendingRuleText);
+            setRuleProposalRule(res?.rule || null);
+            setRuleProposalState('saved');
+        } catch (e) {
+            setRuleProposalError(e?.message || 'Could not save rule');
+            setRuleProposalState('error');
+        }
+    };
+
+    const dismissRuleProposal = () => {
+        setRuleProposalState('dismissed');
+        setPendingRuleText(null);
     };
 
     const goPrevDraft = () => setFocusedDraftSlot((s) => Math.max(0, s - 1));
@@ -767,6 +827,89 @@ export default function ChatInterface({
                                 Council is updating your essay…
                             </div>
                         )}
+
+                        {!isLoading && pendingRuleText && ruleProposalState !== 'idle' && ruleProposalState !== 'dismissed' ? (
+                            <div
+                                className={`refinement-rule-proposal refinement-rule-proposal--${ruleProposalState}`}
+                                role="status"
+                                aria-live="polite"
+                            >
+                                {ruleProposalState === 'asking' ? (
+                                    <>
+                                        <div className="refinement-rule-proposal-text">
+                                            <span className="refinement-rule-proposal-title">
+                                                Save this as a rule for future essays?
+                                            </span>
+                                            <span className="refinement-rule-proposal-instr">
+                                                “{pendingRuleText.length > 220
+                                                    ? pendingRuleText.slice(0, 217) + '…'
+                                                    : pendingRuleText}”
+                                            </span>
+                                        </div>
+                                        <div className="refinement-rule-proposal-actions">
+                                            <button
+                                                type="button"
+                                                className="refinement-rule-btn refinement-rule-btn--primary"
+                                                onClick={handleSaveAsRule}
+                                            >
+                                                Save as rule
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="refinement-rule-btn"
+                                                onClick={dismissRuleProposal}
+                                            >
+                                                Not now
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : ruleProposalState === 'saving' ? (
+                                    <span className="refinement-rule-proposal-text">
+                                        Saving rule…
+                                    </span>
+                                ) : ruleProposalState === 'saved' ? (
+                                    <>
+                                        <span className="refinement-rule-proposal-text">
+                                            ✓ {ruleProposalRule
+                                                ? <>Added to pending rules: <em>“{ruleProposalRule}”</em></>
+                                                : 'Saved.'}
+                                            <span className="refinement-rule-hint">
+                                                {' '}Review in Settings → Voice rules.
+                                            </span>
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="refinement-rule-btn"
+                                            onClick={dismissRuleProposal}
+                                        >
+                                            Dismiss
+                                        </button>
+                                    </>
+                                ) : ruleProposalState === 'error' ? (
+                                    <>
+                                        <span className="refinement-rule-proposal-text">
+                                            Couldn't save rule: {ruleProposalError}
+                                        </span>
+                                        <div className="refinement-rule-proposal-actions">
+                                            <button
+                                                type="button"
+                                                className="refinement-rule-btn refinement-rule-btn--primary"
+                                                onClick={handleSaveAsRule}
+                                            >
+                                                Retry
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="refinement-rule-btn"
+                                                onClick={dismissRuleProposal}
+                                            >
+                                                Dismiss
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : null}
+                            </div>
+                        ) : null}
 
                         <div className="input-row-top">
                             <label

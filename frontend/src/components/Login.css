@@ -163,6 +163,30 @@
     cursor: not-allowed;
 }
 
+.login-google {
+    width: 100%;
+    padding: 11px 16px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.login-google:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--accent-primary);
+}
+
+.login-google:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .login-error {
     background: rgba(248, 113, 113, 0.08);
     color: #fca5a5;

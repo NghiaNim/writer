@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { API_BASE, warmUpBackend } from '../api';
+import { api, API_BASE, warmUpBackend } from '../api';
 import './Login.css';
 
 /**
@@ -12,12 +12,13 @@ import './Login.css';
  * sees a "check your email" message instead of being logged in.
  */
 export default function Login() {
-    const { login, signup, loading, error, clearError } = useAuth();
+    const { login, signup, loginWithGoogleCode, loading, error, clearError } = useAuth();
     const [mode, setMode] = useState('login'); // 'login' | 'signup'
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [localError, setLocalError] = useState(null);
     const [confirmationMessage, setConfirmationMessage] = useState(null);
+    const oauthCodeHandledRef = useRef(false);
     // 'pending' until the warm-up ping returns; 'up' on success; 'down' on
     // failure. Render's free tier sleeps after ~15min and takes 30-60s to
     // wake; we surface this so users understand the first-attempt failure.
@@ -34,6 +35,35 @@ export default function Login() {
             cancelled = true;
         };
     }, []);
+
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get('code');
+        if (!code || oauthCodeHandledRef.current) return;
+        oauthCodeHandledRef.current = true;
+
+        let cancelled = false;
+        setLocalError(null);
+        setConfirmationMessage('Completing Google sign-in...');
+
+        (async () => {
+            try {
+                const redirectTo = `${window.location.origin}${window.location.pathname}`;
+                await loginWithGoogleCode(code, redirectTo);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } catch (e) {
+                if (!cancelled) {
+                    setConfirmationMessage(null);
+                    setLocalError(e?.message || 'Google sign-in failed');
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [loginWithGoogleCode]);
 
     useEffect(() => {
         // Clear any stale error when the user toggles modes. Intentionally
@@ -96,6 +126,18 @@ export default function Login() {
                     msg;
             }
             setLocalError(msg);
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        setLocalError(null);
+        setConfirmationMessage(null);
+        try {
+            const redirectTo = `${window.location.origin}${window.location.pathname}`;
+            const { url } = await api.auth.getGoogleLoginUrl(redirectTo);
+            window.location.assign(url);
+        } catch (e) {
+            setLocalError(e?.message || 'Could not start Google sign-in');
         }
     };
 
@@ -186,6 +228,14 @@ export default function Login() {
 
                     <button type="submit" className="login-submit" disabled={loading}>
                         {loading ? 'Working...' : buttonLabel}
+                    </button>
+                    <button
+                        type="button"
+                        className="login-google"
+                        disabled={loading}
+                        onClick={handleGoogleSignIn}
+                    >
+                        Continue with Google
                     </button>
                 </form>
 

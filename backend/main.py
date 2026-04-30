@@ -809,7 +809,7 @@ async def send_message_stream(
                 topic_val = (session_topic or "").strip() or derive_topic_from_message(
                     body.content
                 )
-                upsert_completed_essay(
+                essay_row_id = upsert_completed_essay(
                     user_id=user.id,
                     conversation_id=conversation_id,
                     session_id=body.session_id,
@@ -829,6 +829,38 @@ async def send_message_stream(
                         "has_word_target": word_target is not None,
                     },
                 )
+
+                # Fire-and-forget: extract durable user facts from this
+                # essay so future essays can pull biographical / voice
+                # memory into the prompt. Wrapped so any failure is just
+                # a log line — never reaches the user-facing stream.
+                if fe.strip():
+                    from .memory_extraction import extract_and_store
+
+                    async def _run_memory_extraction(
+                        uid: str,
+                        text: str,
+                        topic: str,
+                        eid: Optional[str],
+                    ) -> None:
+                        try:
+                            await extract_and_store(
+                                user_id=uid,
+                                essay_text=text,
+                                topic=topic,
+                                source_essay_id=eid,
+                            )
+                        except Exception as ex:
+                            print(f"WARN: memory extraction failed: {ex}")
+
+                    asyncio.create_task(
+                        _run_memory_extraction(
+                            user.id,
+                            fe.strip(),
+                            topic_val,
+                            essay_row_id,
+                        )
+                    )
 
             posthog.capture(
                 "council_completed",
@@ -1336,6 +1368,59 @@ async def api_reject_suggestion(
     return reject_suggestion(
         user.id, body.suggestion_id, essay_type=body.essay_type
     ).model_dump()
+
+
+class ProposeRuleFromRefinementBody(BaseModel):
+    """Body for POST /api/voice-profile/propose-rule-from-refinement.
+
+    Called from the frontend right after a refinement run completes. We
+    distill the user's free-form instruction (e.g. "make the opening less
+    flowery, no em-dashes") into ONE durable rule and stage it in the
+    pending_suggestions queue. The user accepts or rejects through the
+    existing review UI — nothing auto-commits to canonical rules.
+    """
+
+    instruction: str = Field(..., min_length=1, max_length=4000)
+    essay_type: str = "general"
+
+
+@app.post("/api/voice-profile/propose-rule-from-refinement")
+async def api_propose_rule_from_refinement(
+    body: ProposeRuleFromRefinementBody,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Distill a refinement instruction → rule, stage it for the user to accept.
+
+    Returns:
+      { proposed: bool, rule: str | None, profile: <VoiceProfile dict> }
+
+    `proposed=False` means the LLM judged the instruction too one-off to
+    generalize — UI should silently skip the prompt rather than offer a bad rule.
+    """
+    from .memory_extraction import distill_refinement_to_rule
+
+    rule = await distill_refinement_to_rule(body.instruction)
+    if not rule:
+        profile = load_voice_profile(user.id, essay_type=body.essay_type)
+        return {"proposed": False, "rule": None, "profile": profile.model_dump()}
+
+    # Don't propose something the user already has as a rule (case-insensitive).
+    profile = load_voice_profile(user.id, essay_type=body.essay_type)
+    if rule.lower() in {r.lower() for r in profile.rules}:
+        return {"proposed": False, "rule": rule, "profile": profile.model_dump()}
+
+    updated = add_suggestions(
+        user.id,
+        [rule],
+        source="manual",
+        essay_type=body.essay_type,
+    )
+    posthog.capture(
+        "rule_proposed_from_refinement",
+        distinct_id=user.id,
+        properties={"essay_type": body.essay_type},
+    )
+    return {"proposed": True, "rule": rule, "profile": updated.model_dump()}
 
 
 class EssayMemoryFeedbackBody(BaseModel):

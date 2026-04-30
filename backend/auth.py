@@ -17,7 +17,7 @@ import logging
 from typing import Optional
 
 import posthog
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel
 
 from .supabase_client import get_supabase, get_supabase_for_auth
@@ -40,6 +40,15 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class OAuthStartResponse(BaseModel):
+    url: str
+
+
+class GoogleExchangeRequest(BaseModel):
+    code: str
+    redirect_to: str
 
 
 class AuthUser(BaseModel):
@@ -205,6 +214,58 @@ async def login(body: LoginRequest):
         "user_logged_in",
         distinct_id=str(user.id),
         properties={"login_method": "email"},
+    )
+
+    return AuthResponse(
+        access_token=session.access_token,
+        refresh_token=getattr(session, "refresh_token", None),
+        user=_user_to_dict(user),
+        needs_email_confirmation=False,
+    )
+
+
+@router.get("/google/start", response_model=OAuthStartResponse)
+async def google_oauth_start(redirect_to: str = Query(..., min_length=1)):
+    """Build the Supabase Google OAuth URL for the frontend redirect."""
+    supabase = get_supabase_for_auth()
+    try:
+        oauth = supabase.auth.sign_in_with_oauth(
+            {"provider": "google", "options": {"redirect_to": redirect_to}}
+        )
+    except Exception as e:
+        logger.info(f"Google OAuth start failed: {e}")
+        raise HTTPException(status_code=400, detail="Could not start Google login")
+
+    oauth_url = getattr(oauth, "url", None)
+    if not oauth_url:
+        raise HTTPException(status_code=400, detail="Google login URL not available")
+    return OAuthStartResponse(url=oauth_url)
+
+
+@router.post("/google/exchange", response_model=AuthResponse)
+async def google_oauth_exchange(body: GoogleExchangeRequest):
+    """Exchange the OAuth callback code for an authenticated Supabase session."""
+    supabase = get_supabase_for_auth()
+    try:
+        result = supabase.auth.exchange_code_for_session(
+            {"auth_code": body.code, "redirect_to": body.redirect_to}
+        )
+    except Exception as e:
+        logger.info(f"Google OAuth code exchange failed: {e}")
+        raise HTTPException(
+            status_code=401,
+            detail="Google sign-in failed during code exchange",
+        )
+
+    session = getattr(result, "session", None)
+    user = getattr(result, "user", None)
+    if session is None or user is None:
+        raise HTTPException(status_code=401, detail="Google sign-in did not return a session")
+
+    posthog.capture(
+        "user_logged_in",
+        distinct_id=str(user.id),
+        properties={"login_method": "google"},
     )
 
     return AuthResponse(

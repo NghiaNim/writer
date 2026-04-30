@@ -134,6 +134,28 @@ export const api = {
    * Auth endpoints (Phase 1 — Supabase).
    */
   auth: {
+    async getGoogleLoginUrl(redirectTo) {
+      const response = await authedFetch(
+        `${API_BASE}/auth/google/start?redirect_to=${encodeURIComponent(redirectTo)}`
+      );
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Could not start Google sign-in'));
+      }
+      return response.json();
+    },
+
+    async exchangeGoogleCode(code, redirectTo) {
+      const response = await authedFetch(`${API_BASE}/auth/google/exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, redirect_to: redirectTo }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Google sign-in failed'));
+      }
+      return response.json();
+    },
+
     async signup(email, password) {
       const response = await authedFetch(`${API_BASE}/auth/signup`, {
         method: 'POST',
@@ -618,6 +640,30 @@ export const api = {
       });
       if (!response.ok) {
         throw new Error(await extractError(response, 'Failed to reject suggestion'));
+      }
+      return response.json();
+    },
+    /**
+     * Distill a refinement instruction into a durable rule and stage it
+     * in pending_suggestions. Returns:
+     *   { proposed: bool, rule: string | null, profile: VoiceProfile }
+     * `proposed=false` means the instruction was too one-off — UI should
+     * silently skip the prompt.
+     */
+    async proposeRuleFromRefinement(instruction, essayType = 'general') {
+      const response = await authedFetch(
+        `${API_BASE}/api/voice-profile/propose-rule-from-refinement`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instruction,
+            essay_type: essayType,
+          }),
+        },
+      );
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to propose rule'));
       }
       return response.json();
     },

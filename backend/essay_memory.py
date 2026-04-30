@@ -48,10 +48,14 @@ def upsert_completed_essay(
     essay_type: Optional[str] = None,
     so_what_answer: Optional[str] = None,
     core_claim: Optional[str] = None,
-) -> None:
-    """Insert or update one row per (user_id, conversation_id)."""
+) -> Optional[str]:
+    """Insert or update one row per (user_id, conversation_id).
+
+    Returns the row id on success (so callers can attach extracted facts
+    to it via user_fact.source_essay_id), or None on failure / empty input.
+    """
     if not full_essay or not str(full_essay).strip():
-        return
+        return None
     topic_clean = (topic or "").strip() or "Essay"
     summary = make_summary(full_essay)
     payload: Dict[str, Any] = {
@@ -83,10 +87,15 @@ def upsert_completed_essay(
             sb.table("essay_memory").update(update_fields).eq("id", row_id).eq(
                 "user_id", user_id
             ).execute()
+            return str(row_id)
         else:
-            sb.table("essay_memory").insert(payload).execute()
+            res = sb.table("essay_memory").insert(payload).execute()
+            if res.data:
+                return str(res.data[0].get("id"))
+            return None
     except Exception as e:
         logger.warning("essay_memory upsert failed user=%s conv=%s: %s", user_id, conversation_id, e)
+        return None
 
 
 def save_essay_feedback(

@@ -61,6 +61,25 @@ export function AuthProvider({ children }) {
         }
     }, []);
 
+    const loginWithGoogleCode = useCallback(async (code, redirectTo) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const result = await api.auth.exchangeGoogleCode(code, redirectTo);
+            if (!result.access_token) {
+                throw new Error('Google sign-in failed: no access token returned.');
+            }
+            setToken(result.access_token);
+            setUser(result.user);
+            return result;
+        } catch (e) {
+            setError(e.message || 'Google sign-in failed');
+            throw e;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     const signup = useCallback(async (email, password) => {
         setLoading(true);
         setError(null);
@@ -108,11 +127,12 @@ export function AuthProvider({ children }) {
             loading,
             error,
             login,
+            loginWithGoogleCode,
             signup,
             logout,
             clearError,
         }),
-        [token, user, loading, error, login, signup, logout, clearError]
+        [token, user, loading, error, login, loginWithGoogleCode, signup, logout, clearError]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
