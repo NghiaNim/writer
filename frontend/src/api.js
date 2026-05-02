@@ -199,6 +199,18 @@ export const api = {
       }
       return response.json();
     },
+
+    async refresh(refreshToken) {
+      const response = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!response.ok) {
+        throw new Error('Refresh failed');
+      }
+      return response.json();
+    },
   },
 
   /**

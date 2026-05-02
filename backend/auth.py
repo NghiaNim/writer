@@ -299,3 +299,44 @@ async def logout(authorization: Optional[str] = Header(None)):
 async def me(user: AuthUser = Depends(get_current_user)):
     """Return the currently authenticated user."""
     return user
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+@router.post("/refresh", response_model=AuthResponse)
+async def refresh(body: RefreshRequest):
+    """Swap a refresh token for a fresh access token.
+
+    Used by the frontend on app mount (and after a 401 from a protected
+    endpoint) to keep the session alive past the access token's expiry
+    without forcing the user to log in again.
+    """
+    if not body.refresh_token:
+        raise HTTPException(status_code=400, detail="refresh_token is required")
+    auth_client = get_supabase_for_auth()
+    try:
+        result = auth_client.auth.refresh_session(body.refresh_token)
+    except Exception as e:
+        logger.info(f"Refresh failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is invalid or expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    session = getattr(result, "session", None)
+    user = getattr(result, "user", None)
+    if session is None or getattr(session, "access_token", None) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is invalid or expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return AuthResponse(
+        access_token=session.access_token,
+        refresh_token=getattr(session, "refresh_token", None),
+        user=_user_to_dict(user),
+        needs_email_confirmation=False,
+    )

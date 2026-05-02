@@ -481,32 +481,40 @@ async def healthz():
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
-async def list_conversations():
-    """List all conversations (metadata only)."""
-    return storage.list_conversations()
+async def list_conversations(user: AuthUser = Depends(get_current_user)):
+    """List the caller's conversations (metadata only)."""
+    return storage.list_conversations(user.id)
 
 
 @app.post("/api/conversations", response_model=Conversation)
-async def create_conversation(request: CreateConversationRequest):
-    """Create a new conversation."""
+async def create_conversation(
+    request: CreateConversationRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Create a new conversation owned by the caller."""
     conversation_id = str(uuid.uuid4())
-    conversation = storage.create_conversation(conversation_id)
-    return conversation
+    return storage.create_conversation(user.id, conversation_id)
 
 
 @app.get("/api/conversations/{conversation_id}", response_model=Conversation)
-async def get_conversation(conversation_id: str):
+async def get_conversation(
+    conversation_id: str,
+    user: AuthUser = Depends(get_current_user),
+):
     """Get a specific conversation with all its messages."""
-    conversation = storage.get_conversation(conversation_id)
+    conversation = storage.get_conversation(conversation_id, user.id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return conversation
 
 
 @app.delete("/api/conversations/{conversation_id}")
-async def delete_conversation(conversation_id: str):
-    """Delete a conversation."""
-    deleted = storage.delete_conversation(conversation_id)
+async def delete_conversation(
+    conversation_id: str,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Delete one of the caller's conversations."""
+    deleted = storage.delete_conversation(conversation_id, user.id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return {"status": "deleted"}
@@ -545,8 +553,8 @@ async def send_message_stream(
             detail=f"Invalid essay_mode. Must be one of: {valid_essay_modes}"
         )
 
-    # Check if conversation exists
-    conversation = storage.get_conversation(conversation_id)
+    # Check if conversation exists (and is owned by the caller)
+    conversation = storage.get_conversation(conversation_id, user.id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -661,7 +669,7 @@ async def send_message_stream(
             aggregate_rankings = {}
             
             # Add user message
-            storage.add_user_message(conversation_id, body.content)
+            storage.add_user_message(conversation_id, user.id, body.content)
 
             posthog.capture(
                 "council_started",
@@ -770,7 +778,7 @@ async def send_message_stream(
             # Check if any models responded successfully in Stage 1
             if not any(r for r in stage1_results if not r.get('error')):
                 error_msg = 'All models failed to respond in Stage 1, likely due to rate limits or API errors. Please try again or adjust your model selection.'
-                storage.add_error_message(conversation_id, error_msg)
+                storage.add_error_message(conversation_id, user.id, error_msg)
                 posthog.capture(
                     "council_error",
                     distinct_id=user.id,
@@ -832,7 +840,7 @@ async def send_message_stream(
             if title_task:
                 try:
                     title = await title_task
-                    storage.update_conversation_title(conversation_id, title)
+                    storage.update_conversation_title(conversation_id, user.id, title)
                     yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
                 except Exception as e:
                     print(f"Error waiting for title task: {e}")
@@ -855,6 +863,7 @@ async def send_message_stream(
 
             storage.add_assistant_message(
                 conversation_id,
+                user.id,
                 stage1_results,
                 stage2_results if body.execution_mode in ["chat_ranking", "full"] else None,
                 stage3_result if body.execution_mode == "full" else None,
@@ -947,7 +956,7 @@ async def send_message_stream(
                 try:
                     # Give it a small grace period to finish if it's close
                     title = await asyncio.wait_for(title_task, timeout=2.0)
-                    storage.update_conversation_title(conversation_id, title)
+                    storage.update_conversation_title(conversation_id, user.id, title)
                     print(f"Saved title despite cancellation: {title}")
                 except Exception as e:
                     print(f"Could not save title during cancellation: {e}")
@@ -955,7 +964,7 @@ async def send_message_stream(
         except Exception as e:
             print(f"Stream error: {e}")
             # Save error to conversation history
-            storage.add_error_message(conversation_id, f"Error: {str(e)}")
+            storage.add_error_message(conversation_id, user.id, f"Error: {str(e)}")
             # Send error event
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 

@@ -1,326 +1,202 @@
-"""JSON-based storage for conversations."""
+"""Supabase-backed storage for conversations.
 
-import json
-import os
-from datetime import datetime
-from typing import List, Dict, Any, Optional
-from pathlib import Path
-from .config import DATA_DIR
+Conversations live in the `public.conversations` table (migration 006). Each
+function takes a `user_id` and scopes its query so a user can only ever see
+or mutate their own rows. The service-role client bypasses RLS, so app-level
+scoping is the actual enforcement — RLS policies in the migration are
+belt-and-suspenders against any future direct anon-key access.
 
+The dict shapes returned here match what the frontend already consumes:
 
-INDEX_FILE_NAME = "conversations_index.json"
+    list_conversations() -> [{id, created_at, title, message_count}, ...]
+    get_conversation()   -> {id, created_at, title, messages: [...]}
 
+Mutating helpers (add_user_message / add_assistant_message / etc.) read the
+current row, append to the in-memory `messages` list, and write the whole
+list back. That mirrors the previous file-based behavior — concurrent writes
+to the same conversation last-write-wins, which matches the prior semantics.
+"""
 
-def ensure_data_dir():
-    """Ensure the data directory exists."""
-    Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
+from __future__ import annotations
 
+import logging
+from typing import Any, Dict, List, Optional
 
-def get_conversation_path(conversation_id: str) -> str:
-    """Get the file path for a conversation."""
-    return os.path.join(DATA_DIR, f"{conversation_id}.json")
+from .supabase_client import get_supabase
 
-
-def get_index_path() -> str:
-    """Get the file path for the conversation index."""
-    return os.path.join(DATA_DIR, INDEX_FILE_NAME)
-
-
-def _load_index() -> Optional[List[Dict[str, Any]]]:
-    """Load the conversation index file."""
-    path = get_index_path()
-    if not os.path.exists(path):
-        return None
-    try:
-        with open(path, 'r') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return None
+logger = logging.getLogger(__name__)
 
 
-def _save_index(index: List[Dict[str, Any]]):
-    """Save the conversation index file."""
-    ensure_data_dir()
-    path = get_index_path()
-    with open(path, 'w') as f:
-        json.dump(index, f, indent=2)
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
 
-def rebuild_index() -> List[Dict[str, Any]]:
-    """
-    Rebuild the conversation index from actual conversation files.
-    Use this fallback if index is missing or corrupted.
-    """
-    ensure_data_dir()
-    index = []
-    
-    for filename in os.listdir(DATA_DIR):
-        if filename.endswith('.json') and filename != INDEX_FILE_NAME:
-            path = os.path.join(DATA_DIR, filename)
-            try:
-                with open(path, 'r') as f:
-                    data = json.load(f)
-                    index.append({
-                        "id": data["id"],
-                        "created_at": data["created_at"],
-                        "title": data.get("title", "New Conversation"),
-                        "message_count": len(data["messages"])
-                    })
-            except (json.JSONDecodeError, OSError):
-                continue
-
-    # Sort by creation time, newest first
-    index.sort(key=lambda x: x["created_at"], reverse=True)
-    _save_index(index)
-    return index
-
-
-def _update_index_entry(conversation: Dict[str, Any]):
-    """Update or add a single entry in the index."""
-    index = _load_index()
-    if index is None:
-        index = rebuild_index()
-        return  # rebuild already includes the current state if file was saved
-
-    # Create metadata entry
-    entry = {
-        "id": conversation["id"],
-        "created_at": conversation["created_at"],
-        "title": conversation.get("title", "New Conversation"),
-        "message_count": len(conversation["messages"])
+def _row_to_full(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Coerce a DB row into the shape the API/frontend expects for a full conversation."""
+    return {
+        "id": str(row["id"]),
+        "created_at": str(row["created_at"]),
+        "title": row.get("title") or "New Conversation",
+        "messages": row.get("messages") or [],
     }
 
-    # Remove existing entry if present
-    index = [item for item in index if item["id"] != conversation["id"]]
-    
-    # Add new entry
-    index.append(entry)
-    
-    # Sort and save
-    index.sort(key=lambda x: x["created_at"], reverse=True)
-    _save_index(index)
+
+def _row_to_meta(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Coerce a DB row into the metadata shape used by the sidebar list."""
+    messages = row.get("messages") or []
+    return {
+        "id": str(row["id"]),
+        "created_at": str(row["created_at"]),
+        "title": row.get("title") or "New Conversation",
+        "message_count": len(messages),
+    }
 
 
-def _remove_from_index(conversation_id: str):
-    """Remove an entry from the index."""
-    index = _load_index()
-    if index is None:
-        return  # No index to remove from
+def _fetch_row(conversation_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    """Read a single conversation row, scoped to the owner."""
+    sb = get_supabase()
+    res = (
+        sb.table("conversations")
+        .select("id, user_id, title, messages, created_at, updated_at")
+        .eq("id", conversation_id)
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not res.data:
+        return None
+    return res.data[0]
 
-    # Filter out the deleted conversation
-    new_index = [item for item in index if item["id"] != conversation_id]
-    
-    if len(new_index) != len(index):
-        _save_index(new_index)
+
+def _write_messages(conversation_id: str, user_id: str, messages: List[Dict[str, Any]]) -> None:
+    """Persist the full messages array for a conversation."""
+    sb = get_supabase()
+    sb.table("conversations").update({"messages": messages}).eq("id", conversation_id).eq(
+        "user_id", user_id
+    ).execute()
 
 
-def create_conversation(conversation_id: str) -> Dict[str, Any]:
+# ---------------------------------------------------------------------------
+# CRUD
+# ---------------------------------------------------------------------------
+
+
+def create_conversation(user_id: str, conversation_id: Optional[str] = None) -> Dict[str, Any]:
+    """Create a new conversation owned by `user_id`.
+
+    `conversation_id` is optional — if omitted, the DB assigns one.
     """
-    Create a new conversation.
-
-    Args:
-        conversation_id: Unique identifier for the conversation
-
-    Returns:
-        New conversation dict
-    """
-    ensure_data_dir()
-
-    conversation = {
-        "id": conversation_id,
-        "created_at": datetime.utcnow().isoformat(),
+    sb = get_supabase()
+    payload: Dict[str, Any] = {
+        "user_id": user_id,
         "title": "New Conversation",
-        "messages": []
+        "messages": [],
     }
-
-    # Save to file
-    path = get_conversation_path(conversation_id)
-    with open(path, 'w') as f:
-        json.dump(conversation, f, indent=2)
-
-    # Update index
-    _update_index_entry(conversation)
-
-    return conversation
+    if conversation_id:
+        payload["id"] = conversation_id
+    res = sb.table("conversations").insert(payload).execute()
+    if not res.data:
+        raise RuntimeError("Failed to create conversation row")
+    return _row_to_full(res.data[0])
 
 
-def get_conversation(conversation_id: str) -> Optional[Dict[str, Any]]:
-    """
-    Load a conversation from storage.
-
-    Args:
-        conversation_id: Unique identifier for the conversation
-
-    Returns:
-        Conversation dict or None if not found
-    """
-    path = get_conversation_path(conversation_id)
-
-    if not os.path.exists(path):
+def get_conversation(conversation_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    """Load a conversation owned by `user_id`. Returns None if missing."""
+    row = _fetch_row(conversation_id, user_id)
+    if row is None:
         return None
-
-    with open(path, 'r') as f:
-        return json.load(f)
+    return _row_to_full(row)
 
 
-def save_conversation(conversation: Dict[str, Any]):
-    """
-    Save a conversation to storage.
-
-    Args:
-        conversation: Conversation dict to save
-    """
-    ensure_data_dir()
-
-    path = get_conversation_path(conversation['id'])
-    with open(path, 'w') as f:
-        json.dump(conversation, f, indent=2)
-
-    # Update index
-    _update_index_entry(conversation)
+def list_conversations(user_id: str) -> List[Dict[str, Any]]:
+    """List all conversations for a user, newest first, metadata only."""
+    sb = get_supabase()
+    res = (
+        sb.table("conversations")
+        .select("id, title, messages, created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return [_row_to_meta(r) for r in (res.data or [])]
 
 
-def list_conversations() -> List[Dict[str, Any]]:
-    """
-    List all conversations (metadata only).
-    Uses cached index file for O(1) performance.
-
-    Returns:
-        List of conversation metadata dicts
-    """
-    ensure_data_dir()
-
-    # Try to load from index first
-    index = _load_index()
-    
-    # If index missing or invalid, rebuild it
-    if index is None:
-        return rebuild_index()
-        
-    return index
+def delete_conversation(conversation_id: str, user_id: str) -> bool:
+    """Delete a conversation. Returns True if a row was removed."""
+    sb = get_supabase()
+    res = (
+        sb.table("conversations")
+        .delete()
+        .eq("id", conversation_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return bool(res.data)
 
 
-def add_user_message(conversation_id: str, content: str):
-    """
-    Add a user message to a conversation.
+def update_conversation_title(conversation_id: str, user_id: str, title: str) -> None:
+    sb = get_supabase()
+    sb.table("conversations").update({"title": title}).eq("id", conversation_id).eq(
+        "user_id", user_id
+    ).execute()
 
-    Args:
-        conversation_id: Conversation identifier
-        content: User message content
-    """
-    conversation = get_conversation(conversation_id)
-    if conversation is None:
+
+# ---------------------------------------------------------------------------
+# Message append helpers
+# ---------------------------------------------------------------------------
+
+
+def add_user_message(conversation_id: str, user_id: str, content: str) -> None:
+    row = _fetch_row(conversation_id, user_id)
+    if row is None:
         raise ValueError(f"Conversation {conversation_id} not found")
-
-    conversation["messages"].append({
-        "role": "user",
-        "content": content
-    })
-
-    save_conversation(conversation)
+    messages = row.get("messages") or []
+    messages.append({"role": "user", "content": content})
+    _write_messages(conversation_id, user_id, messages)
 
 
 def add_assistant_message(
     conversation_id: str,
+    user_id: str,
     stage1: List[Dict[str, Any]],
     stage2: Optional[List[Dict[str, Any]]] = None,
-    stage3: Optional[Dict[str,Any]] = None,
-    metadata: Optional[Dict[str, Any]] = None
-):
-    """
-    Add an assistant message to a conversation.
-    
-    Supports partial execution modes where stage2 and/or stage3 may be None.
-    
-    Args:
-        conversation_id: Conversation identifier
-        stage1: List of individual model responses (always present)
-        stage2: List of model rankings (None if execution_mode was 'chat_only')
-        stage3: Final synthesized response (None if execution_mode was not 'full')
-        metadata: Optional metadata including execution_mode, label_to_model, etc.
-    """
-    conversation = get_conversation(conversation_id)
-    if conversation is None:
+    stage3: Optional[Dict[str, Any]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    row = _fetch_row(conversation_id, user_id)
+    if row is None:
         raise ValueError(f"Conversation {conversation_id} not found")
+    messages = row.get("messages") or []
 
-    message = {
+    message: Dict[str, Any] = {
         "role": "assistant",
         "stage1": stage1,
     }
-    
-    # Only include stage2 and stage3 if they were executed
     if stage2 is not None:
         message["stage2"] = stage2
     if stage3 is not None:
         message["stage3"] = stage3
-
     if metadata:
         message["metadata"] = metadata
 
-    conversation["messages"].append(message)
+    messages.append(message)
+    _write_messages(conversation_id, user_id, messages)
 
-    save_conversation(conversation)
 
-
-def add_error_message(conversation_id: str, error_text: str):
-    """
-    Add an error message to a conversation to record a failed turn.
-
-    Args:
-        conversation_id: Conversation identifier
-        error_text: The error description
-    """
-    conversation = get_conversation(conversation_id)
-    if conversation is None:
+def add_error_message(conversation_id: str, user_id: str, error_text: str) -> None:
+    row = _fetch_row(conversation_id, user_id)
+    if row is None:
         raise ValueError(f"Conversation {conversation_id} not found")
-
-    message = {
-        "role": "assistant",
-        "content": None,
-        "error": error_text,
-        "stage1": [],
-        "stage2": [],
-        "stage3": None
-    }
-
-    conversation["messages"].append(message)
-    save_conversation(conversation)
-
-
-def update_conversation_title(conversation_id: str, title: str):
-    """
-    Update the title of a conversation.
-
-    Args:
-        conversation_id: Conversation identifier
-        title: New title for the conversation
-    """
-    conversation = get_conversation(conversation_id)
-    if conversation is None:
-        raise ValueError(f"Conversation {conversation_id} not found")
-
-    conversation["title"] = title
-    save_conversation(conversation)
-
-
-def delete_conversation(conversation_id: str) -> bool:
-    """
-    Delete a conversation.
-
-    Args:
-        conversation_id: Conversation identifier
-
-    Returns:
-        True if deleted, False if not found
-    """
-    path = get_conversation_path(conversation_id)
-
-    if not os.path.exists(path):
-        return False
-
-    os.remove(path)
-    
-    # Update index
-    _remove_from_index(conversation_id)
-    
-    return True
+    messages = row.get("messages") or []
+    messages.append(
+        {
+            "role": "assistant",
+            "content": None,
+            "error": error_text,
+            "stage1": [],
+            "stage2": [],
+            "stage3": None,
+        }
+    )
+    _write_messages(conversation_id, user_id, messages)

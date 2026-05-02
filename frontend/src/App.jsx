@@ -924,7 +924,13 @@ function AppShell() {
 }
 
 function AuthGate() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, restoring } = useAuth();
+  if (restoring) {
+    // Wait for the stored session to be validated/refreshed before deciding
+    // whether to show login. Otherwise we flash the login screen for one
+    // paint on every page load with a saved session.
+    return null;
+  }
   if (!isAuthenticated) {
     return <Login />;
   }
