@@ -720,6 +720,7 @@ export const api = {
   /**
    * Smart intake helpers (single-LLM-call, no council).
    *   POST /api/intake/questions   → { questions: string[] }
+   *   POST /api/intake/example     → { example: string }
    *   POST /api/intake/core-idea   → { core_idea: string }
    */
   intake: {
@@ -731,6 +732,17 @@ export const api = {
       });
       if (!response.ok) {
         throw new Error(await extractError(response, 'Failed to generate questions'));
+      }
+      return response.json();
+    },
+    async example({ topic, audience = '', question }) {
+      const response = await authedFetch(`${API_BASE}/api/intake/example`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, audience, question }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to generate example'));
       }
       return response.json();
     },

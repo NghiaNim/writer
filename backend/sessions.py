@@ -85,6 +85,7 @@ class SessionRow(BaseModel):
 
 class MemoryMatch(BaseModel):
     id: str
+    conversation_id: Optional[str] = None
     topic: str
     summary: Optional[str] = None
     created_at: Optional[str] = None
@@ -194,7 +195,7 @@ async def memory_check(
 
     query = (
         supabase.table("essay_memory")
-        .select("id, topic, summary, created_at")
+        .select("id, conversation_id, topic, summary, created_at")
         .eq("user_id", user.id)
         .order("created_at", desc=True)
         .limit(5)
@@ -213,6 +214,7 @@ async def memory_check(
     matches = [
         MemoryMatch(
             id=str(r["id"]),
+            conversation_id=str(r["conversation_id"]) if r.get("conversation_id") else None,
             topic=r.get("topic") or "",
             summary=r.get("summary"),
             created_at=str(r["created_at"]) if r.get("created_at") else None,

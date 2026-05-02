@@ -68,6 +68,29 @@ function buildInteractiveMessage({ topic, audience, qa, coreIdea, authors }) {
 }
 
 
+function formatRelativeDate(iso) {
+    if (!iso) return '';
+    const then = new Date(iso);
+    if (Number.isNaN(then.getTime())) return '';
+    const diffMs = Date.now() - then.getTime();
+    const day = 86400000;
+    const days = Math.floor(diffMs / day);
+    if (days < 1) return 'today';
+    if (days < 2) return 'yesterday';
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) {
+        const w = Math.floor(days / 7);
+        return w === 1 ? '1 week ago' : `${w} weeks ago`;
+    }
+    if (days < 365) {
+        const m = Math.floor(days / 30);
+        return m === 1 ? '1 month ago' : `${m} months ago`;
+    }
+    const y = Math.floor(days / 365);
+    return y === 1 ? '1 year ago' : `${y} years ago`;
+}
+
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -78,6 +101,7 @@ export default function EssayFlow({
     handoffError = null,
     onDismissHandoffError,
     onOpenVoiceSettings,
+    onOpenPastEssay,
 }) {
     // Steps: 'topic' -> 'questions' -> 'core_idea' -> 'voice' (-> submit)
     //                  | 'draft' (alternate path from Step 1)
@@ -112,6 +136,74 @@ export default function EssayFlow({
     // Memory-check banner (silent past-essay lookup)
     const [memoryMatches, setMemoryMatches] = useState([]);
     const [memoryDismissed, setMemoryDismissed] = useState(false);
+    const [memoryExpanded, setMemoryExpanded] = useState(false);
+
+    // Per-question example state: { [i]: { loading, error, text } }
+    const [examples, setExamples] = useState({});
+
+    const handleShowExample = async (i, question) => {
+        const current = examples[i];
+        // Toggle off if already loaded.
+        if (current && current.text) {
+            setExamples((prev) => ({ ...prev, [i]: { ...prev[i], hidden: !prev[i].hidden } }));
+            return;
+        }
+        setExamples((prev) => ({ ...prev, [i]: { loading: true, error: null, text: '' } }));
+        try {
+            const res = await api.intake.example({
+                topic: topic.trim(),
+                audience: audience.trim(),
+                question,
+            });
+            setExamples((prev) => ({
+                ...prev,
+                [i]: {
+                    loading: false,
+                    error: null,
+                    text: (res?.example || '').trim(),
+                    hidden: false,
+                },
+            }));
+        } catch (err) {
+            setExamples((prev) => ({
+                ...prev,
+                [i]: {
+                    loading: false,
+                    error: err?.message || 'Could not load example',
+                    text: '',
+                },
+            }));
+        }
+    };
+
+    const handleRegenerateExample = async (i, question) => {
+        setExamples((prev) => ({ ...prev, [i]: { loading: true, error: null, text: '' } }));
+        try {
+            const res = await api.intake.example({
+                topic: topic.trim(),
+                audience: audience.trim(),
+                question,
+            });
+            setExamples((prev) => ({
+                ...prev,
+                [i]: {
+                    loading: false,
+                    error: null,
+                    text: (res?.example || '').trim(),
+                    hidden: false,
+                },
+            }));
+        } catch (err) {
+            setExamples((prev) => ({
+                ...prev,
+                [i]: {
+                    loading: false,
+                    error: err?.message || 'Could not load example',
+                    text: '',
+                },
+            }));
+        }
+    };
 
     const [error, setError] = useState(null);
     const [submitting, setSubmitting] = useState(false);
@@ -515,45 +607,144 @@ export default function EssayFlow({
                         )}
                         {memoryMatches.length > 0 && !memoryDismissed && (
                             <div className="essay-flow-memory" role="status">
-                                <span>
-                                    You've written about this before — {memoryMatches.length}{' '}
-                                    {memoryMatches.length === 1 ? 'past essay' : 'past essays'} look
-                                    related. Want to keep it fresh?
-                                </span>
+                                <button
+                                    type="button"
+                                    className="essay-flow-memory-header"
+                                    onClick={() => setMemoryExpanded((v) => !v)}
+                                    aria-expanded={memoryExpanded}
+                                >
+                                    <span className="essay-flow-memory-chevron" aria-hidden="true">
+                                        {memoryExpanded ? '▾' : '▸'}
+                                    </span>
+                                    <span className="essay-flow-memory-text">
+                                        You've written about this before — {memoryMatches.length}{' '}
+                                        {memoryMatches.length === 1 ? 'past essay' : 'past essays'}{' '}
+                                        {memoryMatches.length === 1 ? 'looks' : 'look'} related.{' '}
+                                        Want to keep it fresh?
+                                    </span>
+                                    <span className="essay-flow-memory-action">
+                                        {memoryExpanded ? 'Hide' : 'View'}
+                                    </span>
+                                </button>
                                 <button
                                     type="button"
                                     className="essay-flow-memory-dismiss"
-                                    onClick={() => setMemoryDismissed(true)}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMemoryDismissed(true);
+                                    }}
                                     aria-label="Dismiss"
                                 >
                                     ×
                                 </button>
+                                {memoryExpanded && (
+                                    <ul className="essay-flow-memory-list">
+                                        {memoryMatches.map((m) => (
+                                            <li
+                                                key={m.id}
+                                                className="essay-flow-memory-item"
+                                            >
+                                                <div className="essay-flow-memory-item-topic">
+                                                    {m.topic || 'Untitled essay'}
+                                                </div>
+                                                {m.summary && (
+                                                    <div className="essay-flow-memory-item-summary">
+                                                        {m.summary}
+                                                    </div>
+                                                )}
+                                                <div className="essay-flow-memory-item-meta">
+                                                    <span className="essay-flow-memory-item-date">
+                                                        {formatRelativeDate(m.created_at)}
+                                                    </span>
+                                                    {m.conversation_id && onOpenPastEssay && (
+                                                        <button
+                                                            type="button"
+                                                            className="essay-flow-memory-item-open"
+                                                            onClick={() =>
+                                                                onOpenPastEssay(m.conversation_id)
+                                                            }
+                                                        >
+                                                            Open →
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
                         )}
                         <div className="essay-flow-history expand">
-                            {questions.map((q, i) => (
-                                <div key={i} className="essay-flow-exchange">
-                                    <div className="essay-flow-exchange-q-row">
-                                        <div className="essay-flow-exchange-q">{q}</div>
-                                        <MicButton
+                            {questions.map((q, i) => {
+                                const ex = examples[i];
+                                const exVisible = ex && ex.text && !ex.hidden;
+                                return (
+                                    <div key={i} className="essay-flow-exchange">
+                                        <div className="essay-flow-exchange-q-row">
+                                            <div className="essay-flow-exchange-q">{q}</div>
+                                            <MicButton
+                                                value={answers[i] || ''}
+                                                onChange={(next) => handleAnswerChange(i, next)}
+                                                disabled={disabled}
+                                                size="sm"
+                                                title="Talk through your answer"
+                                            />
+                                        </div>
+                                        <textarea
                                             value={answers[i] || ''}
-                                            onChange={(next) => handleAnswerChange(i, next)}
+                                            onChange={(e) => handleAnswerChange(i, e.target.value)}
+                                            placeholder="Type a sentence or two… or tap the mic to talk it through."
+                                            rows={2}
                                             disabled={disabled}
-                                            size="sm"
-                                            title="Talk through your answer"
+                                            className="essay-flow-textarea"
+                                            style={{ minHeight: 60 }}
                                         />
+                                        <div className="essay-flow-example-row">
+                                            <button
+                                                type="button"
+                                                className="essay-flow-example-toggle"
+                                                onClick={() => handleShowExample(i, q)}
+                                                disabled={disabled || (ex && ex.loading)}
+                                            >
+                                                {ex && ex.loading
+                                                    ? 'Thinking…'
+                                                    : ex && ex.text
+                                                      ? exVisible
+                                                          ? 'Hide example'
+                                                          : 'Show example'
+                                                      : 'Stuck? Show me an example'}
+                                            </button>
+                                        </div>
+                                        {ex && ex.error && (
+                                            <div className="essay-flow-example-error">
+                                                {ex.error}
+                                            </div>
+                                        )}
+                                        {exVisible && (
+                                            <div className="essay-flow-example">
+                                                <div className="essay-flow-example-label">
+                                                    Example — not your answer, just a nudge
+                                                </div>
+                                                <div className="essay-flow-example-text">
+                                                    {ex.text}
+                                                </div>
+                                                <div className="essay-flow-example-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="essay-flow-example-link"
+                                                        onClick={() =>
+                                                            handleRegenerateExample(i, q)
+                                                        }
+                                                        disabled={disabled}
+                                                    >
+                                                        Try a different angle
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                    <textarea
-                                        value={answers[i] || ''}
-                                        onChange={(e) => handleAnswerChange(i, e.target.value)}
-                                        placeholder="Type a sentence or two… or tap the mic to talk it through."
-                                        rows={2}
-                                        disabled={disabled}
-                                        className="essay-flow-textarea"
-                                        style={{ minHeight: 60 }}
-                                    />
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                         {error && <div className="essay-flow-error">{error}</div>}
                         <div className="essay-flow-actions">

@@ -143,6 +143,58 @@ async def _generate_intake_questions(topic: str, audience: str, essay_type: str)
     ]
 
 
+async def _generate_example_answer(topic: str, audience: str, question: str) -> str:
+    """Generate one short example answer for a single intake question.
+
+    The example is meant to unstick a user who's staring at a blank textarea —
+    it should be specific and concrete (so it actually demonstrates what a good
+    answer looks like) but deliberately *different in angle* from the most
+    obvious read of the topic, so it nudges rather than anchors.
+    """
+    audience_part = f"\nAUDIENCE: {audience}" if audience else ""
+    sys_prompt = (
+        "You are an essay coach. The student is staring at a blank textarea "
+        "and needs a sample answer to unstick them. Write ONE example response "
+        "(2-3 sentences, first person) to the question below, grounded in the "
+        "given topic. Make it concrete and specific — name a moment, a detail, "
+        "a number, a contradiction. Avoid generic platitudes. Pick a non-obvious "
+        "angle so the student is nudged, not anchored. Do not preface with "
+        "'For example' or quotation marks — just the answer text."
+    )
+    user_prompt = (
+        f"TOPIC: {topic}{audience_part}\n"
+        f"QUESTION: {question}\n\n"
+        "Return STRICT JSON, no prose:\n"
+        '{"example": "..."}'
+    )
+    from .council import query_model
+
+    try:
+        res = await query_model(
+            _INTAKE_MODEL,
+            [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            timeout=30.0,
+            temperature=0.85,
+        )
+    except Exception as e:
+        print(f"WARN: intake example LLM call failed: {e}")
+        res = None
+
+    parsed = _safe_json_loads((res or {}).get("content", "")) if res else None
+    if isinstance(parsed, dict):
+        ex = parsed.get("example")
+        if isinstance(ex, str) and ex.strip():
+            return ex.strip()
+    # Fallback raw content (strip any code fences) so the user still sees something.
+    raw = (res or {}).get("content", "").strip() if res else ""
+    if raw:
+        return raw[:600]
+    return ""
+
+
 async def _generate_core_idea(
     topic: str, audience: str, qa: List[Dict[str, str]]
 ) -> str:
@@ -1530,6 +1582,29 @@ async def api_intake_questions(
         },
     )
     return {"questions": questions}
+
+
+class IntakeExampleRequest(BaseModel):
+    topic: str
+    audience: str = ""
+    question: str
+
+
+@app.post("/api/intake/example")
+async def api_intake_example(
+    body: IntakeExampleRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    if not (body.topic or "").strip():
+        raise HTTPException(status_code=400, detail="topic is required")
+    if not (body.question or "").strip():
+        raise HTTPException(status_code=400, detail="question is required")
+    example = await _generate_example_answer(
+        topic=body.topic.strip(),
+        audience=(body.audience or "").strip(),
+        question=body.question.strip(),
+    )
+    return {"example": example}
 
 
 class IntakeCoreIdeaRequest(BaseModel):

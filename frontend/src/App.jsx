@@ -887,6 +887,7 @@ function AppShell() {
           handoffError={streamHandoffError}
           onDismissHandoffError={() => setStreamHandoffError(null)}
           onOpenVoiceSettings={() => handleOpenSettings('voice')}
+          onOpenPastEssay={handleSelectConversation}
         />
       ) : (
         <ChatInterface
