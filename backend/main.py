@@ -48,12 +48,25 @@ from .voice_library import pick_random_voice, get_voice_by_id
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: initialize and flush PostHog."""
-    posthog.api_key = os.environ.get("POSTHOG_PROJECT_TOKEN", "")
+    """Application lifespan: initialize and flush PostHog.
+
+    If POSTHOG_PROJECT_TOKEN is missing, we set a placeholder key and disable
+    the client so capture() calls become no-ops instead of crashing endpoints.
+    """
+    token = os.environ.get("POSTHOG_PROJECT_TOKEN", "").strip()
+    if token:
+        posthog.api_key = token
+        posthog.disabled = False
+    else:
+        # Placeholder satisfies posthog's setup() check; disabled=True drops events.
+        posthog.api_key = "phc_disabled_no_token_set"
+        posthog.disabled = True
+        print("WARN: POSTHOG_PROJECT_TOKEN not set — posthog disabled")
     posthog.host = os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com")
     posthog.enable_exception_autocapture = True
     yield
-    posthog.flush()
+    if not posthog.disabled:
+        posthog.flush()
 
 
 app = FastAPI(title="LLM Council Plus API", lifespan=lifespan)
