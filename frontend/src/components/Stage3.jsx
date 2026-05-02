@@ -36,7 +36,7 @@ export default function Stage3({ finalResponse, startTime, endTime }) {
             <div className="stage-header">
                 <div className="stage-title">
                     <span className="stage-icon">⚖️</span>
-                    Stage 3: Final Council Answer
+                    Stage 3: Final Essay
                 </div>
                 <StageTimer startTime={startTime} endTime={endTime} label="Duration" />
             </div>
@@ -93,7 +93,7 @@ export function Stage3Skeleton() {
             <div className="stage-header">
                 <div className="stage-title">
                     <span className="stage-icon">⚖️</span>
-                    Stage 3: Final Council Answer
+                    Stage 3: Final Essay
                 </div>
                 <div className="stage-timer-skeleton">
                     <Skeleton variant="text" width="60px" />

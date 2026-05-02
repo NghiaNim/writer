@@ -72,8 +72,8 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
 
             <h4>Raw Evaluations</h4>
             <p className="stage-description">
-                Each model evaluated all responses (anonymized as Response A, B, C, etc.) and provided rankings.
-                Below, model names are shown in <strong>bold</strong> for readability, but the original evaluation used anonymous labels.
+                Each council member read every draft (shown anonymously as Draft A, B, C…) and ranked them.
+                Below, real names are shown in <strong>bold</strong> for readability, but the actual review used anonymous labels.
             </p>
 
             {/* Avatar Tabs */}

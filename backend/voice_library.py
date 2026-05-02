@@ -25,9 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 # Cap how much of `essay_text` we feed into the prompt. Whole essays would
-# blow context budget on weaker models. ~600 words is a generous excerpt
-# that captures voice without dominating the prompt.
-ESSAY_EXCERPT_CHAR_BUDGET = 3500
+# blow context budget on weaker models. ~850 words is a generous excerpt
+# that captures voice strongly without dominating the prompt — the actual
+# writing is the highest-signal voice anchor we have, so we lean toward
+# more text rather than less.
+ESSAY_EXCERPT_CHAR_BUDGET = 5000
 
 
 def _seeded_random(seed: Optional[str]) -> random.Random:
@@ -102,47 +104,27 @@ def _truncate_excerpt(text: str, budget: int = ESSAY_EXCERPT_CHAR_BUDGET) -> str
 def format_library_voice_block(voice: Optional[Dict[str, Any]]) -> str:
     """Render a library voice as a prompt-friendly creative scaffold.
 
-    The block is intentionally framed as inspiration, not instruction:
-    we don't want models to mimic the topic or content, only the rhythm,
-    cadence, and stylistic moves. Returns empty string if no voice.
+    The actual writing sample leads the block — it's the highest-signal voice
+    anchor we have, and models weight earlier tokens more. The AI-derived
+    metadata (tone, sentence style, distinctive moves) follows as supporting
+    commentary, not as the primary instruction.
+
+    Framed as inspiration, not instruction: we want models to absorb rhythm,
+    cadence, and concrete-detail density — never the topic or content.
+    Returns empty string if no voice is provided.
     """
     if not voice:
         return ""
 
     sections = [
-        "VOICE INSPIRATION (DO NOT IMITATE TOPIC OR CONTENT — ONLY THE RHYTHM, CADENCE, AND MOVES):",
-        "Below is a writing sample we'd like to anchor your prose against. Match the tone, sentence rhythm, and use of specific concrete detail. DO NOT borrow the subject matter, places, or anecdotes — those belong to a different writer. Use this purely as a stylistic tuning fork.",
+        "VOICE INSPIRATION — STUDY THE WRITING BELOW (DO NOT IMITATE TOPIC OR CONTENT, ONLY RHYTHM AND MOVES):",
+        "The passage below is a stylistic tuning fork. Read it before you write. Match its sentence rhythm, its willingness to use specific concrete detail, and its tonal commitments. DO NOT borrow its subject matter, places, anecdotes, or claims — those belong to a different writer.",
     ]
-
-    sentence_style = (voice.get("sentence_style") or "").strip()
-    if sentence_style:
-        sections.append("")
-        sections.append(f"Sentence style to echo: {sentence_style}")
-
-    tone = (voice.get("tone") or "").strip()
-    if tone:
-        sections.append(f"Tone to echo: {tone}")
-
-    moves = voice.get("distinctive_moves") or []
-    if isinstance(moves, list) and moves:
-        sections.append("")
-        sections.append("Distinctive moves to draw from sparingly:")
-        for m in moves:
-            if isinstance(m, str) and m.strip():
-                sections.append(f"- {m.strip()}")
-
-    avoid = voice.get("avoid_in_imitation") or []
-    if isinstance(avoid, list) and avoid:
-        sections.append("")
-        sections.append("Avoid in your output:")
-        for a in avoid:
-            if isinstance(a, str) and a.strip():
-                sections.append(f"- {a.strip()}")
 
     excerpt = _truncate_excerpt(voice.get("essay_text") or "")
     if excerpt:
         sections.append("")
-        sections.append("Writing sample (style anchor):")
+        sections.append("WRITING SAMPLE (the voice you are echoing):")
         sections.append("\"\"\"")
         sections.append(excerpt)
         sections.append("\"\"\"")
@@ -150,7 +132,44 @@ def format_library_voice_block(voice: Optional[Dict[str, Any]]) -> str:
     sample = (voice.get("sample_sentence") or "").strip()
     if sample:
         sections.append("")
-        sections.append(f"One representative sentence in this voice: {sample}")
+        sections.append(f"One representative sentence from this voice: {sample}")
+
+    # Supporting hints derived from analysis of the sample above. These are
+    # secondary — the writing itself is the source of truth.
+    hints: list[str] = []
+    sentence_style = (voice.get("sentence_style") or "").strip()
+    if sentence_style:
+        hints.append(f"Sentence style: {sentence_style}")
+
+    tone = (voice.get("tone") or "").strip()
+    if tone:
+        hints.append(f"Tone: {tone}")
+
+    moves = voice.get("distinctive_moves") or []
+    move_lines: list[str] = []
+    if isinstance(moves, list) and moves:
+        for m in moves:
+            if isinstance(m, str) and m.strip():
+                move_lines.append(f"- {m.strip()}")
+
+    avoid = voice.get("avoid_in_imitation") or []
+    avoid_lines: list[str] = []
+    if isinstance(avoid, list) and avoid:
+        for a in avoid:
+            if isinstance(a, str) and a.strip():
+                avoid_lines.append(f"- {a.strip()}")
+
+    if hints or move_lines or avoid_lines:
+        sections.append("")
+        sections.append("Notes on this voice (use as cross-reference; the sample above is the source of truth):")
+        for h in hints:
+            sections.append(h)
+        if move_lines:
+            sections.append("Distinctive moves to draw from sparingly:")
+            sections.extend(move_lines)
+        if avoid_lines:
+            sections.append("Avoid in your output:")
+            sections.extend(avoid_lines)
 
     sections.append("")
     return "\n".join(sections)

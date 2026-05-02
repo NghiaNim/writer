@@ -47,16 +47,23 @@ router = APIRouter(prefix="/council-config", tags=["council-config"])
 # ---------------------------------------------------------------------------
 
 # Verified against the live OpenRouter catalog. Older IDs like
-# anthropic/claude-3.5-sonnet and google/gemini-pro-1.5 were deprecated and
-# silently rendered as empty selectors — these IDs are current as of the
-# 2026 catalog and span four different model families.
+# Defaults span four different model families so the council isn't an echo
+# chamber, and the Chairman is deliberately picked from a *fifth* family slot
+# (Gemini Pro) so it isn't the same family as the Architect — otherwise the
+# same model would write one of the four drafts AND synthesize the winner,
+# biasing Stage 3 toward whatever Stage 1 voice it already produced.
+#
+# OpenRouter slugs shift over time. If any of these 404 in the catalog
+# (https://openrouter.ai/api/v1/models), update the right-hand sides; nothing
+# else in the codebase depends on the exact strings.
 DEFAULT_PERSONA_MODELS = {
-    "architect": "openrouter:anthropic/claude-sonnet-4",
-    "editor": "openrouter:openai/gpt-4o",
+    "architect": "openrouter:anthropic/claude-sonnet-4.6",
+    "editor": "openrouter:openai/gpt-4.1",
     "devils_advocate": "openrouter:google/gemini-2.5-flash",
     "voice_guardian": "openrouter:meta-llama/llama-3.3-70b-instruct",
 }
-DEFAULT_CHAIRMAN_MODEL = "openrouter:anthropic/claude-sonnet-4"
+# Chairman intentionally NOT in the Anthropic family (Architect is Claude).
+DEFAULT_CHAIRMAN_MODEL = "openrouter:google/gemini-2.5-pro"
 
 
 def factory_council_config() -> Dict[str, Any]:

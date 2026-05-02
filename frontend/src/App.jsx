@@ -904,7 +904,6 @@ function AppShell() {
           searchProvider={searchProvider}
           onOpenSettings={handleOpenSettings}
           executionMode={executionMode}
-          onExecutionModeChange={setExecutionMode}
           essayMode={essayMode}
           onEssayModeChange={setEssayMode}
           activeCouncil={currentCouncil}

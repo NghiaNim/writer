@@ -84,9 +84,10 @@ export default function EssayLoadingStatus({ loading, progress, aborted }) {
 
     let progressLabel = null;
     if (stage === 'stage1' && stage1Progress?.total) {
-        progressLabel = `${stage1Progress.count}/${stage1Progress.total} drafts in`;
+        progressLabel = `${stage1Progress.count} of ${stage1Progress.total} drafts complete`;
     } else if (stage === 'stage2' && stage2Progress?.total) {
-        progressLabel = `${stage2Progress.count}/${stage2Progress.total} reviews in`;
+        const noun = stage2Progress.total === 1 ? 'review' : 'reviews';
+        progressLabel = `${stage2Progress.count} of ${stage2Progress.total} peer ${noun} complete`;
     }
 
     if (minimized) {

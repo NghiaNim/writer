@@ -7,7 +7,6 @@ import Stage2, { Stage2Skeleton } from './Stage2';
 import Stage3, { Stage3Skeleton } from './Stage3';
 import CouncilGrid from './CouncilGrid';
 import CouncilChips from './CouncilChips';
-import ExecutionModeToggle from './ExecutionModeToggle';
 import EssayLoadingStatus from './EssayLoadingStatus';
 import FinalEssay from './FinalEssay';
 import { api } from '../api';
@@ -146,7 +145,6 @@ export default function ChatInterface({
     councilModels = [],
     chairmanModel = null,
     executionMode,
-    onExecutionModeChange,
     essayMode = 'topic',
     onEssayModeChange,
     searchProvider = 'duckduckgo',
@@ -788,7 +786,6 @@ export default function ChatInterface({
                                     type="button"
                                     className="config-link essay-voice-rules-link"
                                     onClick={() => onOpenSettings('voice')}
-                                    disabled={isLoading}
                                     title="Open Settings → My Voice"
                                 >
                                     Voice rules
@@ -1024,7 +1021,6 @@ export default function ChatInterface({
                                 type="button"
                                 className="config-link essay-voice-rules-link"
                                 onClick={() => onOpenSettings('voice')}
-                                disabled={isLoading}
                                 title="Open Settings → My Voice: rules and reference paragraphs for every essay"
                             >
                                 Voice rules
@@ -1086,13 +1082,6 @@ export default function ChatInterface({
                             )}
                         </div>
 
-                        <div className="input-row-bottom">
-                            <ExecutionModeToggle
-                                value={executionMode}
-                                onChange={onExecutionModeChange}
-                                disabled={isLoading}
-                            />
-                        </div>
                         </form>
                 )}
             </div>
