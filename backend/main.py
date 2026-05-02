@@ -2035,4 +2035,7 @@ async def test_openrouter_api(request: TestOpenRouterRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    # Render (and most PaaS) inject the listening port via $PORT. Fall back to
+    # 8001 for local dev where nothing sets it.
+    port = int(os.environ.get("PORT", "8001"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
