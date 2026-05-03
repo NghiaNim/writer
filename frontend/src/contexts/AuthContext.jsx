@@ -158,6 +158,19 @@ export function AuthProvider({ children }) {
         clearSession();
     }, [clearSession]);
 
+    // Wire the api helper SYNCHRONOUSLY on every render, before any effect
+    // runs. This is critical: the restore effect below calls api.auth.me()
+    // immediately, and authedFetch reads `_authTokenGetter` at call time. If
+    // we wired this in a separate useEffect (declared later in the file), it
+    // would run AFTER the restore effect — meaning /auth/me would be called
+    // with no Authorization header on every page refresh, 401, and (if
+    // refresh also failed) log the user out. setAuthTokenGetter just stashes
+    // a closure in module scope, so calling it during render is safe.
+    setAuthTokenGetter(() => tokenRef.current);
+    setUnauthorizedHandler(() => {
+        clearSession();
+    });
+
     // Restore session from localStorage on mount. Validate via /auth/me; if
     // expired, try refresh once. Either drops us into the app authenticated
     // or clears state and shows the login screen.
@@ -218,14 +231,6 @@ export function AuthProvider({ children }) {
         // Run exactly once on mount.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    // Wire the api helper to read the current token and to call clearSession on 401.
-    useEffect(() => {
-        setAuthTokenGetter(() => tokenRef.current);
-        setUnauthorizedHandler(() => {
-            clearSession();
-        });
-    }, [clearSession]);
 
     const clearError = useCallback(() => setError(null), []);
 
