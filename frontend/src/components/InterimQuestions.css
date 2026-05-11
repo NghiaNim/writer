@@ -1,0 +1,270 @@
+/* Interim Questions side panel — appears alongside EssayLoadingStatus
+   while the council is drafting. Compact, calm, NOT a modal. */
+
+.interim-questions {
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(251, 191, 36, 0.28);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin: 12px 0 24px;
+    color: #e2e8f0;
+    font-family: var(--font-ui, system-ui, sans-serif);
+    position: relative;
+    overflow: hidden;
+}
+
+.interim-questions::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, rgba(251, 191, 36, 0.7), rgba(251, 191, 36, 0));
+}
+
+.interim-questions__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: #fcd34d;
+    margin-bottom: 12px;
+}
+
+.interim-questions__pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fbbf24;
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6);
+    animation: interim-pulse 1.8s infinite;
+}
+
+@keyframes interim-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.55); }
+    70%  { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+}
+
+.interim-questions__title {
+    font-weight: 700;
+}
+
+.interim-questions__count {
+    margin-left: auto;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.interim-questions__q {
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-size: 17px;
+    line-height: 1.4;
+    color: #f1f5f9;
+    margin: 0 0 12px;
+}
+
+.interim-questions__input {
+    width: 100%;
+    background: rgba(2, 6, 23, 0.65);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 8px;
+    color: #e2e8f0;
+    padding: 10px 12px;
+    font-family: var(--font-ui, system-ui, sans-serif);
+    font-size: 14px;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 72px;
+    box-sizing: border-box;
+}
+
+.interim-questions__input:focus {
+    outline: none;
+    border-color: rgba(251, 191, 36, 0.55);
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.12);
+}
+
+.interim-questions__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.interim-questions__skip,
+.interim-questions__submit {
+    background: transparent;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #cbd5e1;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: inherit;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.interim-questions__skip:hover {
+    border-color: rgba(148, 163, 184, 0.6);
+}
+
+.interim-questions__submit {
+    background: rgba(251, 191, 36, 0.15);
+    border-color: rgba(251, 191, 36, 0.55);
+    color: #fde68a;
+    font-weight: 600;
+}
+
+.interim-questions__submit:hover:not(:disabled) {
+    background: rgba(251, 191, 36, 0.25);
+}
+
+.interim-questions__submit:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.interim-questions__done {
+    font-size: 13px;
+    color: #94a3b8;
+    font-style: italic;
+    margin: 0;
+}
+
+.interim-questions__history {
+    list-style: none;
+    padding: 12px 0 0;
+    margin: 12px 0 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.interim-questions__history-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.interim-questions__history-q {
+    color: #cbd5e1;
+}
+
+.interim-questions__history-a {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.interim-questions__history-item--skipped .interim-questions__history-a {
+    opacity: 0.6;
+}
+
+.interim-questions__heard {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.interim-questions__heard-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #94a3b8;
+    margin-bottom: 8px;
+}
+
+.interim-questions__heard-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.interim-questions__heard-list li {
+    position: relative;
+    padding-left: 14px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #cbd5e1;
+}
+
+.interim-questions__heard-list li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: #fbbf24;
+}
+
+.interim-questions__heard-q {
+    display: block;
+    color: #94a3b8;
+    font-style: italic;
+    margin-bottom: 2px;
+}
+
+.interim-questions__heard-a {
+    display: block;
+    color: #e2e8f0;
+}
+
+.interim-questions__skipped-note {
+    margin: 10px 0 0;
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.interim-questions__tip {
+    margin: 14px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid rgba(148, 163, 184, 0.12);
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.45;
+    font-style: italic;
+}
+
+/* Chairman variant — the FINAL clarification before stage 3. More emphatic
+   border + a gold inner glow so the user notices this is the last
+   shape-the-essay moment. */
+.interim-questions--chairman {
+    border-color: rgba(251, 191, 36, 0.55);
+    background:
+        radial-gradient(120% 80% at 0% 0%, rgba(251, 191, 36, 0.08), transparent 60%),
+        rgba(15, 23, 42, 0.65);
+    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.18) inset;
+}
+
+.interim-questions--chairman::before {
+    background: linear-gradient(180deg, rgba(251, 191, 36, 1), rgba(251, 191, 36, 0.2));
+    width: 4px;
+}
+
+.interim-questions--chairman .interim-questions__title {
+    color: #fde68a;
+    letter-spacing: 0.12em;
+}
+
+.interim-questions__chairman-note {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: #fcd34d;
+    line-height: 1.5;
+    background: rgba(251, 191, 36, 0.06);
+    border-left: 2px solid rgba(251, 191, 36, 0.45);
+    padding: 8px 10px;
+    border-radius: 4px;
+}
