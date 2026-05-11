@@ -184,6 +184,7 @@ export default function VoiceProfileSettings() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [suggesting, setSuggesting] = useState(false);
+    const [restoringDefaults, setRestoringDefaults] = useState(false);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
 
@@ -276,6 +277,28 @@ export default function VoiceProfileSettings() {
         addRule(newRule);
         setNewRule('');
     };
+
+    // Pull the server-side DEFAULT_VOICE_RULES list and add any rule the user
+    // doesn't already have. Doesn't remove or reorder anything they've added.
+    const handleRestoreDefaults = async () => {
+        if (restoringDefaults) return;
+        setRestoringDefaults(true);
+        try {
+            const { rules: defaults = [] } = await api.voice.defaults();
+            const existing = new Set(rules.map((r) => (r || '').trim().toLowerCase()));
+            const missing = defaults.filter(
+                (r) => r && !existing.has(r.trim().toLowerCase())
+            );
+            if (missing.length) {
+                setRules((prev) => [...prev, ...missing]);
+            }
+        } catch (e) {
+            setError(e.message || 'Failed to restore default rules');
+        } finally {
+            setRestoringDefaults(false);
+        }
+    };
+
     const removeRule = (idx) => setRules((prev) => prev.filter((_, i) => i !== idx));
     const editRule = (idx, value) =>
         setRules((prev) => prev.map((r, i) => (i === idx ? value : r)));
@@ -461,17 +484,25 @@ export default function VoiceProfileSettings() {
                 accent={rules.length > 0}
                 helper="Concrete, prescriptive, one rule per line. The Voice Guardian and Chairman are required to apply every rule below."
                 action={
-                    rules.length > 0 ? (
-                        <span
-                            style={{
-                                fontSize: '12px',
-                                color: colors.textMuted,
-                                fontStyle: 'italic',
-                            }}
-                        >
-                            Active
-                        </span>
-                    ) : null
+                    <button
+                        type="button"
+                        onClick={handleRestoreDefaults}
+                        disabled={restoringDefaults}
+                        title="Add any default rules you don't already have. Won't remove or change your existing rules."
+                        style={{
+                            background: 'transparent',
+                            color: colors.textMuted,
+                            border: `1px dashed ${colors.panelBorder}`,
+                            borderRadius: '999px',
+                            padding: '4px 12px',
+                            fontSize: '12px',
+                            cursor: restoringDefaults ? 'wait' : 'pointer',
+                            fontFamily: 'inherit',
+                            opacity: restoringDefaults ? 0.6 : 1,
+                        }}
+                    >
+                        {restoringDefaults ? 'Restoring…' : 'Restore defaults'}
+                    </button>
                 }
             >
                 {rules.length === 0 ? (

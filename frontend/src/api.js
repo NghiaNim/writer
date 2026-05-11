@@ -622,6 +622,13 @@ export const api = {
       }
       return response.json();
     },
+    async defaults() {
+      const response = await authedFetch(`${API_BASE}/api/voice-profile/defaults`);
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to load default rules'));
+      }
+      return response.json();
+    },
     async suggestRules({ source = 'reference_paragraphs', text = null, essayType = 'general' } = {}) {
       const response = await authedFetch(`${API_BASE}/api/voice-profile/suggest-rules`, {
         method: 'POST',
