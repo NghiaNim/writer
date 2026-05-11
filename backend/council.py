@@ -521,6 +521,7 @@ async def stage3_synthesize_final(
     user_id: Optional[str] = None,
     essay_type: str = "general",
     library_voice: Optional[Dict[str, Any]] = None,
+    in_flight_qa_block: str = "",
 ) -> Dict[str, Any]:
     """
     Stage 3: Chairman synthesizes final response.
@@ -572,6 +573,14 @@ async def stage3_synthesize_final(
 
     fact_rows = load_recent_user_facts(user_id) if user_id else []
     student_profile_block = format_student_profile_block(fact_rows)
+
+    # Fold any answers the user gave to interim questions during stages 1-2
+    # into the same block so existing custom prompt templates automatically
+    # pick them up via {student_profile_block}.
+    if in_flight_qa_block and in_flight_qa_block.strip():
+        student_profile_block = (
+            (student_profile_block + "\n\n") if student_profile_block else ""
+        ) + in_flight_qa_block.strip()
 
     # Library voice scaffolding (invisible to user).
     library_voice_block = format_library_voice_block(library_voice)
