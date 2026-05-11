@@ -107,16 +107,6 @@ const acceptButtonStyle = {
     cursor: 'pointer',
 };
 
-// Common starter rules for college essays. One-tap add.
-const SUGGESTED_STARTER_RULES = [
-    'No em-dashes — prefer periods or commas.',
-    'Avoid "delve into," "tapestry of," "in an era where."',
-    'Lean shorter sentences. Vary length, but cut filler.',
-    "Don't open with a quote.",
-    'Use concrete nouns over abstract ones.',
-    'No three-item parallel lists when one example would do.',
-];
-
 // Per-section panel wrapper — visible card with title + body.
 function Panel({ title, count, accent, helper, children, action }) {
     return (
@@ -286,8 +276,6 @@ export default function VoiceProfileSettings() {
         addRule(newRule);
         setNewRule('');
     };
-    const handleAddSuggested = (s) => addRule(s);
-
     const removeRule = (idx) => setRules((prev) => prev.filter((_, i) => i !== idx));
     const editRule = (idx, value) =>
         setRules((prev) => prev.map((r, i) => (i === idx ? value : r)));
@@ -403,10 +391,6 @@ export default function VoiceProfileSettings() {
         return <div style={{ color: colors.textMuted }}>Loading voice profile…</div>;
     }
 
-    const unaddedSuggestions = SUGGESTED_STARTER_RULES.filter(
-        (s) => !ruleSet.has(s.toLowerCase())
-    );
-
     return (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
             {/* ---------- Page header ---------- */}
@@ -503,7 +487,7 @@ export default function VoiceProfileSettings() {
                             marginBottom: '14px',
                         }}
                     >
-                        No rules yet. Either type one below, or tap a starter to add it instantly.
+                        No rules yet. Type one below — the council applies every rule on this list.
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
@@ -581,45 +565,6 @@ export default function VoiceProfileSettings() {
                     </button>
                 </div>
 
-                {/* Suggested starter rules */}
-                {unaddedSuggestions.length > 0 && (
-                    <div style={{ marginTop: '14px' }}>
-                        <div
-                            style={{
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em',
-                                color: colors.textMuted,
-                                marginBottom: '8px',
-                            }}
-                        >
-                            Common starter rules
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                            {unaddedSuggestions.map((s) => (
-                                <button
-                                    key={s}
-                                    type="button"
-                                    onClick={() => handleAddSuggested(s)}
-                                    style={{
-                                        background: 'rgba(255,255,255,0.04)',
-                                        color: colors.text,
-                                        border: '1px dashed rgba(148, 163, 184, 0.3)',
-                                        borderRadius: '999px',
-                                        padding: '5px 12px',
-                                        fontSize: '12px',
-                                        cursor: 'pointer',
-                                        fontFamily: 'inherit',
-                                    }}
-                                    title="Tap to add this rule"
-                                >
-                                    + {s}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </Panel>
 
             {/* ---------- 2. Pending review queue ---------- */}
