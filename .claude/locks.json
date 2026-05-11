@@ -1,0 +1,37 @@
+[
+  {
+    "file": "frontend/src/components/InterimQuestions.jsx",
+    "session": "7838dc55-e379-4a0a-8ac0-fa82be572c79",
+    "started": "2026-05-11T14:02:03Z"
+  },
+  {
+    "file": "backend/main.py",
+    "session": "7838dc55-e379-4a0a-8ac0-fa82be572c79",
+    "started": "2026-05-11T14:03:15Z"
+  },
+  {
+    "file": "frontend/src/App.jsx",
+    "session": "7838dc55-e379-4a0a-8ac0-fa82be572c79",
+    "started": "2026-05-11T14:03:32Z"
+  },
+  {
+    "file": "frontend/src/components/ChatInterface.jsx",
+    "session": "7838dc55-e379-4a0a-8ac0-fa82be572c79",
+    "started": "2026-05-11T14:03:57Z"
+  },
+  {
+    "file": "frontend/src/components/ChatInterface.css",
+    "session": "7838dc55-e379-4a0a-8ac0-fa82be572c79",
+    "started": "2026-05-11T14:04:15Z"
+  },
+  {
+    "file": "CLAUDE.md",
+    "session": "7838dc55-e379-4a0a-8ac0-fa82be572c79",
+    "started": "2026-05-11T14:04:48Z"
+  },
+  {
+    "file": "/Users/nghianim/.claude/settings.json",
+    "session": "4e43380f-77b6-4e08-8946-c3ed62de61e9",
+    "started": "2026-05-11T14:08:32Z"
+  }
+]

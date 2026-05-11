@@ -175,20 +175,6 @@ Mix and match models from different sources in your council:
   <img width="600" alt="LLM API Keys Settings" src="https://github.com/user-attachments/assets/f9a5ec9d-17e8-4e78-ad40-0c21850f2823" />
 </p>
 
-### Execution Modes
-
-<p align="center">
-  <img width="818" alt="Execution Modes Toggle" src="https://github.com/user-attachments/assets/6f8dcc5b-6dbb-423a-8376-9f6b0ebb58ba" />
-</p>
-
-Choose how deeply the council deliberates:
-
-| Mode | Stages | Best For |
-|------|--------|----------|
-| **Chat Only** | Stage 1 only | Quick responses, comparing model outputs |
-| **Chat + Ranking** | Stages 1 & 2 | See how models rank each other |
-| **Full Deliberation** | All 3 stages | Complete council synthesis (default) |
-
 ### Web Search Integration
 
 <p align="center">
@@ -499,7 +485,7 @@ This project is a fork and enhancement of the original **[llm-council](https://g
 **LLM Council Plus** builds upon the original "vibe coded" foundation with:
 - Multi-provider support (OpenRouter, Ollama, Groq, Direct APIs, Custom endpoints)
 - Web search integration (DuckDuckGo, Tavily, Brave + Jina Reader)
-- Execution modes (Chat Only, Chat + Ranking, Full Deliberation)
+- Essay Coach product layer (smart intake, voice rules, durable user-fact memory, interim Q&A, chairman clarification)
 - Temperature controls for all stages
 - Enhanced Settings UI with import/export
 - Real-time streaming with progress tracking

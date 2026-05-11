@@ -118,7 +118,7 @@ This fixes binary incompatibilities (e.g., `@rollup/rollup-darwin-*` variants).
 | `components/EssayLoadingStatus.jsx` | Terminal-style "the council is working" panel with stage label, progress counter, minimize, tip line about editing rules. |
 | `components/InterimQuestions.jsx` | Gold-accented side panel that surfaces interim questions one at a time. Renders chairman clarifications with `interim-questions--chairman` variant. Includes "Here's what the council heard" bullets. |
 | `components/FinalEssay.jsx` | Final essay block with regenerate button and council-notes toggle. |
-| `components/Stage1.jsx` / `Stage2.jsx` / `Stage3.jsx` | Legacy stage inspectors (shown only for chat_only / chat_ranking modes). |
+| `components/Stage1.jsx` / `Stage2.jsx` | Raw stage inspectors rendered inside the FinalEssay "Show council notes" disclosure and the aborted-fallback inline notes. The full essay itself is rendered by FinalEssay; there's no Stage3.jsx. |
 | `components/CouncilGrid.jsx` / `CouncilChips.jsx` | Visual grid + persona-chip row of council members with provider icons. |
 | `components/Sidebar.jsx` | Conversation list (per-user). |
 | `components/Settings.jsx` | 7-section settings: Council, System Prompts, **My Voice**, **What We Know** (new), Search Providers, Backup & Reset, plus the LLM API Keys section (hosted-mode hidden). |
@@ -227,11 +227,11 @@ The streaming endpoint (`POST /api/conversations/{id}/message/stream`) yields th
 ```
 search_start → search_complete | search_error       (if web_search=true; either-or)
 stage1_start → stage1_init → stage1_progress(×N) → stage1_complete
-interim_question(×0–2)                              (chat_ranking / full only)
+interim_question(×0–2)                              (after stage 1)
 stage2_start → stage2_init → stage2_progress(×N) → stage2_complete
-interim_question(×0–1)                              (full only, if budget remains)
-clarification_question(×0–1)                        (full only, chairman pre-pass)
-stage3_start → stage3_complete                      (full only)
+interim_question(×0–1)                              (after stage 2, if budget remains)
+clarification_question(×0–1)                        (chairman pre-pass)
+stage3_start → stage3_complete
 title_complete                                       (first message in conversation)
 run_finished                                         (always, just before complete/error)
 complete | error                                     (terminal)
@@ -334,13 +334,6 @@ Persist:
    - user_fact  (fire-and-forget extraction via memory_extraction)
      → maybe_summarize_overflow() folds oldest half if corpus > 8000 chars
 ```
-
-## Execution Modes
-
-Three modes control deliberation depth:
-- **Chat Only**: Stage 1 only (quick responses)
-- **Chat + Ranking**: Stages 1 & 2 (peer review without synthesis)
-- **Full Deliberation**: All 3 stages (default)
 
 ## Testing & Debugging
 

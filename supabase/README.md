@@ -14,6 +14,7 @@ verification script to confirm everything is wired up.
 | `migrations/005_user_fact_categories.sql` | Adds `category` (biography / experience / belief / interest / achievement / relationship / reference / general) and `source_essay_id` FK to `user_fact`; relaxes source check to allow `'essay'`. |
 | `migrations/006_conversations.sql` | Creates the `conversations` table for per-user chat history JSONB with RLS. |
 | `migrations/007_fact_archive_and_cleanup.sql` | Drops stray `user_profiles` + `brainstorm_drafts` from a prototype migration (their FKs pointed at a non-existent `users(id)`); adds `user_fact.archived_at` + `superseded_by` (self-FK) for summarization-on-overflow; adds `'summary'` source; active-only index. |
+| `migrations/008_user_settings.sql` | Creates `user_settings` for per-user overrides of prompts, temperatures, and search prefs that used to live globally in `data/settings.json` (where one user could clobber every other user's values). NULL columns fall back to the operator-wide defaults. RLS on `auth.uid() = user_id`. |
 
 All migrations are idempotent: re-running them is safe.
 
