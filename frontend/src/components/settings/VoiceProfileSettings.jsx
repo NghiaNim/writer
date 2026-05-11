@@ -1,5 +1,35 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api';
+
+// ---------------------------------------------------------------------------
+// AutoGrowTextarea — used for the rule editor so long rules display fully
+// instead of being truncated inside a single-line <input>.
+// ---------------------------------------------------------------------------
+
+function AutoGrowTextarea({ value, onChange, style, ...rest }) {
+    const ref = useRef(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+    }, [value]);
+    return (
+        <textarea
+            ref={ref}
+            value={value}
+            onChange={onChange}
+            rows={1}
+            style={{
+                resize: 'none',
+                overflow: 'hidden',
+                lineHeight: 1.5,
+                ...style,
+            }}
+            {...rest}
+        />
+    );
+}
 
 // ---------------------------------------------------------------------------
 // Style tokens (kept inline so this file ships without a sibling .css)
@@ -483,7 +513,7 @@ export default function VoiceProfileSettings() {
                                 style={{
                                     display: 'flex',
                                     gap: '8px',
-                                    alignItems: 'center',
+                                    alignItems: 'flex-start',
                                     padding: '10px 12px',
                                     background: colors.ruleBg,
                                     border: `1px solid ${colors.ruleBorder}`,
@@ -496,13 +526,13 @@ export default function VoiceProfileSettings() {
                                         color: '#60a5fa',
                                         fontWeight: 700,
                                         fontSize: '13px',
-                                        minWidth: '20px',
+                                        minWidth: '24px',
+                                        paddingTop: '4px',
                                     }}
                                 >
                                     {idx + 1}.
                                 </span>
-                                <input
-                                    type="text"
+                                <AutoGrowTextarea
                                     value={rule}
                                     onChange={(e) => editRule(idx, e.target.value)}
                                     style={{
@@ -510,11 +540,18 @@ export default function VoiceProfileSettings() {
                                         flex: 1,
                                         background: 'transparent',
                                         border: '1px solid transparent',
+                                        padding: '4px 6px',
+                                        minHeight: '28px',
                                     }}
+                                    aria-label={`Rule ${idx + 1}`}
                                 />
                                 <button
                                     type="button"
-                                    style={removeButtonStyle}
+                                    style={{
+                                        ...removeButtonStyle,
+                                        marginTop: '2px',
+                                        flexShrink: 0,
+                                    }}
                                     onClick={() => removeRule(idx)}
                                 >
                                     Remove
