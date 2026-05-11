@@ -5,6 +5,25 @@ All notable changes to LLM Council Plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-05-11
+
+### Removed
+- **Legacy execution modes** (`chat_only`, `chat_ranking`) — unreachable from the UI for the entire 0.3.x line. The toggle was never built; the modes only persisted because nothing forced cleanup. Net delete: ~800 LOC.
+  - `Stage3.jsx` + `Stage3.css` (its job is done by `FinalEssay`).
+  - `Stage1Skeleton` / `Stage2Skeleton` exports (only the legacy branch used them).
+  - The entire legacy stage-by-stage rendering branch in `ChatInterface.jsx`.
+  - `executionMode` state, `setExecutionMode`, the auto-save effect, and the prop threading through `App.jsx → ChatInterface → AssistantMessageBody`.
+  - `execution_mode` field on `SendMessageRequest`, on `UpdateSettingsRequest`, and on `Settings`. Backend always runs all three stages now; old persisted values in `data/settings.json` are silently ignored.
+- **Redundant `SUGGESTED_STARTER_RULES`** in `VoiceProfileSettings.jsx` — every starter was already covered by `DEFAULT_VOICE_RULES` seeded on first read.
+- **Dead `AVAILABLE_MODELS` list** in `backend/settings.py` (static fallback for a legacy Settings UI; the live OpenRouter catalog drives the picker).
+- **Stale "Phase N" comments** throughout the backend — replaced with concrete descriptions of what each block does.
+
+### Added
+- **"Restore defaults" button** on the voice-rules editor with an inline two-step confirm. Pulls `GET /api/voice-profile/defaults` and adds any rule the user doesn't already have; never removes or reorders existing rules.
+
+### Changed
+- `Stage1.jsx` and `Stage2.jsx` are now used only as raw stage inspectors inside the FinalEssay "Show council notes" disclosure and the aborted-fallback notes.
+
 ## [0.3.0] - 2026-05-11
 
 ### Added

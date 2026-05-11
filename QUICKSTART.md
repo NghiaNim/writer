@@ -139,18 +139,6 @@ After the essay is done you can refine with the chips, save feedback, or start a
 
 ---
 
-## 5. Execution Modes
-
-Choose your deliberation depth (toggle in chat header):
-
-| Mode | What Happens |
-|------|--------------|
-| **Chat Only** | Just Stage 1 - quick individual responses |
-| **Chat + Ranking** | Stages 1 & 2 - see peer rankings |
-| **Full Deliberation** | All 3 stages - complete synthesis (default) |
-
----
-
 ## 7. Quick Tips
 
 - **Mix model families** for diverse perspectives (e.g., GPT + Claude + Gemini).
