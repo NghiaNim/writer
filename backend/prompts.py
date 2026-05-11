@@ -226,6 +226,133 @@ PERSONA_KEYS = [p["key"] for p in DEFAULT_COUNCIL_PERSONAS]
 PERSONAS_BY_KEY = {p["key"]: p for p in DEFAULT_COUNCIL_PERSONAS}
 
 
+# ---------------------------------------------------------------------------
+# Pitch race (Stage 0): four personas propose a thesis + lead + key move in
+# parallel. A cheap picker picks one. All four then write the full essay from
+# the same picked pitch, so synthesis later is "merge variations on a theme"
+# instead of "fuse four different visions."
+# ---------------------------------------------------------------------------
+
+PITCH_PROMPT_DEFAULT = """You are part of an essay-writing council. Before anyone drafts a full essay, every council member pitches their angle so the council can pick the strongest before committing.
+
+Topic or draft from user:
+{user_query}
+
+{essay_mode_block}
+
+{voice_profile_block}
+{student_profile_block}
+
+Output ONE pitch in EXACTLY this format, no preface, no commentary:
+
+THESIS: <one sentence — the specific, defensible claim the essay will argue or land>
+LEAD: <the actual first sentence of the essay (1-2 lines), the kind that earns the reader's trust>
+KEY MOVE: <one sentence naming the structural or rhetorical decision that makes this essay distinctive (e.g., "Open with the strongest counterargument and work back", "Anchor every paragraph in one concrete scene")>
+WHY THIS WORKS: <one sentence on why this angle beats the obvious read>
+
+Take a risk. The pitch most likely to get picked is the one that surprises, not the one that signals competence."""
+
+
+PITCH_PICKER_PROMPT_DEFAULT = """You are picking the strongest pitch from a council of essay-writers. All pitches respond to the same topic.
+
+Topic:
+{user_query}
+
+Pitches:
+{pitches_text}
+
+Pick ONE. Prefer specificity over breadth. Prefer the surprising angle over the safe one. Prefer the pitch whose lead sentence you'd actually want to keep reading. Reject pitches that hedge, generalize, or sound like a brand voice.
+
+If two pitches are equally strong, pick the one with the more concrete lead sentence.
+
+Output STRICT JSON, no commentary, no markdown fences:
+{{"winner_index": N, "reason": "<one short sentence>"}}
+
+N is the 0-indexed position of the winning pitch in the list above."""
+
+
+# ---------------------------------------------------------------------------
+# Stage 2: critiques (replaced peer rankings in 0.4.0)
+# ---------------------------------------------------------------------------
+#
+# Each council member reads the chosen SPINE draft and writes a critique
+# focused on what's weak, what to cut, and what to keep. The chairman then
+# revises the spine using the consolidated critique — much easier than
+# fusing four whole essays.
+
+STAGE2_CRITIQUE_PROMPT_DEFAULT = """You are a member of an essay-writing council reviewing the strongest draft the council produced. Your job is to make it sharper.
+
+Topic or draft from user: {user_query}
+
+{essay_mode_block}
+
+SPINE DRAFT (the one being revised):
+{spine_text}
+
+OTHER DRAFTS (reference only — do NOT rewrite the spine into one of these):
+{other_drafts_text}
+
+{voice_profile_block}
+{student_profile_block}
+
+Produce a short, surgical critique. No throat-clearing, no praise, no overall judgment. Focus on what the chairman should DO to the spine. Use this format:
+
+CUT: <list 1-3 specific phrases/sentences/passages from the spine that should be removed, each in quotes, with a one-line reason>
+SHARPEN: <list 1-3 specific places where a claim, image, or line should be more concrete or risk more, each quoted with a one-line revision direction>
+KEEP: <list 1-2 things in the spine that should NOT be touched, quoted, one-line why>
+BORROW: <optional — if any specific sentence, image, or move from the OTHER drafts is sharper than the equivalent in the spine, name it with a quote and say what to replace>
+
+Be specific. Quote the actual text. Generic advice ("tighten the prose", "add more detail") is useless to the chairman."""
+
+
+# ---------------------------------------------------------------------------
+# Stage 3: chairman revision (replaced synthesis in 0.4.0)
+# ---------------------------------------------------------------------------
+#
+# The chairman REVISES the spine draft using the consolidated critique.
+# This is a directed revision task, not a synthesis-from-scratch — much
+# closer to how humans actually write.
+
+STAGE3_REVISION_PROMPT_DEFAULT = """You are the Chairman of an essay-writing council. The council picked one draft as the SPINE and produced surgical critiques of it. Your job is to revise the spine using those critiques. You are NOT writing a fresh essay; you are improving an existing one.
+
+Original topic or draft from user: {user_query}
+
+{essay_mode_block}
+
+{word_target_block}
+
+{search_context_block}
+SPINE DRAFT (revise THIS — do not start over):
+{spine_text}
+
+COUNCIL CRITIQUES:
+{critiques_text}
+
+{voice_profile_block}
+{student_profile_block}
+{library_voice_block}
+
+YOUR JOB — REVISE, DO NOT REWRITE.
+
+The spine is the essay. Apply the council's CUT, SHARPEN, KEEP, and BORROW notes in that order:
+1. Apply every CUT. If multiple critics agree on a cut, it's almost certainly right.
+2. Apply SHARPEN: replace the flagged passages with sharper, more concrete, more committed versions. Don't soften them.
+3. Honor every KEEP. The asymmetric sentence, the risky image, the unusual word — these are usually the parts of the essay that work.
+4. Apply BORROW only where the borrowed sentence is clearly sharper than what the spine has. Take the bolder version, not the safer one.
+
+Rules:
+- Preserve the spine's structure unless a critique explicitly tells you to restructure.
+- Do not flatten the writer's voice into smooth AI prose. Idiosyncrasy is the feature.
+- If a USER VOICE PROFILE is provided above, every rule in it overrides your stylistic preferences. Walk through the rules mentally and revise any sentence that violates one.
+- If a VOICE INSPIRATION block is provided, treat it as a tonal anchor only. Match its rhythm; do not borrow its content.
+- If a TARGET LENGTH is given, stay within ±10%. Do not pad.
+
+In topic mode: return the revised essay.
+In draft mode: the user's original draft IS the spine. Improve it using the critiques while preserving their voice and claims.
+
+Output only the revised essay. No preface, no "Here is the revision", no section headers."""
+
+
 STAGE2_PROMPT_DEFAULT = """You are evaluating different draft essays written in response to the same topic or rough draft.
 
 Topic / draft from user: {user_query}

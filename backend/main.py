@@ -809,12 +809,61 @@ async def send_message_stream(
                 )
                 await asyncio.sleep(0.05)
 
-            # Stage 1: Collect responses
+            # Pitch race (Stage 0): every persona pitches a thesis + lead +
+            # key move in parallel. A cheap Gemini Flash call picks the
+            # strongest. The picked pitch becomes the SHARED angle that
+            # every Stage 1 essay writes from — so the 4 essays end up as
+            # variations on one theme, making Stage 3 revision tractable.
+            from .council import collect_pitches, pick_strongest_pitch
+
+            yield f"data: {json.dumps({'type': 'pitch_start'})}\n\n"
+            await asyncio.sleep(0.05)
+
+            pitches: List[Dict[str, Any]] = []
+            total_pitchers = 0
+            async for item in collect_pitches(
+                body.content,
+                request,
+                essay_mode=body.essay_mode,
+                council_models=council_models,
+                council_personas=council_personas,
+                user_id=user.id,
+            ):
+                if isinstance(item, int):
+                    total_pitchers = item
+                    yield f"data: {json.dumps({'type': 'pitch_init', 'total': total_pitchers})}\n\n"
+                    continue
+                pitches.append(item)
+                yield f"data: {json.dumps({'type': 'pitch_progress', 'data': item, 'count': len(pitches), 'total': total_pitchers})}\n\n"
+                await asyncio.sleep(0.01)
+
+            yield f"data: {json.dumps({'type': 'pitch_complete', 'data': pitches})}\n\n"
+            await asyncio.sleep(0.05)
+
+            # Pick the strongest pitch. Falls back to the first successful
+            # pitch on any picker failure (logged but non-fatal).
+            shared_pitch_text = ""
+            pitch_pick = {"winner_index": 0, "reason": ""}
+            successful_pitches = [p for p in pitches if not p.get("error") and p.get("response")]
+            if successful_pitches:
+                try:
+                    pitch_pick = await pick_strongest_pitch(body.content, pitches)
+                except Exception as ex:
+                    print(f"WARN: pitch picker failed: {ex}")
+                winner = pitches[pitch_pick["winner_index"]] if (
+                    0 <= pitch_pick["winner_index"] < len(pitches)
+                ) else successful_pitches[0]
+                shared_pitch_text = (winner.get("response") or "").strip()
+                yield f"data: {json.dumps({'type': 'pitch_picked', 'data': {'winner_index': pitch_pick['winner_index'], 'reason': pitch_pick.get('reason', ''), 'pitch': shared_pitch_text}})}\n\n"
+                await asyncio.sleep(0.05)
+
+            # Stage 1: collect full essays, every persona writing toward the
+            # picked pitch.
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
             await asyncio.sleep(0.05)
-            
+
             total_models = 0
-            
+
             async for item in stage1_collect_responses(
                 body.content,
                 search_context,
@@ -825,13 +874,14 @@ async def send_message_stream(
                 word_target=word_target,
                 user_id=user.id,
                 library_voice=library_voice,
+                shared_pitch=shared_pitch_text,
             ):
                 if isinstance(item, int):
                     total_models = item
                     print(f"DEBUG: Sending stage1_init with total={total_models}")
                     yield f"data: {json.dumps({'type': 'stage1_init', 'total': total_models})}\n\n"
                     continue
-                
+
                 stage1_results.append(item)
                 yield f"data: {json.dumps({'type': 'stage1_progress', 'data': item, 'count': len(stage1_results), 'total': total_models})}\n\n"
                 await asyncio.sleep(0.01)

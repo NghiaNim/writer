@@ -184,6 +184,213 @@ async def query_models_parallel(models: List[str], messages: List[Dict[str, str]
     return dict(results)
 
 
+async def collect_pitches(
+    user_query: str,
+    request: Any = None,
+    essay_mode: str = "topic",
+    council_models: Optional[List[str]] = None,
+    council_personas: Optional[List[CouncilPersona]] = None,
+    user_id: Optional[str] = None,
+    essay_type: str = "general",
+) -> Any:
+    """Stage 0 (pitch race): every council member produces a one-paragraph
+    pitch (THESIS / LEAD / KEY MOVE / WHY) in parallel. Cheap exploration of
+    the angle space before anyone commits to a full essay.
+
+    Yields:
+        - First yield: total_models (int)
+        - Subsequent yields: per-pitch dicts {model, persona, council_index, response | error}
+    """
+    from .prompts import PITCH_PROMPT_DEFAULT
+
+    settings = get_settings()
+
+    profile: Optional[VoiceProfile] = None
+    if user_id:
+        try:
+            profile = load_voice_profile(user_id, essay_type=essay_type)
+        except Exception as e:
+            logger.warning("voice profile load failed for user=%s: %s", user_id, e)
+    voice_profile_block = format_voice_profile_block(profile)
+
+    rows = load_recent_user_facts(user_id) if user_id else []
+    student_profile_block = format_student_profile_block(rows)
+
+    essay_mode_block = format_essay_mode_block(essay_mode)
+
+    personas = (
+        council_personas if council_personas is not None
+        else (settings.council_personas or [])
+    )
+    models = council_models if council_models is not None else get_council_models()
+
+    def _persona_name_for_index(idx: int) -> str:
+        if idx < len(personas) and personas[idx].name:
+            return personas[idx].name
+        return ""
+
+    def _build_prompt(idx: int) -> str:
+        # Pitches use a single shared template — persona system prompts shape
+        # the FULL essay in Stage 1, not the pitch. Different personas still
+        # produce different pitches because of model + temperature variation.
+        try:
+            return PITCH_PROMPT_DEFAULT.format(
+                user_query=user_query,
+                essay_mode_block=essay_mode_block,
+                voice_profile_block=voice_profile_block,
+                student_profile_block=student_profile_block,
+            )
+        except Exception as e:
+            logger.warning(f"Pitch prompt format failed for member {idx}: {e}")
+            return f"Pitch your angle for this essay topic:\n\n{user_query}"
+
+    # Pitches benefit from MORE creativity than full drafts — bump the temp
+    # above council_temperature so the exploration is genuinely divergent.
+    pitch_temp = min(0.95, settings.council_temperature + 0.2)
+
+    yield len(models)
+
+    async def _query_safe(idx: int, m: str):
+        prompt = _build_prompt(idx)
+        messages = [{"role": "user", "content": prompt}]
+        try:
+            return idx, m, await query_model(m, messages, temperature=pitch_temp, timeout=45.0)
+        except Exception as e:
+            return idx, m, {"error": True, "error_message": str(e)}
+
+    tasks = [asyncio.create_task(_query_safe(i, m)) for i, m in enumerate(models)]
+    pending = set(tasks)
+    try:
+        while pending:
+            if request and await request.is_disconnected():
+                logger.info("Client disconnected during pitch race. Cancelling tasks...")
+                for t in pending:
+                    t.cancel()
+                raise asyncio.CancelledError("Client disconnected")
+            done, pending = await asyncio.wait(
+                pending, return_when=asyncio.FIRST_COMPLETED, timeout=1.0
+            )
+            for task in done:
+                try:
+                    idx, model, response = await task
+                    persona_name = _persona_name_for_index(idx)
+                    if response and response.get("error"):
+                        yield {
+                            "model": model,
+                            "persona": persona_name,
+                            "council_index": idx,
+                            "response": None,
+                            "error": True,
+                            "error_message": response.get("error_message", "Unknown error"),
+                        }
+                        continue
+                    content = (response or {}).get("content", "") if response else ""
+                    if not isinstance(content, str):
+                        content = str(content) if content is not None else ""
+                    yield {
+                        "model": model,
+                        "persona": persona_name,
+                        "council_index": idx,
+                        "response": content,
+                        "error": False,
+                    }
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    logger.error(f"Error processing pitch task: {e}")
+    except asyncio.CancelledError:
+        for t in tasks:
+            if not t.done():
+                t.cancel()
+        raise
+
+
+async def pick_strongest_pitch(
+    user_query: str,
+    pitches: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Single Gemini-Flash call to pick the strongest pitch.
+
+    Returns {"winner_index": int, "reason": str}. On any failure, falls back
+    to the first successful pitch with reason='fallback (picker error)'.
+    """
+    from .prompts import PITCH_PICKER_PROMPT_DEFAULT
+    import json
+    import re
+
+    successful = [p for p in pitches if not p.get("error") and p.get("response")]
+    if not successful:
+        return {"winner_index": 0, "reason": "no successful pitches"}
+
+    # Use stable letters so the picker reasons by label, not raw index.
+    pitches_text = "\n\n".join(
+        f"PITCH {i} (council member {p.get('persona') or p.get('model')}):\n"
+        f"{(p.get('response') or '').strip()}"
+        for i, p in enumerate(successful)
+    )
+
+    try:
+        prompt = PITCH_PICKER_PROMPT_DEFAULT.format(
+            user_query=user_query,
+            pitches_text=pitches_text,
+        )
+    except Exception as e:
+        logger.warning(f"pitch picker prompt format failed: {e}")
+        return {
+            "winner_index": pitches.index(successful[0]),
+            "reason": "fallback (prompt format error)",
+        }
+
+    try:
+        res = await query_model(
+            "google:gemini-2.5-flash",
+            [{"role": "user", "content": prompt}],
+            timeout=25.0,
+            temperature=0.2,
+        )
+    except Exception as e:
+        logger.warning(f"pitch picker call failed: {e}")
+        return {
+            "winner_index": pitches.index(successful[0]),
+            "reason": "fallback (picker error)",
+        }
+
+    if not res or res.get("error"):
+        return {
+            "winner_index": pitches.index(successful[0]),
+            "reason": "fallback (picker returned error)",
+        }
+
+    raw = (res.get("content") or "").strip()
+    parsed = None
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        m = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+        if m:
+            try:
+                parsed = json.loads(m.group(0))
+            except Exception:
+                parsed = None
+
+    if not isinstance(parsed, dict):
+        return {
+            "winner_index": pitches.index(successful[0]),
+            "reason": "fallback (unparseable picker output)",
+        }
+
+    try:
+        local_idx = int(parsed.get("winner_index", 0))
+    except (TypeError, ValueError):
+        local_idx = 0
+    local_idx = max(0, min(len(successful) - 1, local_idx))
+    chosen = successful[local_idx]
+    return {
+        "winner_index": pitches.index(chosen),
+        "reason": str(parsed.get("reason") or "").strip()[:200] or "(no reason given)",
+    }
+
+
 async def stage1_collect_responses(
     user_query: str,
     search_context: str = "",
@@ -195,6 +402,7 @@ async def stage1_collect_responses(
     user_id: Optional[str] = None,
     essay_type: str = "general",
     library_voice: Optional[Dict[str, Any]] = None,
+    shared_pitch: Optional[str] = None,
 ) -> Any:
     """
     Stage 1: Collect individual responses from all council models.
@@ -256,6 +464,19 @@ async def stage1_collect_responses(
     fallback_template = settings.stage1_prompt or STAGE1_PROMPT_DEFAULT
     personas = council_personas if council_personas is not None else (settings.council_personas or [])
 
+    # When a shared pitch was picked in the pitch race, prepend it to every
+    # persona's prompt so all 4 essays converge on the same THESIS / LEAD /
+    # KEY MOVE. This is what makes Stage 2 synthesis tractable later: the
+    # 4 essays are variations on one theme, not 4 different visions.
+    shared_pitch_prefix = ""
+    if shared_pitch and shared_pitch.strip():
+        shared_pitch_prefix = (
+            "COUNCIL-AGREED ANGLE (write your essay using THIS thesis, "
+            "lead, and key structural move — do not propose a different "
+            "angle; differ in execution, not in angle):\n\n"
+            f"{shared_pitch.strip()}\n\n---\n\n"
+        )
+
     def _build_prompt_for_index(idx: int) -> str:
         """Pick persona prompt for council member `idx`, with fallbacks."""
         template = None
@@ -265,7 +486,7 @@ async def stage1_collect_responses(
             template = fallback_template
 
         try:
-            return template.format(
+            body = template.format(
                 user_query=user_query,
                 search_context_block=search_context_block,
                 voice_profile_block=voice_profile_block,
@@ -279,8 +500,10 @@ async def stage1_collect_responses(
                 f"Error formatting Stage 1 prompt for member {idx}: {e}. Using bare fallback."
             )
             if search_context_block:
-                return f"{search_context_block}\n\nTopic or draft from user:\n{user_query}"
-            return user_query
+                body = f"{search_context_block}\n\nTopic or draft from user:\n{user_query}"
+            else:
+                body = user_query
+        return shared_pitch_prefix + body
 
     # Prepare tasks for all models
     models = council_models if council_models is not None else get_council_models()
