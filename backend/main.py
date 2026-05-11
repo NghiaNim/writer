@@ -660,6 +660,50 @@ async def send_message_stream(
                     print(f"WARN: failed to pin voice_library_id on session: {e}")
 
     async def event_generator():
+        # Pull interim-question helpers up-front so we can clear the run buffer
+        # at the start and read it again before stage 3.
+        from .interim_questions import (
+            MAX_QUESTIONS_PER_RUN,
+            clear_run_buffer,
+            generate_interim_questions,
+            get_run_buffer,
+            reset_run_buffer,
+        )
+        from .user_facts import load_recent_user_facts
+
+        # Per-run state for interim Q&A. Reset at the start so a new run on
+        # the same conversation doesn't see stale answers.
+        reset_run_buffer(conversation_id)
+
+        async def _emit_interim_questions(stage1_for_context):
+            """Generate interim questions and yield SSE events. Caller is
+            responsible for awaiting the resulting events; this is an async
+            generator returned to the outer loop."""
+            already_asked = get_run_buffer(conversation_id)
+            n_remaining = max(0, MAX_QUESTIONS_PER_RUN - len(already_asked))
+            if n_remaining <= 0:
+                return
+            try:
+                known_facts = await asyncio.to_thread(
+                    load_recent_user_facts, user.id
+                )
+            except Exception:
+                known_facts = []
+            try:
+                qs = await generate_interim_questions(
+                    topic=session_topic or "",
+                    user_query=body.content,
+                    known_facts=known_facts,
+                    asked_this_run=already_asked,
+                    stage1_drafts=stage1_for_context,
+                    n_remaining=n_remaining,
+                )
+            except Exception as ex:
+                print(f"WARN: interim question generation failed: {ex}")
+                qs = []
+            for q in qs:
+                yield f"data: {json.dumps({'type': 'interim_question', 'data': q})}\n\n"
+
         try:
             # Initialize variables for metadata
             stage1_results = []
@@ -667,7 +711,7 @@ async def send_message_stream(
             stage3_result = None
             label_to_model = {}
             aggregate_rankings = {}
-            
+
             # Add user message
             storage.add_user_message(conversation_id, user.id, body.content)
 
@@ -723,18 +767,39 @@ async def send_message_stream(
                     raise asyncio.CancelledError("Client disconnected")
 
                 # Run search (now fully async for Tavily/Brave, threaded only for DuckDuckGo)
-                search_result = await perform_web_search(
-                    search_query, 
-                    settings.search_result_count,  # Configurable result count (default 8)
-                    provider, 
-                    settings.full_content_results,
-                    settings.search_keyword_extraction,
-                    hybrid_mode=settings.search_hybrid_mode  # Combine web+news for DuckDuckGo
-                )
-                search_context = search_result["results"]
-                extracted_query = search_result["extracted_query"]
-                search_intent = search_result.get("intent", "unknown")
-                yield f"data: {json.dumps({'type': 'search_complete', 'data': {'search_query': search_query, 'extracted_query': extracted_query, 'search_context': search_context, 'provider': provider.value, 'intent': search_intent}})}\n\n"
+                search_failed = False
+                search_error_message = None
+                try:
+                    search_result = await perform_web_search(
+                        search_query,
+                        settings.search_result_count,  # Configurable result count (default 8)
+                        provider,
+                        settings.full_content_results,
+                        settings.search_keyword_extraction,
+                        hybrid_mode=settings.search_hybrid_mode  # Combine web+news for DuckDuckGo
+                    )
+                    search_context = search_result["results"]
+                    extracted_query = search_result["extracted_query"]
+                    search_intent = search_result.get("intent", "unknown")
+                    # perform_web_search swallows internal errors and returns
+                    # a "[System Note: Web search was attempted but failed.]"
+                    # placeholder. Detect that so we can warn the user instead
+                    # of running stages 1-3 on a silently-empty context.
+                    if isinstance(search_context, str) and search_context.startswith("[System Note: Web search was attempted but failed"):
+                        search_failed = True
+                        search_error_message = f"{provider.value} search failed; council ran without web context."
+                except Exception as e:
+                    print(f"Web search raised: {e}")
+                    search_failed = True
+                    search_error_message = f"{provider.value} search errored: {e}"
+                    search_context = ""
+                    extracted_query = search_query
+                    search_intent = "unknown"
+
+                if search_failed:
+                    yield f"data: {json.dumps({'type': 'search_error', 'data': {'provider': provider.value, 'message': search_error_message, 'search_query': search_query}})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'search_complete', 'data': {'search_query': search_query, 'extracted_query': extracted_query, 'search_context': search_context, 'provider': provider.value, 'intent': search_intent}})}\n\n"
                 posthog.capture(
                     "web_search_performed",
                     distinct_id=user.id,
@@ -775,6 +840,14 @@ async def send_message_stream(
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
             await asyncio.sleep(0.05)
 
+            # Interim questions: stage 1 just finished; stage 2 is about to
+            # start. Use the council's drafts to pick questions whose answers
+            # would ground vague claims in the final essay.
+            if body.execution_mode in ["chat_ranking", "full"]:
+                async for event in _emit_interim_questions(stage1_results):
+                    yield event
+                    await asyncio.sleep(0.01)
+
             # Check if any models responded successfully in Stage 1
             if not any(r for r in stage1_results if not r.get('error')):
                 error_msg = 'All models failed to respond in Stage 1, likely due to rate limits or API errors. Please try again or adjust your model selection.'
@@ -813,8 +886,59 @@ async def send_message_stream(
                 yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'search_query': search_query, 'search_context': search_context}})}\n\n"
                 await asyncio.sleep(0.05)
 
+                # Second window: stage 2 done, stage 3 not yet started. Only
+                # emit if the user still has question budget left after
+                # stage 1's batch.
+                if body.execution_mode == "full":
+                    async for event in _emit_interim_questions(stage1_results):
+                        yield event
+                        await asyncio.sleep(0.01)
+
             # Stage 3: Only if mode is 'full'
             if body.execution_mode == "full":
+                # Chairman pre-pass: one final clarification, pinned to a
+                # specific vague claim in the drafts. Single Flash call;
+                # silently returns None if everything is already grounded.
+                from .interim_questions import (
+                    format_in_flight_qa_block,
+                    generate_chairman_clarification,
+                    wait_for_answer,
+                )
+
+                try:
+                    already_asked = get_run_buffer(conversation_id)
+                    try:
+                        known_facts = await asyncio.to_thread(
+                            load_recent_user_facts, user.id
+                        )
+                    except Exception:
+                        known_facts = []
+                    clarification = await generate_chairman_clarification(
+                        topic=session_topic or "",
+                        user_query=body.content,
+                        known_facts=known_facts,
+                        asked_this_run=already_asked,
+                        stage1_drafts=stage1_results,
+                    )
+                except Exception as ex:
+                    print(f"WARN: chairman clarification failed: {ex}")
+                    clarification = None
+
+                if clarification:
+                    yield (
+                        f"data: {json.dumps({'type': 'clarification_question', 'data': clarification})}\n\n"
+                    )
+                    # Wait up to ~25s for an answer. Skip and answer both
+                    # short-circuit; timeout proceeds without the answer.
+                    try:
+                        await wait_for_answer(
+                            conversation_id,
+                            clarification["question_id"],
+                            timeout_s=25.0,
+                        )
+                    except Exception as ex:
+                        print(f"WARN: clarification wait failed: {ex}")
+
                 yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
                 await asyncio.sleep(0.05)
 
@@ -822,6 +946,10 @@ async def send_message_stream(
                 if await request.is_disconnected():
                     print("Client disconnected before Stage 3")
                     raise asyncio.CancelledError("Client disconnected")
+
+                in_flight_block = format_in_flight_qa_block(
+                    get_run_buffer(conversation_id)
+                )
 
                 stage3_result = await stage3_synthesize_final(
                     body.content,
@@ -833,6 +961,7 @@ async def send_message_stream(
                     word_target=word_target,
                     user_id=user.id,
                     library_voice=library_voice,
+                    in_flight_qa_block=in_flight_block,
                 )
                 yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
@@ -946,10 +1075,18 @@ async def send_message_stream(
                 },
             )
 
+            # Signal that the run has fully terminated so the frontend can
+            # freeze any in-flight interim-question inputs — late answers
+            # would still persist to user_fact but cannot be folded into
+            # this chairman synthesis.
+            yield f"data: {json.dumps({'type': 'run_finished', 'reason': 'complete'})}\n\n"
+
             # Send completion event
+            clear_run_buffer(conversation_id)
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
 
         except asyncio.CancelledError:
+            clear_run_buffer(conversation_id)
             print(f"Stream cancelled for conversation {conversation_id}")
             # Even if cancelled, try to save the title if it's ready or nearly ready
             if title_task:
@@ -962,9 +1099,13 @@ async def send_message_stream(
                     print(f"Could not save title during cancellation: {e}")
             raise
         except Exception as e:
+            clear_run_buffer(conversation_id)
             print(f"Stream error: {e}")
             # Save error to conversation history
             storage.add_error_message(conversation_id, user.id, f"Error: {str(e)}")
+            # Signal run termination before the error event so the frontend
+            # can lock interim-question input even on a partial run.
+            yield f"data: {json.dumps({'type': 'run_finished', 'reason': 'error'})}\n\n"
             # Send error event
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
@@ -1040,7 +1181,7 @@ class TestTavilyRequest(BaseModel):
 
 
 @app.get("/api/settings")
-async def get_app_settings():
+async def get_app_settings(user: AuthUser = Depends(get_current_user)):
     """Get current application settings."""
     settings = get_settings()
     return {
@@ -1097,7 +1238,7 @@ async def get_app_settings():
 
 
 @app.get("/api/settings/defaults")
-async def get_default_settings():
+async def get_default_settings(user: AuthUser = Depends(get_current_user)):
     """Get default model settings."""
     from .prompts import (
         STAGE1_PROMPT_DEFAULT,
@@ -1119,7 +1260,10 @@ async def get_default_settings():
 
 
 @app.put("/api/settings")
-async def update_app_settings(request: UpdateSettingsRequest):
+async def update_app_settings(
+    request: UpdateSettingsRequest,
+    user: AuthUser = Depends(get_current_user),
+):
     """Update application settings."""
     updates = {}
 
@@ -1347,6 +1491,18 @@ async def api_get_voice_profile(
 ):
     profile = load_voice_profile(user.id, essay_type=essay_type)
     return profile.model_dump()
+
+
+@app.get("/api/voice-profile/defaults")
+async def api_get_voice_profile_defaults():
+    """Return the default voice rules every new user is seeded with.
+
+    Frontend uses this for a "restore defaults" button and to show users
+    what came pre-loaded vs. what they've added themselves.
+    """
+    from .voice_profile import DEFAULT_VOICE_RULES
+
+    return {"rules": list(DEFAULT_VOICE_RULES)}
 
 
 @app.post("/api/voice-profile")
@@ -1663,6 +1819,118 @@ async def api_intake_core_idea(
     return {"core_idea": brief}
 
 
+class IntakeAnswerRequest(BaseModel):
+    """An answer to a question the council asked while drafting.
+
+    `conversation_id` keys the in-process run buffer so stage 3 can read it.
+    `session_id` is optional — when present we also persist the Q&A onto
+    `essay_sessions.conversation` so it survives a process restart and can be
+    reviewed later. Skipped questions (empty answer) still POST so the UI can
+    advance; the backend drops them from the in-flight buffer but does not
+    persist a fact for them.
+    """
+    conversation_id: str = Field(..., min_length=1)
+    question_id: str = Field(..., min_length=1)
+    question: str = Field(..., min_length=1, max_length=600)
+    answer: str = Field("", max_length=8000)
+    session_id: Optional[str] = None
+    skipped: bool = False
+
+
+@app.post("/api/intake/answer")
+async def api_intake_answer(
+    body: IntakeAnswerRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Record an answer to an interim question.
+
+    Three side-effects:
+      1. Append to the in-process run buffer so stage 3 can use the answer
+         in the chairman synthesis happening RIGHT NOW.
+      2. Persist the Q&A onto essay_sessions.conversation when session_id
+         is present, so it survives restarts and is auditable.
+      3. Fire-and-forget extract_and_store on the Q+A text so durable
+         facts accumulate in user_fact for future essays.
+    """
+    from .interim_questions import append_run_answer
+    from .memory_extraction import extract_and_store
+
+    convo = storage.get_conversation(body.conversation_id, user.id)
+    if convo is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    answer_text = (body.answer or "").strip()
+    is_skipped = body.skipped or not answer_text
+
+    # Always record the buffer entry — including skips — so any flow
+    # waiting on this question_id (e.g. the chairman clarification) can
+    # short-circuit instead of timing out.
+    append_run_answer(
+        body.conversation_id,
+        question_id=body.question_id,
+        question=body.question,
+        answer=answer_text if not is_skipped else "",
+        skipped=is_skipped,
+    )
+
+    if body.session_id:
+        try:
+            sb = get_supabase()
+            row = (
+                sb.table("essay_sessions")
+                .select("conversation")
+                .eq("id", body.session_id)
+                .eq("user_id", user.id)
+                .limit(1)
+                .execute()
+            )
+            convo_arr = list((row.data or [{}])[0].get("conversation") or [])
+            convo_arr.append(
+                {
+                    "type": "interim_qa",
+                    "question_id": body.question_id,
+                    "question": body.question,
+                    "answer": answer_text,
+                    "skipped": is_skipped,
+                }
+            )
+            sb.table("essay_sessions").update({"conversation": convo_arr}).eq(
+                "id", body.session_id
+            ).eq("user_id", user.id).execute()
+        except Exception as e:
+            print(f"WARN: persist interim answer to session failed: {e}")
+
+    extracted_count = 0
+    if not is_skipped:
+        # Build a tiny synthetic "essay" so the existing extractor can pull
+        # third-person facts. Fire-and-forget — never block the user.
+        synthetic = (
+            f"In response to the question \"{body.question.strip()}\", "
+            f"the writer says: {answer_text}"
+        )
+
+        async def _run() -> None:
+            try:
+                inserted = await extract_and_store(
+                    user_id=user.id,
+                    essay_text=synthetic,
+                    topic=body.question.strip(),
+                    source_essay_id=None,
+                    source="intake",
+                    min_chars=40,
+                )
+                if inserted:
+                    print(
+                        f"INFO: interim Q&A inserted {inserted} facts for {user.id}"
+                    )
+            except Exception as ex:
+                print(f"WARN: interim fact extraction failed: {ex}")
+
+        asyncio.create_task(_run())
+
+    return {"ok": True, "skipped": is_skipped, "extracted_count": extracted_count}
+
+
 class RefinementSuggestionsRequest(BaseModel):
     essay_text: str
     original_brief: str = ""
@@ -1689,7 +1957,7 @@ async def api_refinement_suggestions(
 
 
 @app.get("/api/models/direct")
-async def get_direct_models():
+async def get_direct_models(user: AuthUser = Depends(get_current_user)):
     """Get available models from all configured direct providers."""
     all_models = []
     
@@ -1710,7 +1978,10 @@ async def get_direct_models():
 
 
 @app.post("/api/settings/test-tavily")
-async def test_tavily_api(request: TestTavilyRequest):
+async def test_tavily_api(
+    request: TestTavilyRequest,
+    user: AuthUser = Depends(get_current_user),
+):
     """Test Tavily API key with a simple search."""
     import httpx
     settings = get_settings()
@@ -1746,7 +2017,10 @@ class TestBraveRequest(BaseModel):
 
 
 @app.post("/api/settings/test-brave")
-async def test_brave_api(request: TestBraveRequest):
+async def test_brave_api(
+    request: TestBraveRequest,
+    user: AuthUser = Depends(get_current_user),
+):
     """Test Brave API key with a simple search."""
     import httpx
     settings = get_settings()
@@ -1782,7 +2056,10 @@ class TestSerperRequest(BaseModel):
 
 
 @app.post("/api/settings/test-serper")
-async def test_serper_api(request: TestSerperRequest):
+async def test_serper_api(
+    request: TestSerperRequest,
+    user: AuthUser = Depends(get_current_user),
+):
     """Test Serper API key with a simple search."""
     import httpx
     settings = get_settings()
@@ -1823,7 +2100,10 @@ class TestProviderRequest(BaseModel):
 
 
 @app.post("/api/settings/test-provider")
-async def test_provider_api(request: TestProviderRequest):
+async def test_provider_api(
+    request: TestProviderRequest,
+    user: AuthUser = Depends(get_current_user),
+):
     """Test an API key for a specific provider."""
     from .council import PROVIDERS
     from .settings import get_settings
@@ -1853,7 +2133,10 @@ class TestOllamaRequest(BaseModel):
 
 
 @app.get("/api/ollama/tags")
-async def get_ollama_tags(base_url: Optional[str] = None):
+async def get_ollama_tags(
+    base_url: Optional[str] = None,
+    user: AuthUser = Depends(get_current_user),
+):
     """Fetch available models from Ollama."""
     import httpx
     from .config import get_ollama_base_url
@@ -1894,7 +2177,10 @@ async def get_ollama_tags(base_url: Optional[str] = None):
 
 
 @app.post("/api/settings/test-ollama")
-async def test_ollama_connection(request: TestOllamaRequest):
+async def test_ollama_connection(
+    request: TestOllamaRequest,
+    user: AuthUser = Depends(get_current_user),
+):
     """Test connection to Ollama instance."""
     import httpx
     
@@ -1925,7 +2211,10 @@ class TestCustomEndpointRequest(BaseModel):
 
 
 @app.post("/api/settings/test-custom-endpoint")
-async def test_custom_endpoint(request: TestCustomEndpointRequest):
+async def test_custom_endpoint(
+    request: TestCustomEndpointRequest,
+    user: AuthUser = Depends(get_current_user),
+):
     """Test connection to a custom OpenAI-compatible endpoint."""
     from .providers.custom_openai import CustomOpenAIProvider
 
@@ -1934,7 +2223,7 @@ async def test_custom_endpoint(request: TestCustomEndpointRequest):
 
 
 @app.get("/api/custom-endpoint/models")
-async def get_custom_endpoint_models():
+async def get_custom_endpoint_models(user: AuthUser = Depends(get_current_user)):
     """Fetch available models from the custom endpoint."""
     from .providers.custom_openai import CustomOpenAIProvider
     from .settings import get_settings
@@ -1949,7 +2238,7 @@ async def get_custom_endpoint_models():
 
 
 @app.get("/api/models")
-async def get_openrouter_models():
+async def get_openrouter_models(user: AuthUser = Depends(get_current_user)):
     """Fetch available models from OpenRouter API."""
     import httpx
     from .config import get_openrouter_api_key
@@ -2009,7 +2298,10 @@ async def get_openrouter_models():
 
 
 @app.post("/api/settings/test-openrouter")
-async def test_openrouter_api(request: TestOpenRouterRequest):
+async def test_openrouter_api(
+    request: TestOpenRouterRequest,
+    user: AuthUser = Depends(get_current_user),
+):
     """Test OpenRouter API key with a simple request."""
     import httpx
     from .config import get_openrouter_api_key
