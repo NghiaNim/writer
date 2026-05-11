@@ -32,7 +32,7 @@ from .council_config import (
 )
 from .search import perform_web_search, SearchProvider
 from .sessions import router as sessions_router
-from .settings import get_settings, update_settings, Settings, DEFAULT_COUNCIL_MODELS, DEFAULT_CHAIRMAN_MODEL, AVAILABLE_MODELS
+from .settings import get_settings, update_settings, Settings, DEFAULT_COUNCIL_MODELS, DEFAULT_CHAIRMAN_MODEL, SECRET_FIELDS
 from .supabase_client import get_supabase
 from .voice_profile import (
     VoiceProfile,
@@ -557,6 +557,15 @@ async def send_message_stream(
     conversation = storage.get_conversation(conversation_id, user.id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Pull this user's per-field overrides (prompts, temperatures, search
+    # prefs) and install them as a request-scoped overlay so every
+    # downstream get_settings() call inside the stream sees the user's
+    # values instead of clobbering the operator-wide defaults.
+    from .user_settings import load_user_settings
+    from .settings import apply_user_settings_overlay, clear_user_settings_overlay
+    _user_overlay = load_user_settings(user.id)
+    _overlay_token = apply_user_settings_overlay(_user_overlay)
 
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
@@ -1108,6 +1117,11 @@ async def send_message_stream(
             yield f"data: {json.dumps({'type': 'run_finished', 'reason': 'error'})}\n\n"
             # Send error event
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        finally:
+            # Always drop the per-user settings overlay so a failed or
+            # cancelled request can't leak prefs into the next async task
+            # scheduled on this event loop.
+            clear_user_settings_overlay(_overlay_token)
 
     return StreamingResponse(
         event_generator(),
@@ -1182,8 +1196,20 @@ class TestTavilyRequest(BaseModel):
 
 @app.get("/api/settings")
 async def get_app_settings(user: AuthUser = Depends(get_current_user)):
-    """Get current application settings."""
-    settings = get_settings()
+    """Get the current effective application settings for this user.
+
+    Returns operator-wide defaults merged with this user's overrides
+    (prompts / temperatures / search prefs). API keys are returned as
+    boolean *_api_key_set flags only — never the values themselves.
+    """
+    from .user_settings import load_user_settings
+    from .settings import apply_user_settings_overlay, clear_user_settings_overlay
+    overlay = load_user_settings(user.id)
+    token = apply_user_settings_overlay(overlay)
+    try:
+        settings = get_settings()
+    finally:
+        clear_user_settings_overlay(token)
     return {
         "search_provider": settings.search_provider,
         "search_keyword_extraction": settings.search_keyword_extraction,
@@ -1332,40 +1358,20 @@ async def update_app_settings(
                 detail=f"Invalid council_personas payload: {e}",
             )
 
-    if request.serper_api_key is not None:
-        updates["serper_api_key"] = request.serper_api_key
-        # Also set in environment for immediate use
-        if request.serper_api_key:
-            os.environ["SERPER_API_KEY"] = request.serper_api_key
-
-    if request.tavily_api_key is not None:
-        updates["tavily_api_key"] = request.tavily_api_key
-        # Also set in environment for immediate use
-        if request.tavily_api_key:
-            os.environ["TAVILY_API_KEY"] = request.tavily_api_key
-
-    if request.brave_api_key is not None:
-        updates["brave_api_key"] = request.brave_api_key
-        # Also set in environment for immediate use
-        if request.brave_api_key:
-            os.environ["BRAVE_API_KEY"] = request.brave_api_key
-
-    if request.openrouter_api_key is not None:
-        updates["openrouter_api_key"] = request.openrouter_api_key
-        
-    # Direct Provider Keys
-    if request.openai_api_key is not None:
-        updates["openai_api_key"] = request.openai_api_key
-    if request.anthropic_api_key is not None:
-        updates["anthropic_api_key"] = request.anthropic_api_key
-    if request.google_api_key is not None:
-        updates["google_api_key"] = request.google_api_key
-    if request.mistral_api_key is not None:
-        updates["mistral_api_key"] = request.mistral_api_key
-    if request.deepseek_api_key is not None:
-        updates["deepseek_api_key"] = request.deepseek_api_key
-    if request.groq_api_key is not None:
-        updates["groq_api_key"] = request.groq_api_key
+    # API keys are operator-only secrets sourced from env vars
+    # (see SECRET_FIELDS in backend/settings.py). The request payload may
+    # still carry them — frontend in self-hosted dev or legacy clients —
+    # but we silently drop them rather than 4xx, so the UI still gets a
+    # 200 from "Save". Anything actually configured comes from env vars.
+    dropped_secret_fields = []
+    for field in SECRET_FIELDS.keys():
+        if getattr(request, field, None) is not None:
+            dropped_secret_fields.append(field)
+    if dropped_secret_fields:
+        print(
+            f"PUT /api/settings: dropped operator-only secret fields "
+            f"from request: {dropped_secret_fields}"
+        )
 
     # Enabled Providers
     if request.enabled_providers is not None:
@@ -1418,10 +1424,46 @@ async def update_app_settings(
             )
         updates["execution_mode"] = request.execution_mode
 
+    # Split updates into per-user (prompts, temperatures, search prefs)
+    # and operator-wide (everything else: ollama, custom endpoint URL,
+    # enabled_providers, council selection, …). Per-user fields land in
+    # the Supabase user_settings row so users no longer clobber each other.
+    from .user_settings import (
+        PER_USER_FIELDS,
+        update_user_settings,
+        load_user_settings,
+    )
+    from .settings import apply_user_settings_overlay, clear_user_settings_overlay
+
+    per_user_updates: Dict[str, Any] = {}
+    for field in list(updates.keys()):
+        if field in PER_USER_FIELDS:
+            value = updates.pop(field)
+            # SearchProvider enum → str for Postgres storage; everything
+            # else passes through unchanged.
+            if field == "search_provider" and hasattr(value, "value"):
+                value = value.value
+            per_user_updates[field] = value
+
+    if per_user_updates:
+        try:
+            update_user_settings(user.id, per_user_updates)
+        except Exception as e:
+            print(f"PUT /api/settings: user_settings upsert failed: {e}")
+
     if updates:
         settings = update_settings(**updates)
     else:
         settings = get_settings()
+
+    # Re-apply the user's overlay so the response reflects their effective
+    # values, not just the operator defaults we may have just written.
+    overlay = load_user_settings(user.id)
+    token = apply_user_settings_overlay(overlay)
+    try:
+        settings = get_settings()
+    finally:
+        clear_user_settings_overlay(token)
 
     return {
         "search_provider": settings.search_provider,

@@ -2,13 +2,59 @@
 
 import json
 import os
+from contextvars import ContextVar
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Any, Optional, List, Dict
 from pydantic import BaseModel
 from .search import SearchProvider
 
 # Settings file path
 SETTINGS_FILE = Path(__file__).parent.parent / "data" / "settings.json"
+
+# Operator-only secret fields: env vars are authoritative. The PUT
+# /api/settings endpoint silently drops these fields, and get_settings()
+# overlays env-var values on top of anything that might still be in
+# data/settings.json (legacy installs).
+SECRET_FIELDS: Dict[str, str] = {
+    "openrouter_api_key": "OPENROUTER_API_KEY",
+    "openai_api_key": "OPENAI_API_KEY",
+    "anthropic_api_key": "ANTHROPIC_API_KEY",
+    "google_api_key": "GOOGLE_API_KEY",
+    "mistral_api_key": "MISTRAL_API_KEY",
+    "deepseek_api_key": "DEEPSEEK_API_KEY",
+    "groq_api_key": "GROQ_API_KEY",
+    "tavily_api_key": "TAVILY_API_KEY",
+    "brave_api_key": "BRAVE_API_KEY",
+    "serper_api_key": "SERPER_API_KEY",
+    "custom_endpoint_api_key": "CUSTOM_ENDPOINT_API_KEY",
+}
+
+# Request-scoped overlay of per-user settings (populated by the FastAPI
+# endpoints via `apply_user_settings_overlay`). When set, `get_settings()`
+# merges these on top of the operator-wide defaults so the rest of the
+# codebase can keep calling get_settings() without threading user_id
+# through every helper. Empty dict = no overlay = operator defaults only.
+_user_settings_overlay: ContextVar[Dict[str, Any]] = ContextVar(
+    "user_settings_overlay", default={}
+)
+
+
+def apply_user_settings_overlay(overlay: Optional[Dict[str, Any]]):
+    """Set a per-user overlay for the current async context. Returns a
+    token to pass to `clear_user_settings_overlay`. Safe to call with
+    None/empty — overlay just becomes a no-op."""
+    return _user_settings_overlay.set(overlay or {})
+
+
+def clear_user_settings_overlay(token) -> None:
+    """Restore the overlay to whatever it was before the matching
+    `apply_user_settings_overlay` call. Always call this in a `finally`
+    block so a failed request can't leak state into the next one."""
+    try:
+        _user_settings_overlay.reset(token)
+    except (LookupError, ValueError):
+        # Token from a different context — best-effort cleanup.
+        _user_settings_overlay.set({})
 
 # Default models. Four empty slots so the default council size matches the
 # four essay personas (Architect, Editor, Devil's Advocate, Voice Guardian).
@@ -34,34 +80,6 @@ DEFAULT_DIRECT_PROVIDER_TOGGLES = {
     "deepseek": False,
     "groq": False
 }
-
-
-# Available models for selection (popular OpenRouter models). The user-facing
-# council picker pulls the live OpenRouter catalog via /api/models; this list
-# is only a static fallback for the legacy Settings UI.
-AVAILABLE_MODELS = [
-    # OpenAI
-    {"id": "openai/gpt-4o", "name": "GPT-4o [OpenRouter]", "provider": "OpenAI", "source": "openrouter"},
-    {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini [OpenRouter]", "provider": "OpenAI", "source": "openrouter"},
-    {"id": "openai/o1-preview", "name": "o1 Preview [OpenRouter]", "provider": "OpenAI", "source": "openrouter"},
-    {"id": "openai/o1-mini", "name": "o1 Mini [OpenRouter]", "provider": "OpenAI", "source": "openrouter"},
-    # Google
-    {"id": "google/gemini-pro-1.5", "name": "Gemini 1.5 Pro [OpenRouter]", "provider": "Google", "source": "openrouter", "is_free": True},
-    {"id": "google/gemini-flash-1.5", "name": "Gemini 1.5 Flash [OpenRouter]", "provider": "Google", "source": "openrouter", "is_free": True},
-    {"id": "google/gemini-pro-vision", "name": "Gemini Pro Vision [OpenRouter]", "provider": "Google", "source": "openrouter"},
-    # Anthropic
-    {"id": "anthropic/claude-3.5-sonnet", "name": "Claude 3.5 Sonnet [OpenRouter]", "provider": "Anthropic", "source": "openrouter"},
-    {"id": "anthropic/claude-3-opus", "name": "Claude 3 Opus [OpenRouter]", "provider": "Anthropic", "source": "openrouter"},
-    {"id": "anthropic/claude-3-haiku", "name": "Claude 3 Haiku [OpenRouter]", "provider": "Anthropic", "source": "openrouter"},
-    # Meta
-    {"id": "meta-llama/llama-3.1-405b-instruct", "name": "Llama 3.1 405B [OpenRouter]", "provider": "Meta", "source": "openrouter"},
-    {"id": "meta-llama/llama-3.1-70b-instruct", "name": "Llama 3.1 70B [OpenRouter]", "provider": "Meta", "source": "openrouter", "is_free": True},
-    # Mistral
-    {"id": "mistralai/mistral-large", "name": "Mistral Large [OpenRouter]", "provider": "Mistral", "source": "openrouter"},
-    {"id": "mistralai/mistral-medium", "name": "Mistral Medium [OpenRouter]", "provider": "Mistral", "source": "openrouter"},
-    # DeepSeek
-    {"id": "deepseek/deepseek-chat", "name": "DeepSeek V3 [OpenRouter]", "provider": "DeepSeek", "source": "openrouter"},
-]
 
 
 from .prompts import (
@@ -165,7 +183,11 @@ class Settings(BaseModel):
 
 
 def get_settings() -> Settings:
-    """Load settings from file, or return defaults."""
+    """Load settings from file, or return defaults.
+
+    Env vars take precedence over stored values for every field in
+    SECRET_FIELDS — secrets are operator-only and not user-mutable.
+    """
     settings: Settings
     if SETTINGS_FILE.exists():
         try:
@@ -176,6 +198,34 @@ def get_settings() -> Settings:
             settings = Settings()
     else:
         settings = Settings()
+
+    # Overlay env-var secrets on top of anything that might have been
+    # persisted in settings.json (legacy installs, mistakenly-written
+    # values). After this overlay, reads of settings.openai_api_key etc.
+    # always reflect what the operator set in the environment.
+    for field, env_name in SECRET_FIELDS.items():
+        env_value = os.getenv(env_name)
+        if env_value:
+            setattr(settings, field, env_value)
+
+    # Overlay per-user prefs (prompts, temperatures, search prefs) from
+    # the request-scoped ContextVar populated by the FastAPI endpoint.
+    # If no overlay is set (background tasks, scripts), we just return
+    # the operator-wide defaults.
+    user_overlay = _user_settings_overlay.get()
+    if user_overlay:
+        # SearchProvider needs special-casing — it's a Pydantic enum field
+        # but the overlay carries a plain string from Postgres.
+        for field, value in user_overlay.items():
+            if value is None:
+                continue
+            if field == "search_provider":
+                try:
+                    setattr(settings, field, SearchProvider(value))
+                except ValueError:
+                    continue
+            elif hasattr(settings, field):
+                setattr(settings, field, value)
 
     # If personas are missing (fresh install or older settings.json from
     # before Phase 1), seed with the 4 essay-writing defaults. We do not
