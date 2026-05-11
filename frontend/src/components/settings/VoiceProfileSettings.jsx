@@ -185,6 +185,10 @@ export default function VoiceProfileSettings() {
     const [saving, setSaving] = useState(false);
     const [suggesting, setSuggesting] = useState(false);
     const [restoringDefaults, setRestoringDefaults] = useState(false);
+    // Inline two-step confirm so an accidental click doesn't repopulate
+    // rules the user intentionally removed.
+    const [restoreConfirming, setRestoreConfirming] = useState(false);
+    const restoreConfirmTimerRef = useRef(null);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
 
@@ -278,10 +282,28 @@ export default function VoiceProfileSettings() {
         setNewRule('');
     };
 
-    // Pull the server-side DEFAULT_VOICE_RULES list and add any rule the user
-    // doesn't already have. Doesn't remove or reorder anything they've added.
+    // Two-step "Restore defaults": first click arms the confirm state and
+    // starts a 4s timer to reset it; second click within that window pulls
+    // DEFAULT_VOICE_RULES from the server and adds any rule the user doesn't
+    // already have. Never removes or reorders existing rules.
     const handleRestoreDefaults = async () => {
         if (restoringDefaults) return;
+        if (!restoreConfirming) {
+            setRestoreConfirming(true);
+            if (restoreConfirmTimerRef.current) {
+                clearTimeout(restoreConfirmTimerRef.current);
+            }
+            restoreConfirmTimerRef.current = setTimeout(() => {
+                setRestoreConfirming(false);
+                restoreConfirmTimerRef.current = null;
+            }, 4000);
+            return;
+        }
+        if (restoreConfirmTimerRef.current) {
+            clearTimeout(restoreConfirmTimerRef.current);
+            restoreConfirmTimerRef.current = null;
+        }
+        setRestoreConfirming(false);
         setRestoringDefaults(true);
         try {
             const { rules: defaults = [] } = await api.voice.defaults();
@@ -298,6 +320,16 @@ export default function VoiceProfileSettings() {
             setRestoringDefaults(false);
         }
     };
+
+    // Clean up the confirm timer on unmount so it doesn't fire against a
+    // stale setter after the user navigates away.
+    useEffect(() => {
+        return () => {
+            if (restoreConfirmTimerRef.current) {
+                clearTimeout(restoreConfirmTimerRef.current);
+            }
+        };
+    }, []);
 
     const removeRule = (idx) => setRules((prev) => prev.filter((_, i) => i !== idx));
     const editRule = (idx, value) =>
@@ -488,20 +520,35 @@ export default function VoiceProfileSettings() {
                         type="button"
                         onClick={handleRestoreDefaults}
                         disabled={restoringDefaults}
-                        title="Add any default rules you don't already have. Won't remove or change your existing rules."
+                        title={
+                            restoreConfirming
+                                ? 'Click again to confirm. Existing rules will not be removed.'
+                                : "Add any default rules you don't already have. Won't remove or change your existing rules."
+                        }
                         style={{
-                            background: 'transparent',
-                            color: colors.textMuted,
-                            border: `1px dashed ${colors.panelBorder}`,
+                            background: restoreConfirming
+                                ? 'rgba(251, 191, 36, 0.12)'
+                                : 'transparent',
+                            color: restoreConfirming ? '#fbbf24' : colors.textMuted,
+                            border: `1px dashed ${
+                                restoreConfirming
+                                    ? 'rgba(251, 191, 36, 0.55)'
+                                    : colors.panelBorder
+                            }`,
                             borderRadius: '999px',
                             padding: '4px 12px',
                             fontSize: '12px',
                             cursor: restoringDefaults ? 'wait' : 'pointer',
                             fontFamily: 'inherit',
                             opacity: restoringDefaults ? 0.6 : 1,
+                            transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
                         }}
                     >
-                        {restoringDefaults ? 'Restoring…' : 'Restore defaults'}
+                        {restoringDefaults
+                            ? 'Restoring…'
+                            : restoreConfirming
+                                ? 'Click again to confirm'
+                                : 'Restore defaults'}
                     </button>
                 }
             >
