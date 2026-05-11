@@ -597,140 +597,229 @@ async def stage1_collect_responses(
         raise
 
 
-async def stage2_collect_rankings(
+async def pick_strongest_draft(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
-    search_context: str = "",
-    request: Any = None
-) -> Any: # Returns an async generator
+) -> Dict[str, Any]:
+    """Single Gemini-Flash call to identify which of the Stage 1 essays is the
+    strongest. Becomes the SPINE that Stage 2 critiques and Stage 3 revises.
+
+    Returns {"winner_index": int, "reason": str}. Falls back to the first
+    successful draft on any failure.
     """
-    Stage 2: Collect peer rankings from all council models.
-    
-    Yields:
-        - First yield: label_to_model mapping (dict)
-        - Subsequent yields: Individual model results (dict)
-    """
-    settings = get_settings()
+    import json
+    import re
 
-    # Filter to only successful responses for ranking
-    successful_results = [r for r in stage1_results if not r.get('error')]
+    successful = [
+        (i, r) for i, r in enumerate(stage1_results)
+        if not r.get("error") and r.get("response")
+    ]
+    if not successful:
+        return {"winner_index": 0, "reason": "no successful drafts"}
 
-    # Create anonymized labels for responses (Response A, Response B, etc.)
-    labels = [chr(65 + i) for i in range(len(successful_results))]  # A, B, C, ...
+    drafts_text = "\n\n".join(
+        f"DRAFT {i} ({(r.get('persona') or r.get('model') or 'unknown')}):\n"
+        f"{(r.get('response') or '').strip()}"
+        for i, r in successful
+    )
 
-    # Create mapping from label to model name
-    label_to_model = {
-        f"Response {label}": result['model']
-        for label, result in zip(labels, successful_results)
-    }
-    
-    # Yield the mapping first so the caller has it
-    yield label_to_model
-
-    # Build the ranking prompt
-    responses_text = "\n\n".join([
-        f"Response {label}:\n{result['response']}"
-        for label, result in zip(labels, successful_results)
-    ])
-
-    search_context_block = ""
-    if search_context:
-        search_context_block = f"Context from Web Search:\n{search_context}\n"
+    prompt = (
+        "You are picking the strongest essay from a council of drafts. "
+        "All drafts respond to the same topic and started from the same "
+        "agreed angle, but each council member had a different structural "
+        "commitment. Pick the draft most worth keeping as the spine for "
+        "revision.\n\n"
+        "Prefer the draft whose specificity, voice, and structural decision "
+        "would survive a careful edit. Reject drafts that hedge or read like "
+        "AI-speak.\n\n"
+        f"Topic:\n{user_query}\n\n"
+        f"Drafts:\n{drafts_text}\n\n"
+        "Output STRICT JSON, no commentary, no fences:\n"
+        '{"winner_index": N, "reason": "<one short sentence>"}\n\n'
+        "N is the index used in the DRAFT N header above."
+    )
 
     try:
-        # Ensure prompt is not None
-        prompt_template = settings.stage2_prompt
-        if not prompt_template:
-            from .prompts import STAGE2_PROMPT_DEFAULT
-            prompt_template = STAGE2_PROMPT_DEFAULT
+        res = await query_model(
+            "google:gemini-2.5-flash",
+            [{"role": "user", "content": prompt}],
+            timeout=30.0,
+            temperature=0.2,
+        )
+    except Exception as e:
+        logger.warning(f"spine picker call failed: {e}")
+        return {
+            "winner_index": successful[0][0],
+            "reason": "fallback (picker error)",
+        }
+    if not res or res.get("error"):
+        return {
+            "winner_index": successful[0][0],
+            "reason": "fallback (picker returned error)",
+        }
 
-        ranking_prompt = prompt_template.format(
+    raw = (res.get("content") or "").strip()
+    parsed = None
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        m = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+        if m:
+            try:
+                parsed = json.loads(m.group(0))
+            except Exception:
+                parsed = None
+
+    if not isinstance(parsed, dict):
+        return {
+            "winner_index": successful[0][0],
+            "reason": "fallback (unparseable picker output)",
+        }
+
+    try:
+        idx = int(parsed.get("winner_index", successful[0][0]))
+    except (TypeError, ValueError):
+        idx = successful[0][0]
+    valid_indices = {i for i, _ in successful}
+    if idx not in valid_indices:
+        idx = successful[0][0]
+    return {
+        "winner_index": idx,
+        "reason": str(parsed.get("reason") or "").strip()[:200] or "(no reason given)",
+    }
+
+
+async def stage2_collect_critiques(
+    user_query: str,
+    stage1_results: List[Dict[str, Any]],
+    spine_index: int,
+    request: Any = None,
+    essay_mode: str = "topic",
+    user_id: Optional[str] = None,
+    essay_type: str = "general",
+) -> Any:
+    """Stage 2 (replaces rankings in 0.4.0). Every council member writes a
+    short surgical critique of the SPINE draft: CUT / SHARPEN / KEEP /
+    BORROW. The chairman then revises the spine using these critiques.
+
+    Yields:
+        - Subsequent yields: per-critique dicts {model, persona, council_index, critique | error}
+    """
+    from .prompts import STAGE2_CRITIQUE_PROMPT_DEFAULT
+
+    settings = get_settings()
+
+    successful = [r for r in stage1_results if not r.get("error") and r.get("response")]
+    if not successful or spine_index < 0 or spine_index >= len(stage1_results):
+        return
+
+    spine = stage1_results[spine_index]
+    spine_text = (spine.get("response") or "").strip()
+
+    others = [
+        r for i, r in enumerate(stage1_results)
+        if i != spine_index and not r.get("error") and r.get("response")
+    ]
+    other_drafts_text = "\n\n".join(
+        f"DRAFT {chr(65 + i)} ({(r.get('persona') or r.get('model') or 'unknown')}):\n"
+        f"{(r.get('response') or '').strip()}"
+        for i, r in enumerate(others)
+    ) or "(no other drafts succeeded)"
+
+    profile: Optional[VoiceProfile] = None
+    if user_id:
+        try:
+            profile = load_voice_profile(user_id, essay_type=essay_type)
+        except Exception as e:
+            logger.warning("voice profile load failed for user=%s: %s", user_id, e)
+    voice_profile_block = format_voice_profile_block(profile)
+
+    rows = load_recent_user_facts(user_id) if user_id else []
+    student_profile_block = format_student_profile_block(rows)
+
+    essay_mode_block = format_essay_mode_block(essay_mode)
+
+    try:
+        critique_prompt = STAGE2_CRITIQUE_PROMPT_DEFAULT.format(
             user_query=user_query,
-            responses_text=responses_text,
-            search_context_block=search_context_block
+            essay_mode_block=essay_mode_block,
+            spine_text=spine_text,
+            other_drafts_text=other_drafts_text,
+            voice_profile_block=voice_profile_block,
+            student_profile_block=student_profile_block,
         )
     except (KeyError, AttributeError, TypeError) as e:
-        logger.warning(f"Error formatting Stage 2 prompt: {e}. Using fallback.")
-        ranking_prompt = f"Question: {user_query}\n\n{responses_text}\n\nRank these responses."
+        logger.warning(f"critique prompt format failed: {e}")
+        critique_prompt = (
+            f"Critique this essay draft surgically (CUT/SHARPEN/KEEP/BORROW):\n\n"
+            f"{spine_text}"
+        )
 
-    messages = [{"role": "user", "content": ranking_prompt}]
+    messages = [{"role": "user", "content": critique_prompt}]
 
-    # Only use models that successfully responded in Stage 1
-    # (no point asking failed models to rank - they'll just fail again)
-    successful_models = [r['model'] for r in successful_results]
+    # Use the dedicated Stage 2 temperature (low, for surgical output).
+    crit_temp = settings.stage2_temperature
 
-    # Use dedicated Stage 2 temperature (lower for consistent ranking output)
-    stage2_temp = settings.stage2_temperature
+    # Critiques run on every successful Stage 1 model — the same models that
+    # wrote the drafts critique the spine. No model critiques its own draft
+    # of course, but mixed authorship is fine: a model can usefully critique
+    # the spine even if it wrote one of the OTHER drafts.
+    critic_models = [r["model"] for r in successful]
 
-    async def _query_safe(m: str):
+    async def _query_safe(idx: int, m: str):
         try:
-            return m, await query_model(m, messages, temperature=stage2_temp)
+            return idx, m, await query_model(m, messages, temperature=crit_temp, timeout=60.0)
         except Exception as e:
-            return m, {"error": True, "error_message": str(e)}
+            return idx, m, {"error": True, "error_message": str(e)}
 
-    # Create tasks
-    tasks = [asyncio.create_task(_query_safe(m)) for m in successful_models]
-
-    # Process as they complete
+    tasks = [
+        asyncio.create_task(_query_safe(i, m)) for i, m in enumerate(critic_models)
+    ]
     pending = set(tasks)
     try:
         while pending:
-            # Check for client disconnect
             if request and await request.is_disconnected():
-                logger.info("Client disconnected during Stage 2. Cancelling tasks...")
+                logger.info("Client disconnected during Stage 2 critiques. Cancelling...")
                 for t in pending:
                     t.cancel()
                 raise asyncio.CancelledError("Client disconnected")
-
-            # Wait for the next task to complete (with timeout to check for disconnects)
-            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED, timeout=1.0)
-
+            done, pending = await asyncio.wait(
+                pending, return_when=asyncio.FIRST_COMPLETED, timeout=1.0
+            )
             for task in done:
                 try:
-                    model, response = await task
-                    
-                    result = None
-                    if response is not None:
-                        if response.get('error'):
-                            # Include failed models with error info
-                            result = {
-                                "model": model,
-                                "ranking": None,
-                                "parsed_ranking": [],
-                                "error": response.get('error'),
-                                "error_message": response.get('error_message', 'Unknown error')
-                            }
-                        else:
-                            # Ensure content is always a string before parsing
-                            full_text = response.get('content', '')
-                            if not isinstance(full_text, str):
-                                # Handle case where API returns non-string content (array, object, etc.)
-                                full_text = str(full_text) if full_text is not None else ''
-                            
-                            # Parse with expected count to avoid duplicates
-                            expected_count = len(successful_results)
-                            parsed = parse_ranking_from_text(full_text, expected_count=expected_count)
-                            
-                            result = {
-                                "model": model,
-                                "ranking": full_text,
-                                "parsed_ranking": parsed,
-                                "error": None
-                            }
-                    
-                    if result:
-                        yield result
+                    idx, model, response = await task
+                    persona_name = (successful[idx].get("persona") or "") if idx < len(successful) else ""
+                    if response and response.get("error"):
+                        yield {
+                            "model": model,
+                            "persona": persona_name,
+                            "council_index": idx,
+                            "critique": None,
+                            "error": True,
+                            "error_message": response.get("error_message", "Unknown error"),
+                        }
+                        continue
+                    content = (response or {}).get("content", "") if response else ""
+                    if not isinstance(content, str):
+                        content = str(content) if content is not None else ""
+                    yield {
+                        "model": model,
+                        "persona": persona_name,
+                        "council_index": idx,
+                        "critique": content,
+                        "error": False,
+                    }
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
-                    logger.error(f"Error processing task result: {e}")
-
+                    logger.error(f"Error processing Stage 2 critique task: {e}")
     except asyncio.CancelledError:
-        # Ensure all tasks are cancelled if we get cancelled
         for t in tasks:
             if not t.done():
                 t.cancel()
         raise
+
 
 
 async def stage3_synthesize_final(
@@ -913,100 +1002,6 @@ async def stage3_synthesize_final(
             "error": True,
             "error_message": str(e)
         }
-
-
-def parse_ranking_from_text(ranking_text: str, expected_count: int = None) -> List[str]:
-    """
-    Parse the FINAL RANKING section from the model's response.
-
-    Args:
-        ranking_text: The full text response from the model
-        expected_count: Optional number of expected ranked items (to truncate duplicates)
-
-    Returns:
-        List of response labels in ranked order
-    """
-    import re
-
-    # Defensive: ensure ranking_text is a string
-    if not isinstance(ranking_text, str):
-        ranking_text = str(ranking_text) if ranking_text is not None else ''
-
-    matches = []
-
-    # Look for "FINAL RANKING:" section
-    if "FINAL RANKING:" in ranking_text:
-        # Extract everything after "FINAL RANKING:"
-        parts = ranking_text.split("FINAL RANKING:")
-        if len(parts) >= 2:
-            ranking_section = parts[1]
-            # Try to extract numbered list format (e.g., "1. Response A")
-            # This pattern looks for: number, period, optional space, "Response X"
-            numbered_matches = re.findall(r'\d+\.\s*Response [A-Z]', ranking_section)
-            if numbered_matches:
-                # Extract just the "Response X" part
-                matches = [re.search(r'Response [A-Z]', m).group() for m in numbered_matches]
-            else:
-                # Fallback: Extract all "Response X" patterns in order from the section
-                matches = re.findall(r'Response [A-Z]', ranking_section)
-    
-    # If no matches found in section (or section missing), fallback to full text search
-    if not matches:
-        matches = re.findall(r'Response [A-Z]', ranking_text)
-
-    # Truncate if expected_count is provided
-    if expected_count and len(matches) > expected_count:
-        matches = matches[:expected_count]
-        
-    return matches
-
-
-def calculate_aggregate_rankings(
-    stage2_results: List[Dict[str, Any]],
-    label_to_model: Dict[str, str]
-) -> List[Dict[str, Any]]:
-    """
-    Calculate aggregate rankings across all models.
-
-    Args:
-        stage2_results: Rankings from each model
-        label_to_model: Mapping from anonymous labels to model names
-
-    Returns:
-        List of dicts with model name and average rank, sorted best to worst
-    """
-    from collections import defaultdict
-
-    # Track positions for each model
-    model_positions = defaultdict(list)
-
-    for ranking in stage2_results:
-        ranking_text = ranking['ranking']
-
-        # Parse the ranking from the structured format
-        expected_count = len(label_to_model)
-        parsed_ranking = parse_ranking_from_text(ranking_text, expected_count=expected_count)
-
-        for position, label in enumerate(parsed_ranking, start=1):
-            if label in label_to_model:
-                model_name = label_to_model[label]
-                model_positions[model_name].append(position)
-
-    # Calculate average position for each model
-    aggregate = []
-    for model, positions in model_positions.items():
-        if positions:
-            avg_rank = sum(positions) / len(positions)
-            aggregate.append({
-                "model": model,
-                "average_rank": round(avg_rank, 2),
-                "rankings_count": len(positions)
-            })
-
-    # Sort by average rank (lower is better)
-    aggregate.sort(key=lambda x: x['average_rank'])
-
-    return aggregate
 
 
 async def generate_conversation_title(user_query: str) -> str:

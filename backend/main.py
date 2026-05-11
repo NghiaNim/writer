@@ -20,9 +20,7 @@ from .council import (
     generate_conversation_title,
     generate_search_query,
     stage1_collect_responses,
-    stage2_collect_rankings,
     stage3_synthesize_final,
-    calculate_aggregate_rankings,
     resolve_council_config,
     PROVIDERS,
 )
@@ -709,8 +707,7 @@ async def send_message_stream(
             stage1_results = []
             stage2_results = []
             stage3_result = None
-            label_to_model = {}
-            aggregate_rankings = {}
+            spine_index = 0
 
             # Add user message
             storage.add_user_message(conversation_id, user.id, body.content)
@@ -908,29 +905,42 @@ async def send_message_stream(
                 yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
                 return # Stop further processing
 
-            # Stage 2: peer rankings
+            # Pick the spine: which Stage 1 draft becomes the basis for
+            # revision. Cheap Gemini Flash call; falls back to the first
+            # successful draft on any failure.
+            from .council import pick_strongest_draft, stage2_collect_critiques
+
+            try:
+                spine_pick = await pick_strongest_draft(body.content, stage1_results)
+            except Exception as ex:
+                print(f"WARN: spine picker failed: {ex}")
+                spine_pick = {"winner_index": 0, "reason": "fallback (picker exception)"}
+            spine_index = spine_pick.get("winner_index", 0)
+            spine_draft = stage1_results[spine_index] if (
+                0 <= spine_index < len(stage1_results)
+            ) else stage1_results[0]
+            yield f"data: {json.dumps({'type': 'spine_picked', 'data': {'winner_index': spine_index, 'reason': spine_pick.get('reason', ''), 'persona': spine_draft.get('persona') or '', 'model': spine_draft.get('model') or ''}})}\n\n"
+            await asyncio.sleep(0.05)
+
+            # Stage 2: critiques of the spine (replaces rankings in 0.4.0)
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
             await asyncio.sleep(0.05)
 
-            # Iterate over the async generator
-            async for item in stage2_collect_rankings(body.content, stage1_results, search_context, request):
-                # First item is the label mapping
-                if isinstance(item, dict) and not item.get('model'):
-                    label_to_model = item
-                    # Send init event with total count
-                    yield f"data: {json.dumps({'type': 'stage2_init', 'total': len(label_to_model)})}\n\n"
-                    continue
+            yield f"data: {json.dumps({'type': 'stage2_init', 'total': len([r for r in stage1_results if not r.get('error') and r.get('response')])})}\n\n"
 
-                # Subsequent items are results
+            async for item in stage2_collect_critiques(
+                body.content,
+                stage1_results,
+                spine_index,
+                request,
+                essay_mode=body.essay_mode,
+                user_id=user.id,
+            ):
                 stage2_results.append(item)
-
-                # Send progress update
-                print(f"Stage 2 Progress: {len(stage2_results)}/{len(label_to_model)} - {item['model']}")
-                yield f"data: {json.dumps({'type': 'stage2_progress', 'data': item, 'count': len(stage2_results), 'total': len(label_to_model)})}\n\n"
+                yield f"data: {json.dumps({'type': 'stage2_progress', 'data': item, 'count': len(stage2_results)})}\n\n"
                 await asyncio.sleep(0.01)
 
-            aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
-            yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'search_query': search_query, 'search_context': search_context}})}\n\n"
+            yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'spine_index': spine_index, 'search_query': search_query, 'search_context': search_context}})}\n\n"
             await asyncio.sleep(0.05)
 
             # Second window: stage 2 done, stage 3 not yet started. Only
@@ -1022,8 +1032,7 @@ async def send_message_stream(
             # Save complete assistant message with metadata
             metadata = {
                 "essay_mode": body.essay_mode,  # topic vs draft
-                "label_to_model": label_to_model,
-                "aggregate_rankings": aggregate_rankings,
+                "spine_index": spine_index,
             }
             if search_context:
                 metadata["search_context"] = search_context
