@@ -30,6 +30,7 @@ from .user_facts import (
     VALID_CATEGORIES,
     bulk_insert_user_facts,
     delete_facts_for_essay,
+    maybe_summarize_overflow,
 )
 
 logger = logging.getLogger(__name__)
@@ -145,11 +146,16 @@ def _parse_facts(content: str) -> List[Dict[str, str]]:
 
 
 async def extract_facts_from_essay(
-    essay_text: str, topic: Optional[str] = None
+    essay_text: str, topic: Optional[str] = None, min_chars: int = 200
 ) -> List[Dict[str, str]]:
-    """Single Gemini Flash call. Returns [] on any failure."""
+    """Single Gemini Flash call. Returns [] on any failure.
+
+    `min_chars` lets short interim Q&A snippets through (they're paired with
+    a question line, so even a 1-sentence answer carries enough signal to
+    extract one fact).
+    """
     essay = (essay_text or "").strip()
-    if len(essay) < 200:
+    if len(essay) < max(20, min_chars):
         # Not enough text to learn anything durable.
         return []
     essay = _truncate_essay(essay)
@@ -188,11 +194,13 @@ async def extract_and_store(
     essay_text: str,
     topic: Optional[str],
     source_essay_id: Optional[str],
+    source: str = "essay",
+    min_chars: int = 200,
 ) -> int:
     """Extract facts and persist them. Returns count inserted."""
     if not user_id or not (essay_text or "").strip():
         return 0
-    facts = await extract_facts_from_essay(essay_text, topic)
+    facts = await extract_facts_from_essay(essay_text, topic, min_chars=min_chars)
     if not facts:
         return 0
 
@@ -217,7 +225,7 @@ async def extract_and_store(
             bulk_insert_user_facts,
             user_id,
             facts,
-            source="essay",
+            source=source,
             source_essay_id=source_essay_id,
         )
         logger.info(
@@ -227,10 +235,18 @@ async def extract_and_store(
             user_id,
             source_essay_id,
         )
-        return inserted
     except Exception as e:
         logger.warning("memory: bulk insert failed: %s", e)
         return 0
+
+    # If we just pushed the corpus past the prompt budget, fold the oldest
+    # half into a single summary fact. The originals stay in the table
+    # (archived) so the user can still see them in the memory UI.
+    try:
+        await maybe_summarize_overflow(user_id)
+    except Exception as e:
+        logger.warning("memory: overflow summarize failed: %s", e)
+    return inserted
 
 
 async def distill_refinement_to_rule(instruction: str) -> Optional[str]:

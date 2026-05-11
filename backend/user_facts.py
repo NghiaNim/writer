@@ -29,7 +29,12 @@ VALID_CATEGORIES = (
     "general",
 )
 
-VALID_SOURCES = ("manual", "intake", "chat", "feedback", "essay")
+VALID_SOURCES = ("manual", "intake", "chat", "feedback", "essay", "summary")
+
+# When the active-fact corpus crosses this many characters, the oldest half
+# is folded into a single synthetic 'summary' fact so the prompt block stays
+# bounded. Originals are kept (archived) so the user never loses raw input.
+PROFILE_BLOCK_BUDGET_CHARS = 8000
 
 # Human-readable section headers for prompt-block rendering. Order matters —
 # biographical context first, then experience, then beliefs/interests, then
@@ -100,12 +105,15 @@ def format_student_profile_block(facts: Optional[List[Dict[str, Any]]]) -> str:
 def load_recent_user_facts(
     user_id: str, limit: int = DEFAULT_FACT_LIMIT
 ) -> List[Dict[str, Any]]:
+    """Active facts only (archived rows are excluded). Used to build the
+    student-profile block injected into council prompts."""
     sb = get_supabase()
     try:
         res = (
             sb.table("user_fact")
             .select("id, fact_text, category, source, source_essay_id, created_at")
             .eq("user_id", user_id)
+            .is_("archived_at", "null")
             .order("created_at", desc=True)
             .limit(limit)
             .execute()
@@ -145,17 +153,22 @@ def add_user_fact(
     return None
 
 
-def list_user_facts(user_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+def list_user_facts(
+    user_id: str, limit: int = 100, include_archived: bool = False
+) -> List[Dict[str, Any]]:
     sb = get_supabase()
     try:
-        res = (
+        q = (
             sb.table("user_fact")
-            .select("id, fact_text, category, source, source_essay_id, created_at")
+            .select(
+                "id, fact_text, category, source, source_essay_id, "
+                "archived_at, superseded_by, created_at"
+            )
             .eq("user_id", user_id)
-            .order("created_at", desc=True)
-            .limit(limit)
-            .execute()
         )
+        if not include_archived:
+            q = q.is_("archived_at", "null")
+        res = q.order("created_at", desc=True).limit(limit).execute()
         return list(res.data or [])
     except Exception as e:
         logger.warning("user_fact list failed for %s: %s", user_id, e)
@@ -244,6 +257,7 @@ def bulk_insert_user_facts(
             sb.table("user_fact")
             .select("fact_text")
             .eq("user_id", user_id)
+            .is_("archived_at", "null")
             .order("created_at", desc=True)
             .limit(200)
             .execute()
@@ -268,3 +282,143 @@ def bulk_insert_user_facts(
     except Exception as e:
         logger.warning("user_fact bulk insert failed for %s: %s", user_id, e)
         return 0
+
+
+# ---------------------------------------------------------------------------
+# Summarization-on-overflow
+# ---------------------------------------------------------------------------
+#
+# When a user has so many active facts that injecting them all would blow the
+# prompt budget, we fold the oldest half into ONE synthetic 'summary' fact and
+# archive the originals (archived_at + superseded_by). The originals are kept
+# in the table so /api/user-facts can still surface them in the "what we know
+# about you" panel — they just stop participating in prompt construction.
+
+
+def _active_facts_for_overflow(
+    user_id: str, max_rows: int = 500
+) -> List[Dict[str, Any]]:
+    """Pull every active fact (oldest first) up to a safety cap."""
+    sb = get_supabase()
+    try:
+        res = (
+            sb.table("user_fact")
+            .select("id, fact_text, category, created_at")
+            .eq("user_id", user_id)
+            .is_("archived_at", "null")
+            .order("created_at", desc=False)
+            .limit(max_rows)
+            .execute()
+        )
+        return list(res.data or [])
+    except Exception as e:
+        logger.warning("active-fact scan failed for %s: %s", user_id, e)
+        return []
+
+
+def _archive_facts(user_id: str, fact_ids: List[str], summary_id: str) -> int:
+    """Mark the given facts as archived and pointing at the summary row."""
+    if not fact_ids or not summary_id:
+        return 0
+    sb = get_supabase()
+    from datetime import datetime, timezone
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        res = (
+            sb.table("user_fact")
+            .update({"archived_at": now_iso, "superseded_by": summary_id})
+            .in_("id", fact_ids)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return len(res.data or [])
+    except Exception as e:
+        logger.warning("user_fact archive failed for %s: %s", user_id, e)
+        return 0
+
+
+async def maybe_summarize_overflow(user_id: str) -> int:
+    """Compress oldest half of active facts into one summary fact when the
+    corpus is too large to fit in a prompt cleanly. Returns count archived.
+
+    Triggered after fact insertion (extract_and_store / interim Q&A). Safe to
+    call frequently — it's a no-op until the budget is exceeded.
+    """
+    if not user_id:
+        return 0
+    facts = _active_facts_for_overflow(user_id)
+    if not facts:
+        return 0
+    total_chars = sum(len((f.get("fact_text") or "")) for f in facts)
+    if total_chars <= PROFILE_BLOCK_BUDGET_CHARS:
+        return 0
+
+    # Fold the oldest half. With ~24 facts at ~200 chars each, 12 oldest
+    # become one summary; the next overflow trigger compresses again.
+    half = max(1, len(facts) // 2)
+    to_compress = facts[:half]
+    if len(to_compress) < 4:
+        # Not worth a round-trip if there's almost nothing to summarize.
+        return 0
+
+    block = "\n".join(
+        f"- [{(f.get('category') or 'general')}] {(f.get('fact_text') or '').strip()}"
+        for f in to_compress
+        if (f.get("fact_text") or "").strip()
+    )
+
+    sys_prompt = (
+        "You compress a list of durable facts about an essay writer into a "
+        "single dense paragraph that another LLM can use as long-term memory. "
+        "Preserve every concrete detail (places, names, fields, beliefs, "
+        "experiences) — this paragraph replaces the originals in future "
+        "prompt context. Third person, no 'I'. No bullet points. Under 220 "
+        "words. Output the paragraph only, no preamble."
+    )
+    # Lazy import to avoid cycles (council imports user_facts).
+    from .council import query_model
+
+    try:
+        res = await query_model(
+            "google:gemini-2.5-flash",
+            [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": block},
+            ],
+            timeout=45.0,
+            temperature=0.2,
+        )
+    except Exception as e:
+        logger.warning("overflow summarize call failed: %s", e)
+        return 0
+    if not res or res.get("error"):
+        return 0
+    summary_text = (res.get("content") or "").strip()
+    if not summary_text:
+        return 0
+    if len(summary_text) > 6000:
+        summary_text = summary_text[:6000].rstrip()
+
+    # Insert the summary FIRST, then archive originals pointing at it. If the
+    # archive step fails the originals remain active — degrades to "we have a
+    # duplicate summary" which is fine.
+    summary_row = add_user_fact(
+        user_id=user_id,
+        fact_text=summary_text,
+        source="summary",
+        category="general",
+    )
+    if not summary_row:
+        return 0
+
+    archived = _archive_facts(
+        user_id, [str(f["id"]) for f in to_compress], str(summary_row["id"])
+    )
+    logger.info(
+        "user_fact: summarized %d oldest into summary=%s for user=%s",
+        archived,
+        summary_row["id"],
+        user_id,
+    )
+    return archived
