@@ -184,6 +184,14 @@
   font-style: italic;
 }
 
+.essay-loading-tip {
+  margin-top: 8px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.45;
+}
+
 .essay-loading-status.aborted {
   border-color: rgba(248, 113, 113, 0.35);
 }

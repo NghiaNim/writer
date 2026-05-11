@@ -141,6 +141,10 @@ export default function EssayLoadingStatus({ loading, progress, aborted }) {
                 Live status while members draft privately — final essay appears below when ready.
                 You can minimize this bar anytime.
             </div>
+            <div className="essay-loading-tip">
+                Want different questions or a different council? Tune your council members and voice
+                rules anytime in Settings — changes apply on the next run.
+            </div>
         </div>
     );
 }
