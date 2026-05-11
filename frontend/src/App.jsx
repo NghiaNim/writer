@@ -469,6 +469,37 @@ function AppShell() {
                     search_query: event.data.search_query,
                     extracted_query: event.data.extracted_query,
                     search_context: event.data.search_context,
+                    search_error: null,
+                  }
+                };
+
+                messages[messages.length - 1] = updatedLastMsg;
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'search_error':
+              // Search failed but the run continues — surface a warning so
+              // the user knows the council is drafting without web context.
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+
+                const updatedLastMsg = {
+                  ...lastMsg,
+                  loading: {
+                    ...lastMsg.loading,
+                    search: false
+                  },
+                  metadata: {
+                    ...lastMsg.metadata,
+                    search_query: event.data?.search_query,
+                    search_error: {
+                      provider: event.data?.provider,
+                      message:
+                        event.data?.message ||
+                        'Web search failed; council ran without web context.',
+                    },
                   }
                 };
 
@@ -718,9 +749,60 @@ function AppShell() {
               setIsLoading(false);
               break;
 
+            case 'interim_question':
+            case 'clarification_question':
+              // The backend asks the user one more question while the
+              // council is still working. clarification_question is the
+              // chairman's final ask right before stage 3 — same data shape,
+              // different label (chairmanAsk: true).
+              setCurrentConversation((prev) => {
+                if (!prev) return prev;
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                if (!lastMsg || lastMsg.role !== 'assistant') return prev;
+                const existing = lastMsg.interimQuestions || [];
+                if (existing.some((q) => q.question_id === event.data?.question_id)) {
+                  return prev;
+                }
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  interimQuestions: [
+                    ...existing,
+                    {
+                      question_id: event.data.question_id,
+                      question: event.data.question,
+                      answer: '',
+                      status: 'pending', // pending | submitted | skipped
+                      chairmanAsk: eventType === 'clarification_question',
+                    },
+                  ],
+                };
+                return { ...prev, messages };
+              });
+              break;
+
             case 'title_complete':
               // Reload conversations to get updated title
               loadConversations();
+              break;
+
+            case 'run_finished':
+              // Backend has fully terminated this run (success, error, or
+              // shortly before either). Late interim-question answers will
+              // still persist to user_fact but cannot land in this chairman
+              // synthesis — freeze the panel.
+              setCurrentConversation((prev) => {
+                if (!prev) return prev;
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                if (!lastMsg || lastMsg.role !== 'assistant') return prev;
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  runFinished: true,
+                  runFinishedReason: event.reason || 'complete',
+                };
+                return { ...prev, messages };
+              });
               break;
 
             case 'complete':
@@ -758,6 +840,8 @@ function AppShell() {
             messages[messages.length - 1] = {
               ...lastMsg,
               aborted: true,
+              runFinished: true,
+              runFinishedReason: 'aborted',
               loading: {
                 search: false,
                 stage1: false,
@@ -795,6 +879,43 @@ function AppShell() {
       }
       // Reload conversations to ensure title/messages are synced, even if aborted
       loadConversations();
+    }
+  };
+
+  // Submit (or skip) an answer to one of the interim questions the backend
+  // emitted while drafting. Updates local message state immediately so the
+  // panel feels snappy, then posts to /api/intake/answer in the background.
+  const handleAnswerInterim = async ({ questionId, question, answer, skipped }) => {
+    if (!currentConversationId || !questionId) return;
+    setCurrentConversation((prev) => {
+      if (!prev) return prev;
+      const messages = [...prev.messages];
+      const idx = messages.length - 1;
+      const lastMsg = messages[idx];
+      if (!lastMsg || lastMsg.role !== 'assistant') return prev;
+      const updated = (lastMsg.interimQuestions || []).map((q) =>
+        q.question_id === questionId
+          ? {
+              ...q,
+              answer: skipped ? '' : (answer || '').trim(),
+              status: skipped ? 'skipped' : 'submitted',
+            }
+          : q
+      );
+      messages[idx] = { ...lastMsg, interimQuestions: updated };
+      return { ...prev, messages };
+    });
+    try {
+      await api.intake.answer({
+        conversationId: currentConversationId,
+        questionId,
+        question,
+        answer: skipped ? '' : (answer || ''),
+        sessionId: currentSessionId,
+        skipped: !!skipped,
+      });
+    } catch (e) {
+      console.warn('Failed to record interim answer:', e);
     }
   };
 
@@ -897,6 +1018,7 @@ function AppShell() {
           onSendMessage={handleSendMessage}
           onAbort={handleAbort}
           onRegenerate={handleRegenerate}
+          onAnswerInterim={handleAnswerInterim}
           isLoading={isLoading}
           councilConfigured={councilConfigured}
           councilModels={councilModels}
