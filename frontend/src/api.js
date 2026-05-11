@@ -855,7 +855,8 @@ export const api = {
    * @param {Object} options - Message options
    * @param {string} options.content - The message content
    * @param {boolean} options.webSearch - Whether to use web search
-   * @param {string} options.executionMode - Execution mode: 'chat_only', 'chat_ranking', or 'full'
+   * @param {string} options.essayMode - 'topic' (write from scratch) or 'draft' (refine the user's draft)
+   * @param {string} options.sessionId - Optional essay_sessions row id
    * @param {function} onEvent - Callback function for each event: (eventType, data) => void
    * @param {AbortSignal} signal - Optional AbortSignal to cancel the request
    * @returns {Promise<void>}
@@ -864,14 +865,12 @@ export const api = {
     const {
       content,
       webSearch = false,
-      executionMode = 'full',
       essayMode = 'topic',
       sessionId = null,
     } = options;
     const body = {
       content,
       web_search: webSearch,
-      execution_mode: executionMode,
       essay_mode: essayMode,
     };
     if (sessionId) {

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import Skeleton from './common/Skeleton';
 import { getModelVisuals, getShortModelName } from '../utils/modelHelpers';
 import ThinkBlockRenderer from './ThinkBlockRenderer';
 import StageTimer from './StageTimer';
@@ -148,52 +147,3 @@ export default function Stage1({ responses, startTime, endTime }) {
   );
 }
 
-export function Stage1Skeleton() {
-  return (
-    <div className="stage-container stage-1 skeleton-mode">
-      <div className="stage-header">
-        <div className="stage-title">
-          <span className="stage-icon">💬</span>
-          Stage 1: Individual Perspectives
-        </div>
-        <div className="stage-timer-skeleton">
-          <Skeleton variant="text" width="60px" />
-        </div>
-      </div>
-
-      {/* Tabs Skeleton */}
-      <div className="tabs" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="tab skeleton-tab">
-            <Skeleton variant="circle" width="24px" height="24px" style={{ marginBottom: '8px' }} />
-            <Skeleton variant="text" width="60%" height="0.8em" />
-          </div>
-        ))}
-      </div>
-
-      <div className="tab-content glass-panel">
-        <div className="model-header">
-          <div className="model-identity">
-            <Skeleton variant="avatar" />
-            <div className="model-info" style={{ gap: '4px', display: 'flex', flexDirection: 'column' }}>
-              <Skeleton variant="text" width="120px" height="1.2em" />
-              <Skeleton variant="text" width="80px" height="0.8em" />
-            </div>
-          </div>
-          <div className="header-actions">
-            <Skeleton variant="rect" width="60px" height="24px" style={{ borderRadius: '12px' }} />
-          </div>
-        </div>
-
-        <div className="response-text">
-          <Skeleton variant="text" width="100%" />
-          <Skeleton variant="text" width="95%" />
-          <Skeleton variant="text" width="90%" />
-          <br />
-          <Skeleton variant="text" width="100%" />
-          <Skeleton variant="text" width="85%" />
-        </div>
-      </div>
-    </div>
-  );
-}

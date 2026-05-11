@@ -55,8 +55,7 @@ function AppShell() {
   const [councilModels, setCouncilModels] = useState([]);
   const [chairmanModel, setChairmanModel] = useState(null);
   const [searchProvider, setSearchProvider] = useState('duckduckgo');
-  const [executionMode, setExecutionMode] = useState('full');
-  const [essayMode, setEssayMode] = useState('topic'); // Phase 4: 'topic' | 'draft'
+  const [essayMode, setEssayMode] = useState('topic'); // 'topic' | 'draft'
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Phase 3: EssayFlow gates new essay creation. We start with it visible
@@ -76,7 +75,6 @@ function AppShell() {
   const [currentWordTarget, setCurrentWordTarget] = useState(null);
   const abortControllerRef = useRef(null);
   const requestIdRef = useRef(0);
-  const isInitialMount = useRef(true);
   // After EssayFlow creates a conversation, GET /api/conversations/:id would
   // return messages:[] until the stream persists — that fetch would clobber
   // optimistic UI. Skip exactly one load for that id hand-off.
@@ -98,7 +96,6 @@ function AppShell() {
       // prompt the user to configure them — that's a no-op in the hosted
       // product. We also don't auto-pop the settings panel anymore.
       const settings = await api.getSettings();
-      setExecutionMode(settings.execution_mode || 'full');
       setSearchProvider(settings.search_provider || 'duckduckgo');
 
       // Mark Ollama as not used in the hosted product (keeps the badge
@@ -135,25 +132,6 @@ function AppShell() {
     setSettingsInitialSection(section || 'council');
     setShowSettings(true);
   };
-
-  // Auto-save execution mode preference when changed
-  useEffect(() => {
-    // Skip saving on initial mount
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    const saveExecutionMode = async () => {
-      try {
-        await api.updateSettings({ execution_mode: executionMode });
-      } catch (error) {
-        console.error('Failed to save execution mode:', error);
-      }
-    };
-
-    saveExecutionMode();
-  }, [executionMode]);
 
   const testOllamaConnection = async (customUrl = null) => {
     try {
@@ -429,7 +407,6 @@ function AppShell() {
         {
           content,
           webSearch,
-          executionMode,
           essayMode: requestEssayMode,
           sessionId: requestSessionId,
         },
@@ -1025,7 +1002,6 @@ function AppShell() {
           chairmanModel={chairmanModel}
           searchProvider={searchProvider}
           onOpenSettings={handleOpenSettings}
-          executionMode={executionMode}
           essayMode={essayMode}
           onEssayModeChange={setEssayMode}
           activeCouncil={currentCouncil}

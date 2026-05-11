@@ -2,9 +2,8 @@ import StageTimer from './StageTimer';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import SearchContext from './SearchContext';
-import Stage1, { Stage1Skeleton } from './Stage1';
-import Stage2, { Stage2Skeleton } from './Stage2';
-import Stage3, { Stage3Skeleton } from './Stage3';
+import Stage1 from './Stage1';
+import Stage2 from './Stage2';
 import CouncilGrid from './CouncilGrid';
 import CouncilChips from './CouncilChips';
 import EssayLoadingStatus from './EssayLoadingStatus';
@@ -51,14 +50,6 @@ function buildChipState(activeCouncil, msg) {
         msg?.progress?.stage1?.count || 0
     );
     return { personas, chairman, stage, stage1Done };
-}
-
-// Phase 3: in 'full' mode (the essay flow) we hide deliberation by default
-// and show only the final essay. chat_only / chat_ranking modes still use
-// the legacy stage-by-stage UI so users can inspect drafts/rankings.
-function shouldUseEssayUX(msg, currentExecutionMode) {
-    const mode = msg?.metadata?.execution_mode || currentExecutionMode || 'full';
-    return mode === 'full';
 }
 
 function stage3EssayText(msg) {
@@ -146,7 +137,6 @@ export default function ChatInterface({
     onOpenSettings,
     councilModels = [],
     chairmanModel = null,
-    executionMode,
     essayMode = 'topic',
     onEssayModeChange,
     searchProvider = 'duckduckgo',
@@ -196,7 +186,6 @@ export default function ChatInterface({
 
     const showRefinementDock =
         Boolean(conversation) &&
-        executionMode === 'full' &&
         draftMessageIndices.length > 0 &&
         councilConfigured;
 
@@ -205,16 +194,11 @@ export default function ChatInterface({
         const m = conversation.messages;
         const li = m.length - 1;
         const lm = m[li];
-        if (
-            lm?.role !== 'assistant' ||
-            !lm?.stage3 ||
-            isLoading ||
-            !shouldUseEssayUX(lm, executionMode)
-        ) {
+        if (lm?.role !== 'assistant' || !lm?.stage3 || isLoading) {
             return null;
         }
         return `${conversationId}-${li}`;
-    }, [conversation, conversationId, isLoading, executionMode]);
+    }, [conversation, conversationId, isLoading]);
 
     const showEssayFeedbackBar =
         Boolean(essayFeedbackKey) && essayFeedbackDoneKey !== essayFeedbackKey;
@@ -534,10 +518,6 @@ export default function ChatInterface({
                                         msg={msg}
                                         index={index}
                                         isLastMessage={index === conversation.messages.length - 1}
-                                        currentExecutionMode={executionMode}
-                                        searchProvider={searchProvider}
-                                        councilModels={councilModels}
-                                        chairmanModel={chairmanModel}
                                         isLoading={isLoading}
                                         onRegenerate={onRegenerate}
                                         onAnswerInterim={onAnswerInterim}
@@ -1095,22 +1075,14 @@ export default function ChatInterface({
 /**
  * Renders the assistant side of a message.
  *
- * In the essay UX (full mode):
- *   - While loading: shows a single terminal-style status panel (no raw drafts).
- *   - When done: shows ONLY the final essay; raw council notes are tucked
- *     behind a "Show council notes" toggle.
- *
- * In chat_only / chat_ranking modes: falls back to the legacy stage-by-stage
- * UI so users can still inspect drafts and rankings directly.
+ *   While loading: a single terminal-style status panel (no raw drafts).
+ *   When done: only the final essay; raw council notes are tucked behind
+ *   the FinalEssay "Show council notes" toggle.
  */
 function AssistantMessageBody({
     msg,
     index,
     isLastMessage,
-    currentExecutionMode,
-    searchProvider,
-    councilModels,
-    chairmanModel,
     isLoading,
     onRegenerate,
     onAnswerInterim,
@@ -1118,7 +1090,6 @@ function AssistantMessageBody({
     activeWordTarget = null,
     essayVersionLabel = null,
 }) {
-    const useEssay = shouldUseEssayUX(msg, currentExecutionMode);
     const isStreaming =
         isLastMessage &&
         isLoading &&
@@ -1126,154 +1097,35 @@ function AssistantMessageBody({
             msg.loading?.stage1 ||
             msg.loading?.stage2 ||
             msg.loading?.stage3);
-    // Extension #1 ("show the mechanism"): persona chip row visible during
-    // generation. Falls back to null when we don't know which council ran.
+    // Persona chip row visible during generation. Falls back to null when
+    // we don't know which council ran.
     const chipState = isLastMessage ? buildChipState(activeCouncil, msg) : null;
 
-    const searchProviderName =
-        searchProvider === 'duckduckgo'
-            ? 'DuckDuckGo'
-            : searchProvider === 'tavily'
-                ? 'Tavily'
-                : searchProvider === 'brave'
-                    ? 'Brave'
-                    : 'Provider';
+    // Council notes (Stage 1 + Stage 2) are hidden by default and shown
+    // through the FinalEssay's toggle once the essay is ready.
+    const councilNotes = (msg.stage1 || msg.stage2) ? (
+        <>
+            {msg.stage1 && (
+                <Stage1
+                    responses={msg.stage1}
+                    startTime={msg.timers?.stage1Start}
+                    endTime={msg.timers?.stage1End}
+                />
+            )}
+            {msg.stage2 && (
+                <Stage2
+                    rankings={msg.stage2}
+                    labelToModel={msg.metadata?.label_to_model}
+                    aggregateRankings={msg.metadata?.aggregate_rankings}
+                    startTime={msg.timers?.stage2Start}
+                    endTime={msg.timers?.stage2End}
+                />
+            )}
+        </>
+    ) : null;
 
-    if (useEssay) {
-        // Council notes (Stage 1 + Stage 2) are hidden by default and shown
-        // through the FinalEssay's toggle once the essay is ready.
-        const councilNotes = (msg.stage1 || msg.stage2) ? (
-            <>
-                {msg.stage1 && (
-                    <Stage1
-                        responses={msg.stage1}
-                        startTime={msg.timers?.stage1Start}
-                        endTime={msg.timers?.stage1End}
-                    />
-                )}
-                {msg.stage2 && (
-                    <Stage2
-                        rankings={msg.stage2}
-                        labelToModel={msg.metadata?.label_to_model}
-                        aggregateRankings={msg.metadata?.aggregate_rankings}
-                        startTime={msg.timers?.stage2Start}
-                        endTime={msg.timers?.stage2End}
-                    />
-                )}
-            </>
-        ) : null;
-
-        return (
-            <>
-                {msg.metadata?.search_error && (
-                    <div className="search-warning" role="status">
-                        <span className="search-warning__icon" aria-hidden="true">⚠️</span>
-                        <span>
-                            {msg.metadata.search_error.message ||
-                                'Web search failed — council ran without web context.'}
-                        </span>
-                    </div>
-                )}
-                {msg.metadata?.search_context && (
-                    <SearchContext
-                        searchQuery={msg.metadata?.search_query}
-                        extractedQuery={msg.metadata?.extracted_query}
-                        searchContext={msg.metadata?.search_context}
-                    />
-                )}
-
-                {chipState && (isStreaming || !msg.stage3) && (
-                    <CouncilChips
-                        personas={chipState.personas}
-                        chairman={chipState.chairman}
-                        stage={chipState.stage}
-                        stage1Done={chipState.stage1Done}
-                        wordTarget={activeWordTarget}
-                    />
-                )}
-
-                {isStreaming && !msg.stage3 && (
-                    <EssayLoadingStatus
-                        loading={msg.loading}
-                        progress={msg.progress}
-                    />
-                )}
-
-                {/* Stay visible while streaming, or briefly after the run
-                    finishes if the user still has unanswered questions —
-                    surfaces the "saved for next time" lock state instead of
-                    silently disappearing. */}
-                {((isStreaming && !msg.stage3) ||
-                    (msg.runFinished && msg.interimQuestions?.some((q) => q.status === 'pending'))) &&
-                    (msg.interimQuestions?.length > 0) && (
-                    <InterimQuestions
-                        questions={msg.interimQuestions}
-                        onAnswer={onAnswerInterim}
-                        runFinished={Boolean(msg.runFinished)}
-                        runFinishedReason={msg.runFinishedReason}
-                    />
-                )}
-
-                {msg.stage3 && (
-                    <FinalEssay
-                        finalResponse={msg.stage3}
-                        startTime={msg.timers?.stage3Start}
-                        endTime={msg.timers?.stage3End}
-                        councilNotes={councilNotes}
-                        onRegenerate={onRegenerate}
-                        canRegenerate={Boolean(onRegenerate) && !isLoading && isLastMessage}
-                        versionLabel={essayVersionLabel}
-                    />
-                )}
-
-                {msg.aborted && (
-                    <div className="aborted-indicator">
-                        <span className="aborted-icon">⏹</span>
-                        <span className="aborted-text">
-                            Generation stopped by user.
-                            {msg.stage1 && !msg.stage3 && ' Partial drafts are available under "Show council notes".'}
-                        </span>
-                    </div>
-                )}
-
-                {/* If stopped before chairman synthesis, expose council notes inline */}
-                {!msg.stage3 && msg.aborted && (msg.stage1 || msg.stage2) && (
-                    <details className="aborted-fallback-notes">
-                        <summary>Show partial council notes</summary>
-                        <div style={{ marginTop: '12px' }}>
-                            {msg.stage1 && (
-                                <Stage1
-                                    responses={msg.stage1}
-                                    startTime={msg.timers?.stage1Start}
-                                    endTime={msg.timers?.stage1End}
-                                />
-                            )}
-                            {msg.stage2 && (
-                                <Stage2
-                                    rankings={msg.stage2}
-                                    labelToModel={msg.metadata?.label_to_model}
-                                    aggregateRankings={msg.metadata?.aggregate_rankings}
-                                    startTime={msg.timers?.stage2Start}
-                                    endTime={msg.timers?.stage2End}
-                                />
-                            )}
-                        </div>
-                    </details>
-                )}
-            </>
-        );
-    }
-
-    // Legacy (chat_only / chat_ranking) UX: keep existing stage-by-stage rendering.
     return (
         <>
-            {msg.loading?.search && (
-                <div className="stage-loading">
-                    <div className="spinner"></div>
-                    <span>🔍 Searching the web with {searchProviderName}...</span>
-                </div>
-            )}
-
             {msg.metadata?.search_error && (
                 <div className="search-warning" role="status">
                     <span className="search-warning__icon" aria-hidden="true">⚠️</span>
@@ -1291,58 +1143,47 @@ function AssistantMessageBody({
                 />
             )}
 
-            {(msg.loading?.stage1 || (msg.stage1 && !msg.stage2)) && (
-                <div className="stage-container">
-                    <div className="stage-header">
-                        <h3>Stage 1: Council Deliberation</h3>
-                        {msg.timers?.stage1Start && (
-                            <StageTimer
-                                startTime={msg.timers.stage1Start}
-                                endTime={msg.timers.stage1End}
-                            />
-                        )}
-                    </div>
-                    <CouncilGrid
-                        models={councilModels}
-                        chairman={chairmanModel}
-                        status={msg.loading?.stage1 ? 'thinking' : 'complete'}
-                        progress={{
-                            currentModel: msg.progress?.stage1?.currentModel,
-                            completed: msg.stage1?.map((r) => r.model) || [],
-                        }}
-                    />
-                </div>
-            )}
-
-            {(msg.loading?.stage1 || (msg.stage1 && !msg.stage2))
-                ? msg.loading?.stage1 && !msg.stage1
-                    ? <Stage1Skeleton />
-                    : msg.stage1 && (
-                        <Stage1
-                            responses={msg.stage1}
-                            startTime={msg.timers?.stage1Start}
-                            endTime={msg.timers?.stage1End}
-                        />
-                    )
-                : null}
-
-            {msg.loading?.stage2 && <Stage2Skeleton />}
-            {msg.stage2 && (
-                <Stage2
-                    rankings={msg.stage2}
-                    labelToModel={msg.metadata?.label_to_model}
-                    aggregateRankings={msg.metadata?.aggregate_rankings}
-                    startTime={msg.timers?.stage2Start}
-                    endTime={msg.timers?.stage2End}
+            {chipState && (isStreaming || !msg.stage3) && (
+                <CouncilChips
+                    personas={chipState.personas}
+                    chairman={chipState.chairman}
+                    stage={chipState.stage}
+                    stage1Done={chipState.stage1Done}
+                    wordTarget={activeWordTarget}
                 />
             )}
 
-            {msg.loading?.stage3 && <Stage3Skeleton />}
+            {isStreaming && !msg.stage3 && (
+                <EssayLoadingStatus
+                    loading={msg.loading}
+                    progress={msg.progress}
+                />
+            )}
+
+            {/* Stay visible while streaming, or briefly after the run
+                finishes if the user still has unanswered questions —
+                surfaces the "saved for next time" lock state instead of
+                silently disappearing. */}
+            {((isStreaming && !msg.stage3) ||
+                (msg.runFinished && msg.interimQuestions?.some((q) => q.status === 'pending'))) &&
+                (msg.interimQuestions?.length > 0) && (
+                <InterimQuestions
+                    questions={msg.interimQuestions}
+                    onAnswer={onAnswerInterim}
+                    runFinished={Boolean(msg.runFinished)}
+                    runFinishedReason={msg.runFinishedReason}
+                />
+            )}
+
             {msg.stage3 && (
-                <Stage3
+                <FinalEssay
                     finalResponse={msg.stage3}
                     startTime={msg.timers?.stage3Start}
                     endTime={msg.timers?.stage3End}
+                    councilNotes={councilNotes}
+                    onRegenerate={onRegenerate}
+                    canRegenerate={Boolean(onRegenerate) && !isLoading && isLastMessage}
+                    versionLabel={essayVersionLabel}
                 />
             )}
 
@@ -1351,9 +1192,34 @@ function AssistantMessageBody({
                     <span className="aborted-icon">⏹</span>
                     <span className="aborted-text">
                         Generation stopped by user.
-                        {msg.stage1 && !msg.stage3 && ' Partial results shown above.'}
+                        {msg.stage1 && !msg.stage3 && ' Partial drafts are available under "Show council notes".'}
                     </span>
                 </div>
+            )}
+
+            {/* If stopped before chairman synthesis, expose council notes inline */}
+            {!msg.stage3 && msg.aborted && (msg.stage1 || msg.stage2) && (
+                <details className="aborted-fallback-notes">
+                    <summary>Show partial council notes</summary>
+                    <div style={{ marginTop: '12px' }}>
+                        {msg.stage1 && (
+                            <Stage1
+                                responses={msg.stage1}
+                                startTime={msg.timers?.stage1Start}
+                                endTime={msg.timers?.stage1End}
+                            />
+                        )}
+                        {msg.stage2 && (
+                            <Stage2
+                                rankings={msg.stage2}
+                                labelToModel={msg.metadata?.label_to_model}
+                                aggregateRankings={msg.metadata?.aggregate_rankings}
+                                startTime={msg.timers?.stage2Start}
+                                endTime={msg.timers?.stage2End}
+                            />
+                        )}
+                    </div>
+                </details>
             )}
         </>
     );
