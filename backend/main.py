@@ -436,7 +436,6 @@ class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
     content: str
     web_search: bool = False
-    execution_mode: str = "full"  # 'chat_only', 'chat_ranking', 'full'
     # How to interpret `content`:
     #   'topic' -> the user supplied an essay topic; council writes from scratch
     #   'draft' -> the user supplied their own draft; council refines while preserving voice
@@ -537,14 +536,6 @@ async def send_message_stream(
 
     Same precedence for `word_target`.
     """
-    # Validate execution_mode
-    valid_modes = ["chat_only", "chat_ranking", "full"]
-    if body.execution_mode not in valid_modes:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid execution_mode. Must be one of: {valid_modes}"
-        )
-
     # Validate essay_mode
     valid_essay_modes = ["topic", "draft"]
     if body.essay_mode not in valid_essay_modes:
@@ -728,7 +719,6 @@ async def send_message_stream(
                 "council_started",
                 distinct_id=user.id,
                 properties={
-                    "execution_mode": body.execution_mode,
                     "essay_mode": body.essay_mode,
                     "web_search_enabled": body.web_search,
                     "is_first_message": is_first_message,
@@ -852,10 +842,9 @@ async def send_message_stream(
             # Interim questions: stage 1 just finished; stage 2 is about to
             # start. Use the council's drafts to pick questions whose answers
             # would ground vague claims in the final essay.
-            if body.execution_mode in ["chat_ranking", "full"]:
-                async for event in _emit_interim_questions(stage1_results):
-                    yield event
-                    await asyncio.sleep(0.01)
+            async for event in _emit_interim_questions(stage1_results):
+                yield event
+                await asyncio.sleep(0.01)
 
             # Check if any models responded successfully in Stage 1
             if not any(r for r in stage1_results if not r.get('error')):
@@ -864,115 +853,112 @@ async def send_message_stream(
                 posthog.capture(
                     "council_error",
                     distinct_id=user.id,
-                    properties={"reason": "all_models_failed", "execution_mode": body.execution_mode},
+                    properties={"reason": "all_models_failed"},
                 )
                 yield f"data: {json.dumps({'type': 'error', 'message': error_msg})}\n\n"
                 return # Stop further processing
 
-            # Stage 2: Only if mode is 'chat_ranking' or 'full'
-            if body.execution_mode in ["chat_ranking", "full"]:
-                yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-                await asyncio.sleep(0.05)
-                
-                # Iterate over the async generator
-                async for item in stage2_collect_rankings(body.content, stage1_results, search_context, request):
-                    # First item is the label mapping
-                    if isinstance(item, dict) and not item.get('model'):
-                        label_to_model = item
-                        # Send init event with total count
-                        yield f"data: {json.dumps({'type': 'stage2_init', 'total': len(label_to_model)})}\n\n"
-                        continue
-                    
-                    # Subsequent items are results
-                    stage2_results.append(item)
-                    
-                    # Send progress update
-                    print(f"Stage 2 Progress: {len(stage2_results)}/{len(label_to_model)} - {item['model']}")
-                    yield f"data: {json.dumps({'type': 'stage2_progress', 'data': item, 'count': len(stage2_results), 'total': len(label_to_model)})}\n\n"
-                    await asyncio.sleep(0.01)
+            # Stage 2: peer rankings
+            yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
+            await asyncio.sleep(0.05)
 
-                aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
-                yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'search_query': search_query, 'search_context': search_context}})}\n\n"
-                await asyncio.sleep(0.05)
+            # Iterate over the async generator
+            async for item in stage2_collect_rankings(body.content, stage1_results, search_context, request):
+                # First item is the label mapping
+                if isinstance(item, dict) and not item.get('model'):
+                    label_to_model = item
+                    # Send init event with total count
+                    yield f"data: {json.dumps({'type': 'stage2_init', 'total': len(label_to_model)})}\n\n"
+                    continue
 
-                # Second window: stage 2 done, stage 3 not yet started. Only
-                # emit if the user still has question budget left after
-                # stage 1's batch.
-                if body.execution_mode == "full":
-                    async for event in _emit_interim_questions(stage1_results):
-                        yield event
-                        await asyncio.sleep(0.01)
+                # Subsequent items are results
+                stage2_results.append(item)
 
-            # Stage 3: Only if mode is 'full'
-            if body.execution_mode == "full":
-                # Chairman pre-pass: one final clarification, pinned to a
-                # specific vague claim in the drafts. Single Flash call;
-                # silently returns None if everything is already grounded.
-                from .interim_questions import (
-                    format_in_flight_qa_block,
-                    generate_chairman_clarification,
-                    wait_for_answer,
-                )
+                # Send progress update
+                print(f"Stage 2 Progress: {len(stage2_results)}/{len(label_to_model)} - {item['model']}")
+                yield f"data: {json.dumps({'type': 'stage2_progress', 'data': item, 'count': len(stage2_results), 'total': len(label_to_model)})}\n\n"
+                await asyncio.sleep(0.01)
 
+            aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
+            yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'search_query': search_query, 'search_context': search_context}})}\n\n"
+            await asyncio.sleep(0.05)
+
+            # Second window: stage 2 done, stage 3 not yet started. Only
+            # emit if the user still has question budget left after
+            # stage 1's batch.
+            async for event in _emit_interim_questions(stage1_results):
+                yield event
+                await asyncio.sleep(0.01)
+
+            # Stage 3: chairman synthesis
+            # Chairman pre-pass: one final clarification, pinned to a specific
+            # vague claim in the drafts. Single Flash call; silently returns
+            # None if everything is already grounded.
+            from .interim_questions import (
+                format_in_flight_qa_block,
+                generate_chairman_clarification,
+                wait_for_answer,
+            )
+
+            try:
+                already_asked = get_run_buffer(conversation_id)
                 try:
-                    already_asked = get_run_buffer(conversation_id)
-                    try:
-                        known_facts = await asyncio.to_thread(
-                            load_recent_user_facts, user.id
-                        )
-                    except Exception:
-                        known_facts = []
-                    clarification = await generate_chairman_clarification(
-                        topic=session_topic or "",
-                        user_query=body.content,
-                        known_facts=known_facts,
-                        asked_this_run=already_asked,
-                        stage1_drafts=stage1_results,
+                    known_facts = await asyncio.to_thread(
+                        load_recent_user_facts, user.id
+                    )
+                except Exception:
+                    known_facts = []
+                clarification = await generate_chairman_clarification(
+                    topic=session_topic or "",
+                    user_query=body.content,
+                    known_facts=known_facts,
+                    asked_this_run=already_asked,
+                    stage1_drafts=stage1_results,
+                )
+            except Exception as ex:
+                print(f"WARN: chairman clarification failed: {ex}")
+                clarification = None
+
+            if clarification:
+                yield (
+                    f"data: {json.dumps({'type': 'clarification_question', 'data': clarification})}\n\n"
+                )
+                # Wait up to ~25s for an answer. Skip and answer both
+                # short-circuit; timeout proceeds without the answer.
+                try:
+                    await wait_for_answer(
+                        conversation_id,
+                        clarification["question_id"],
+                        timeout_s=25.0,
                     )
                 except Exception as ex:
-                    print(f"WARN: chairman clarification failed: {ex}")
-                    clarification = None
+                    print(f"WARN: clarification wait failed: {ex}")
 
-                if clarification:
-                    yield (
-                        f"data: {json.dumps({'type': 'clarification_question', 'data': clarification})}\n\n"
-                    )
-                    # Wait up to ~25s for an answer. Skip and answer both
-                    # short-circuit; timeout proceeds without the answer.
-                    try:
-                        await wait_for_answer(
-                            conversation_id,
-                            clarification["question_id"],
-                            timeout_s=25.0,
-                        )
-                    except Exception as ex:
-                        print(f"WARN: clarification wait failed: {ex}")
+            yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
+            await asyncio.sleep(0.05)
 
-                yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-                await asyncio.sleep(0.05)
+            # Check for disconnect before starting Stage 3
+            if await request.is_disconnected():
+                print("Client disconnected before Stage 3")
+                raise asyncio.CancelledError("Client disconnected")
 
-                # Check for disconnect before starting Stage 3
-                if await request.is_disconnected():
-                    print("Client disconnected before Stage 3")
-                    raise asyncio.CancelledError("Client disconnected")
+            in_flight_block = format_in_flight_qa_block(
+                get_run_buffer(conversation_id)
+            )
 
-                in_flight_block = format_in_flight_qa_block(
-                    get_run_buffer(conversation_id)
-                )
-
-                stage3_result = await stage3_synthesize_final(
-                    body.content,
-                    stage1_results,
-                    stage2_results,
-                    search_context,
-                    essay_mode=body.essay_mode,
-                    chairman_model_override=chairman_override,
-                    word_target=word_target,
-                    user_id=user.id,
-                    library_voice=library_voice,
-                    in_flight_qa_block=in_flight_block,
-                )
-                yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+            stage3_result = await stage3_synthesize_final(
+                body.content,
+                stage1_results,
+                stage2_results,
+                search_context,
+                essay_mode=body.essay_mode,
+                chairman_model_override=chairman_override,
+                word_target=word_target,
+                user_id=user.id,
+                library_voice=library_voice,
+                in_flight_qa_block=in_flight_block,
+            )
+            yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
             # Wait for title generation if it was started
             if title_task:
@@ -985,15 +971,10 @@ async def send_message_stream(
 
             # Save complete assistant message with metadata
             metadata = {
-                "execution_mode": body.execution_mode,  # Save mode for historical context
                 "essay_mode": body.essay_mode,  # topic vs draft
+                "label_to_model": label_to_model,
+                "aggregate_rankings": aggregate_rankings,
             }
-            
-            # Only include stage2/stage3 metadata if they were executed
-            if body.execution_mode in ["chat_ranking", "full"]:
-                metadata["label_to_model"] = label_to_model
-                metadata["aggregate_rankings"] = aggregate_rankings
-            
             if search_context:
                 metadata["search_context"] = search_context
             if search_query:
@@ -1003,12 +984,12 @@ async def send_message_stream(
                 conversation_id,
                 user.id,
                 stage1_results,
-                stage2_results if body.execution_mode in ["chat_ranking", "full"] else None,
-                stage3_result if body.execution_mode == "full" else None,
+                stage2_results,
+                stage3_result,
                 metadata
             )
 
-            if body.execution_mode == "full" and stage3_result:
+            if stage3_result:
                 from .essay_memory import derive_topic_from_message, upsert_completed_essay
 
                 fe = stage3_result.get("response")
@@ -1078,7 +1059,6 @@ async def send_message_stream(
                 "council_completed",
                 distinct_id=user.id,
                 properties={
-                    "execution_mode": body.execution_mode,
                     "stage1_count": len(stage1_results),
                     "web_search_used": bool(search_context),
                 },
@@ -1174,9 +1154,6 @@ class UpdateSettingsRequest(BaseModel):
     council_temperature: Optional[float] = None
     chairman_temperature: Optional[float] = None
     stage2_temperature: Optional[float] = None
-
-    # Execution Mode
-    execution_mode: Optional[str] = None
 
     # System Prompts
     stage1_prompt: Optional[str] = None
@@ -1413,16 +1390,6 @@ async def update_app_settings(
         updates["chairman_temperature"] = request.chairman_temperature
     if request.stage2_temperature is not None:
         updates["stage2_temperature"] = request.stage2_temperature
-
-    # Prompts   # Execution Mode
-    if request.execution_mode is not None:
-        valid_modes = ["chat_only", "chat_ranking", "full"]
-        if request.execution_mode not in valid_modes:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid execution_mode. Must be one of: {valid_modes}"
-            )
-        updates["execution_mode"] = request.execution_mode
 
     # Split updates into per-user (prompts, temperatures, search prefs)
     # and operator-wide (everything else: ollama, custom endpoint URL,

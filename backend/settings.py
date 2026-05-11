@@ -178,9 +178,6 @@ class Settings(BaseModel):
     # whose index exceeds the persona list fall back to stage1_prompt.
     council_personas: List[CouncilPersona] = []  # populated via get_settings() if empty
 
-    # Execution Mode
-    execution_mode: str = "full"  # Default execution mode: 'chat_only', 'chat_ranking', 'full'
-
 
 def get_settings() -> Settings:
     """Load settings from file, or return defaults.
