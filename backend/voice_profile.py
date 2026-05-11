@@ -31,6 +31,60 @@ logger = logging.getLogger(__name__)
 DEFAULT_ESSAY_TYPE = "general"
 
 
+# ---------------------------------------------------------------------------
+# Default voice rules
+# ---------------------------------------------------------------------------
+#
+# Every new user is seeded with this list on their first profile read so the
+# council has a strong "no AI tells" baseline from minute one. Users can edit,
+# remove, or replace any of these — the list is just the starting point.
+#
+# Grouping is for the prompt block; the underlying `rules` column is a flat
+# JSONB array of strings.
+
+DEFAULT_VOICE_RULES: List[str] = [
+    # Punctuation and typography
+    "Avoid em dashes entirely. Replace with commas, parentheses, periods, or colons depending on function — em dashes are the single strongest AI tell.",
+    "Avoid the rhetorical colon followed by a noun phrase (\"The result: chaos.\" / \"The takeaway: simplicity wins.\"). Use full sentences instead.",
+    "Don't use semicolons to stitch together balanced clauses for rhythm. Humans use them sparingly; AI overuses them.",
+    "Avoid scare quotes around ordinary words (the so-called \"solution\"). Commit to the word or pick a different one.",
+    "Don't bold random phrases mid-paragraph for emphasis. If something matters, the sentence should carry the weight.",
+
+    # Sentence structures to ban or limit
+    "Cut the negation-affirmation flip entirely: \"It's not X. It's Y.\" / \"This isn't just A, it's B.\"",
+    "Don't default to tricolons as a closer (\"fast, elegant, and powerful\"). Vary to two or four items, or break the pattern.",
+    "Delete the preambles: \"It's worth noting that…\", \"It's important to remember…\", \"Keep in mind that…\" Just make the point.",
+    "Cut the \"From X to Y\" sweep (\"From beginners to experts, everyone benefits\"). Almost always vacuous.",
+    "Cut participial wind-ups as transitions (\"Having considered the options, the decision was clear\").",
+    "Don't default to the \"While X, Y\" concession opener (\"While the technology is promising, challenges remain\"). Useful occasionally; not as a default hedge.",
+
+    # Vocabulary to avoid
+    "Avoid words that flag AI: delve, navigate (figurative), leverage, robust, seamless, holistic, multifaceted, nuanced, intricate, tapestry, landscape (figurative), realm, journey (figurative), underscore, foster, harness, pivotal, crucial, essential, vital, paramount.",
+    "Cut these phrases: \"in today's fast-paced world\", \"in the ever-evolving landscape of\", \"at the heart of\", \"plays a key role in\", \"stands as a testament to\", \"speaks volumes\", \"a double-edged sword\", \"the elephant in the room\".",
+    "Don't stack hedges (\"perhaps,\" \"arguably,\" \"in some sense,\" \"to a certain extent,\" \"in many ways\"). Pick one or commit to the claim.",
+
+    # Structural patterns
+    "Don't end every paragraph with a summary sentence restating its point. Let ideas land and move on.",
+    "Don't open with a question you then answer (\"What makes a great essay? Three things.\"). Acceptable once; AI does it constantly.",
+    "Avoid the \"ultimately / in conclusion / in essence\" wrap-up at the end of sections.",
+    "Don't begin with a sweeping universal claim (\"Throughout human history…\", \"Since the dawn of…\"). Start in a specific place.",
+    "Don't write paragraphs of uniform length. Vary deliberately, including one- or two-sentence paragraphs.",
+
+    # Tone and voice
+    "No false balance as a default move. If you have a view, state it. Don't \"on the one hand / on the other hand\" everything to seem neutral.",
+    "No throat-clearing acknowledgment of the topic's complexity (\"This is a complex issue with many perspectives…\"). Just engage with it.",
+    "Avoid the warm-but-empty closer (\"By embracing these principles, we build a better future together\"). Cut the inspirational tail entirely.",
+    "Choose specifics over abstractions. If you write \"various challenges,\" name two. If you write \"stakeholders,\" name them.",
+
+    # Positive rules (do this instead)
+    "Use concrete nouns and verbs. Replace \"utilize\" with \"use,\" \"facilitate\" with \"help\" or a specific verb, \"implement\" with \"build\" or \"do.\"",
+    "Allow uneven sentence lengths. Short. Then a longer one that breathes a bit and carries more weight. Then medium.",
+    "Quote specific things, name specific people, cite specific numbers. AI defaults to generality.",
+    "Let the essay have an actual argument with a stake, not just an \"exploration.\"",
+    "End where the thought ends, not with a coda.",
+]
+
+
 # Columns introduced by migration 003. Pre-migration, an upsert that
 # includes them fails with PGRST204 ("column not found in schema cache").
 # The helpers below auto-strip these on the first such failure so the UI
@@ -158,7 +212,13 @@ def _row_to_profile(row: Optional[Dict[str, Any]]) -> VoiceProfile:
 def load_voice_profile(
     user_id: str, essay_type: str = DEFAULT_ESSAY_TYPE
 ) -> VoiceProfile:
-    """Fetch the (user_id, essay_type) profile, or an empty profile if absent."""
+    """Fetch the (user_id, essay_type) profile.
+
+    Seed-on-first-read: if no row exists for this user + essay_type yet, we
+    insert one preloaded with DEFAULT_VOICE_RULES and return it. From that
+    moment on, the row is theirs to edit — emptying the rules list later
+    does NOT trigger another reseed, because the row still exists.
+    """
     sb = get_supabase()
     try:
         res = (
@@ -172,8 +232,34 @@ def load_voice_profile(
     except Exception as e:
         logger.warning("voice_profiles fetch failed for user=%s: %s", user_id, e)
         return VoiceProfile()
+
     rows = res.data or []
-    return _row_to_profile(rows[0] if rows else None)
+    if rows:
+        return _row_to_profile(rows[0])
+
+    # First read for this user — seed with the default rules.
+    seed_payload = {
+        "user_id": user_id,
+        "essay_type": essay_type,
+        "rules": list(DEFAULT_VOICE_RULES),
+    }
+    try:
+        ins = sb.table("voice_profiles").insert(seed_payload).execute()
+        if ins.data:
+            logger.info(
+                "voice_profiles: seeded %d default rules for user=%s essay_type=%s",
+                len(DEFAULT_VOICE_RULES),
+                user_id,
+                essay_type,
+            )
+            return _row_to_profile(ins.data[0])
+    except Exception as e:
+        # Another concurrent request may have already inserted the row, or
+        # the table doesn't exist yet — either way, return the in-memory
+        # defaults so the user still gets the protection on this request.
+        logger.warning("voice_profiles seed insert failed for %s: %s", user_id, e)
+
+    return VoiceProfile(rules=list(DEFAULT_VOICE_RULES))
 
 
 def save_voice_profile(
