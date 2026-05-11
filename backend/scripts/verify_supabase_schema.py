@@ -1,4 +1,4 @@
-"""Verify the Phase 2 Supabase schema is in place and working.
+"""Verify the Supabase schema is in place and working.
 
 Run from project root after applying `supabase/migrations/001_initial.sql`:
 

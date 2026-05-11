@@ -385,11 +385,11 @@ async def _extract_voice_rules_via_llm(samples: List[str]) -> Dict[str, Any]:
         style = str(style)
     return {"rules": cleaned_rules[:8], "inferred_style": style.strip()}
 
-# Phase 1 (Supabase auth): /auth/signup, /auth/login, /auth/logout, /auth/me
+# Supabase auth: /auth/signup, /auth/login, /auth/logout, /auth/me
 app.include_router(auth_router)
-# Phase 3 (3-step input flow): /sessions/* — auth-required
+# Essay intake flow: /sessions/* (auth-required)
 app.include_router(sessions_router)
-# Extension #1: per-user default council config (auth-required)
+# Per-user default council config (auth-required)
 app.include_router(council_config_router)
 
 # Enable CORS. Local dev hits localhost:5173/5174/3000; production hits the
@@ -437,14 +437,14 @@ class SendMessageRequest(BaseModel):
     content: str
     web_search: bool = False
     execution_mode: str = "full"  # 'chat_only', 'chat_ranking', 'full'
-    # Phase 4: how to interpret `content`
+    # How to interpret `content`:
     #   'topic' -> the user supplied an essay topic; council writes from scratch
     #   'draft' -> the user supplied their own draft; council refines while preserving voice
     essay_mode: str = "topic"
-    # Extension #1: optional pointer to an essay_sessions row. When provided,
-    # the backend pulls word_target + council_config off that session and uses
-    # them for stage 1/2/3. Falls back to the user's default council config if
-    # the session has no override, then to factory defaults.
+    # Optional pointer to an essay_sessions row. When provided, the backend
+    # pulls word_target + council_config off that session and uses them for
+    # stage 1/2/3. Falls back to the user's default council config if the
+    # session has no override, then to factory defaults.
     session_id: Optional[str] = None
 
 
@@ -545,7 +545,7 @@ async def send_message_stream(
             detail=f"Invalid execution_mode. Must be one of: {valid_modes}"
         )
 
-    # Validate essay_mode (Phase 4)
+    # Validate essay_mode
     valid_essay_modes = ["topic", "draft"]
     if body.essay_mode not in valid_essay_modes:
         raise HTTPException(
@@ -986,7 +986,7 @@ async def send_message_stream(
             # Save complete assistant message with metadata
             metadata = {
                 "execution_mode": body.execution_mode,  # Save mode for historical context
-                "essay_mode": body.essay_mode,  # Phase 4: topic vs draft
+                "essay_mode": body.essay_mode,  # topic vs draft
             }
             
             # Only include stage2/stage3 metadata if they were executed
@@ -1183,7 +1183,7 @@ class UpdateSettingsRequest(BaseModel):
     stage2_prompt: Optional[str] = None
     stage3_prompt: Optional[str] = None
 
-    # Stage 1 council personas (Phase 1: essay-writing personas)
+    # Stage 1 council personas (essay-writing personas)
     # Each entry: {"name": str, "description": str, "prompt": str}
     council_personas: Optional[List[Dict[str, str]]] = None
 
@@ -1340,7 +1340,7 @@ async def update_app_settings(
     if request.stage3_prompt is not None:
         updates["stage3_prompt"] = request.stage3_prompt
 
-    # Stage 1 council personas (Phase 1: essay-writing personas)
+    # Stage 1 council personas (essay-writing personas)
     if request.council_personas is not None:
         from .settings import CouncilPersona
         try:

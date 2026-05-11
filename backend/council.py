@@ -245,11 +245,11 @@ async def stage1_collect_responses(
     # voice is provided.
     library_voice_block = format_library_voice_block(library_voice)
 
-    # Phase 4: tell every persona explicitly whether the input is a topic
-    # to expand into an essay or a draft to refine.
+    # Tell every persona explicitly whether the input is a topic to
+    # expand into an essay or a draft to refine.
     essay_mode_block = format_essay_mode_block(essay_mode)
 
-    # Extension #1 (word target): inject "TARGET LENGTH: ~N words." block.
+    # Optional "TARGET LENGTH: ~N words." block.
     word_target_block = format_word_target_block(word_target)
 
     from .prompts import STAGE1_PROMPT_DEFAULT
@@ -559,8 +559,8 @@ async def stage3_synthesize_final(
         search_context_block = f"Context from Web Search:\n{search_context}\n"
 
     # Render the user's voice profile so the Chairman applies every rule
-    # before returning the final essay (Phase 2). Loaded per-user from
-    # Supabase. Empty string when no profile is configured.
+    # before returning the final essay. Loaded per-user from Supabase.
+    # Empty string when no profile is configured.
     profile: Optional[VoiceProfile] = None
     if user_id:
         try:
@@ -585,11 +585,11 @@ async def stage3_synthesize_final(
     # Library voice scaffolding (invisible to user).
     library_voice_block = format_library_voice_block(library_voice)
 
-    # Phase 4: tell the Chairman whether this is topic-mode (write fresh)
-    # or draft-mode (refine the user's draft).
+    # Tell the Chairman whether this is topic-mode (write fresh) or
+    # draft-mode (refine the user's draft).
     essay_mode_block = format_essay_mode_block(essay_mode)
 
-    # Extension #1: optional word target.
+    # Optional word target.
     word_target_block = format_word_target_block(word_target)
 
     try:

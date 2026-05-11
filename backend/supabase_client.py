@@ -1,4 +1,4 @@
-"""Supabase clients (Phase 1: Auth).
+"""Supabase clients.
 
 Two service-role clients live here. They share the same secret but are
 separate Python instances so their internal state can't pollute each other:

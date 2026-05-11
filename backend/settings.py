@@ -227,9 +227,9 @@ def get_settings() -> Settings:
             elif hasattr(settings, field):
                 setattr(settings, field, value)
 
-    # If personas are missing (fresh install or older settings.json from
-    # before Phase 1), seed with the 4 essay-writing defaults. We do not
-    # overwrite a user-customized non-empty list.
+    # If personas are missing (fresh install or older settings.json),
+    # seed with the 4 essay-writing defaults. We do not overwrite a
+    # user-customized non-empty list.
     if not settings.council_personas:
         settings.council_personas = _default_personas()
     else:

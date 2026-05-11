@@ -1,7 +1,8 @@
-"""Essay sessions router (Phase 3).
+"""Essay sessions router.
 
-Tracks the 3-step input flow state per user. Every step writes to the
-`essay_sessions` table in Supabase so a user can refresh and resume.
+Tracks the intake state per user (topic → questions → core idea → voice).
+Every step writes to the `essay_sessions` table in Supabase so a user
+can refresh and resume.
 
 Endpoints (all require `Authorization: Bearer <jwt>`):
 
@@ -175,11 +176,11 @@ async def memory_check(
     topic: str = Query(..., min_length=1, max_length=500),
     user: AuthUser = Depends(get_current_user),
 ):
-    """Phase 3: surface past essays whose topic looks similar.
+    """Surface past essays whose topic looks similar.
 
-    Implementation is intentionally conservative — case-insensitive substring
-    match against `topic` keywords, ordered newest-first, capped at 5. Phase
-    5+ can swap in semantic search once we have embeddings.
+    Conservative implementation: case-insensitive substring match against
+    `topic` keywords, ordered newest-first, capped at 5. Swap in semantic
+    search once we have embeddings.
     """
     supabase = get_supabase()
     needle = topic.strip()

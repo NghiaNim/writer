@@ -1,4 +1,4 @@
-"""Authentication router and dependencies (Phase 1).
+"""Authentication router and dependencies.
 
 Wraps Supabase auth so the rest of the app can stay framework-agnostic:
     POST /auth/signup    create user + return session

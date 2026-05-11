@@ -22,7 +22,7 @@ Search Results:
 
 
 # ---------------------------------------------------------------------------
-# Essay-mode framing (Phase 4)
+# Essay-mode framing (topic vs draft)
 # ---------------------------------------------------------------------------
 #
 # The user can flag their input as either an essay TOPIC (write from scratch)
@@ -78,7 +78,7 @@ def format_word_target_block(word_target=None) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Essay-writing council personas (Phase 1)
+# Essay-writing council personas
 # ---------------------------------------------------------------------------
 #
 # Each council member runs Stage 1 with one of these persona prompts. They
