@@ -5,6 +5,38 @@ All notable changes to LLM Council Plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-11
+
+### Added
+- **Essay Coach product layer** built on top of the 3-stage council:
+  - Smart intake flow (`EssayFlow.jsx`): topic → 3–5 probing questions → 1-paragraph core-idea brief → voice anchor.
+  - Per-essay session state in `essay_sessions` (resumable across refresh).
+  - Durable essay memory in `essay_memory` (one row per completed essay, with feedback).
+- **Supabase auth**: email/password + Google OAuth + JWT refresh. Every user has their own conversations, voice rules, facts, and council config. Backend uses service-role key; RLS policies enforce per-user isolation.
+- **Voice profile**: per-user `voice_profiles` row holding rules, reference paragraphs, preferred authors, and an AI-rule review queue. Auto-seeded with ~28 anti-AI-tell **`DEFAULT_VOICE_RULES`** (no em-dashes, no rhetorical-colon noun phrases, no "delve," no false balance, etc.) on first read.
+- **Voice library**: read-only scaffold pool of example voices loaded from `voices/*.json`. The council borrows a random voice's rhythm per essay (deterministic per session id).
+- **User-fact memory** (`user_fact`): Gemini-Flash extractor reads every completed essay and pulls up to 8 categorized facts (biography / experience / belief / interest / achievement / relationship / reference / general). Facts are injected into every future stage 1 + stage 3 prompt.
+- **Interim questions**: while stages 1 and 2 run, the backend emits 1–3 short tailored questions about gaps the drafts hand-waved. Frontend renders them in a gold side panel (`InterimQuestions.jsx`); answers feed the chairman synthesis happening RIGHT NOW and accumulate as durable facts.
+- **Chairman clarification ask-back**: right before stage 3, a single Gemini-Flash call decides if one specific question pinned to a vague claim in the drafts would meaningfully improve the essay. If yes, the panel relights with a brighter gold variant and waits up to 25s for an answer.
+- **Memory summarization-on-overflow**: when the user's active facts exceed 8000 chars, the oldest half is folded into one `'summary'` fact (Gemini Flash) and the originals are archived (visible in the Memory panel, excluded from prompts).
+- **"What We Know" panel** (`Settings → What We Know`): facts grouped by category with per-row Forget button; summary rows visually distinct.
+- **Refinement chips + custom refinements**: post-essay dock with surgical, essay-specific suggestions. Custom refinements can be saved as durable voice rules via the review queue.
+- **SSE event types**: `interim_question`, `clarification_question` join the existing stage1/stage2/stage3 progress events.
+
+### Changed
+- **`load_voice_profile` seeds on first read** so every new user gets the default rules without any signup-time orchestration.
+- **`load_recent_user_facts` filters `archived_at IS NULL`** so archived rows stop participating in prompt construction (still queryable for the Memory panel).
+- **Stage 3 chairman prompt** now folds an `in_flight_qa_block` into `student_profile_block`. Existing custom prompt templates automatically pick this up — no new placeholder required.
+- **`/api/intake/answer`** records skipped questions in the run buffer too, so the chairman wait-loop short-circuits on a user skip instead of timing out.
+- **Voice rule editor** now uses an auto-growing `<textarea>` so long rules display fully (previous `<input>` truncated mid-rule).
+- **`Settings.jsx`** gains a 7th section: **What We Know**.
+
+### Fixed
+- Two stray tables from a prototype migration (`user_profiles`, `brainstorm_drafts`) referenced a non-existent `users(id)` instead of `auth.users(id)`. Migration 007 drops both safely.
+
+### Database
+- **Migration 007** (`007_fact_archive_and_cleanup.sql`): drops `user_profiles` + `brainstorm_drafts`; adds `user_fact.archived_at` + `superseded_by` (self-FK); adds `'summary'` source; active-only index.
+
 ## [0.2.2] - 2026-02-18
 
 ### Fixed

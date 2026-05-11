@@ -7,11 +7,19 @@ verification script to confirm everything is wired up.
 
 | File | What it does |
 | --- | --- |
-| `migrations/001_initial.sql` | Creates `voice_profiles`, `essay_memory`, `essay_sessions`, with indexes, `updated_at` triggers, and Row Level Security policies. |
-| `migrations/002_essay_extensions.sql` | Adds `word_target` + `council_config` to `essay_sessions`, and creates `user_council_config` (per-user default council) with RLS. |
+| `migrations/001_initial.sql` | Creates `voice_profiles`, `essay_memory`, `essay_sessions`, with indexes, `updated_at` triggers, and Row Level Security policies. All FKs to `auth.users(id)`. |
+| `migrations/002_essay_extensions.sql` | Adds `word_target` + `council_config` to `essay_sessions`; creates `user_council_config` (per-user default council) with RLS. |
 | `migrations/003_voice_library_and_review_queue.sql` | Creates `voice_library` (read-only voice scaffolding pool); adds `pending_suggestions` + `preferred_authors` to `voice_profiles`; adds `voice_library_id`, `audience`, `intake_questions`, `core_idea` to `essay_sessions`. After applying, run `uv run python -m backend.scripts.seed_voice_library` to populate `voice_library` from the `voices/` folder. |
+| `migrations/004_essay_memory_and_user_facts.sql` | Links `essay_sessions` ↔ conversation files via `conversation_id`; adds feedback columns to `essay_memory`; creates the `user_fact` table for durable per-user facts with RLS. |
+| `migrations/005_user_fact_categories.sql` | Adds `category` (biography / experience / belief / interest / achievement / relationship / reference / general) and `source_essay_id` FK to `user_fact`; relaxes source check to allow `'essay'`. |
+| `migrations/006_conversations.sql` | Creates the `conversations` table for per-user chat history JSONB with RLS. |
+| `migrations/007_fact_archive_and_cleanup.sql` | Drops stray `user_profiles` + `brainstorm_drafts` from a prototype migration (their FKs pointed at a non-existent `users(id)`); adds `user_fact.archived_at` + `superseded_by` (self-FK) for summarization-on-overflow; adds `'summary'` source; active-only index. |
 
 All migrations are idempotent: re-running them is safe.
+
+> **Never reference `users(id)`** — every table FKs to `auth.users(id)`. If you
+> see a migration referencing a bare `users(id)`, it came from a different
+> codebase and won't work here.
 
 ## Applying a migration (Supabase dashboard)
 

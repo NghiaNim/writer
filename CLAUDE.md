@@ -4,12 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LLM Council Plus is a 3-stage deliberation system where multiple LLMs collaboratively answer user questions through:
-1. **Stage 1**: Individual model responses (with optional web search context)
-2. **Stage 2**: Anonymous peer review/ranking to prevent bias
-3. **Stage 3**: Chairman synthesis of collective wisdom
+LLM Council Plus is a **multi-user Essay Coach** built on a 3-stage LLM council architecture. A user feeds in a topic (or a draft), four AI council personas write competing essays in parallel, anonymously rank each other, and a Chairman model synthesizes a final essay that respects the user's voice rules and known biographical facts.
 
-**Key Innovation**: Hybrid architecture supporting OpenRouter (cloud), Ollama (local), Groq (fast inference), direct provider connections, and custom OpenAI-compatible endpoints.
+**The 3-stage council loop:**
+1. **Stage 1**: Each council persona drafts the essay (with optional web search context, the user's voice rules, and the user's known facts)
+2. **Stage 2**: Anonymous peer review/ranking to prevent bias
+3. **Stage 3**: Chairman synthesis — applies voice rules, weaves in any interim Q&A, produces the final essay
+
+**On top of that loop, the coach adds:**
+- **Supabase Auth** (email/password + Google OAuth) — every user has their own profile, conversations, voice, and memory
+- **Smart intake** — before the council runs, a short Q&A flow distills the user's topic into a core-idea brief
+- **Voice profile** — every new user is seeded with ~28 anti-AI-tell writing rules they can edit; the Voice Guardian and Chairman are required to apply them
+- **User facts memory** — facts about the user (biography, beliefs, experiences) are extracted from every completed essay and from interim Q&A, deduped, archived when the corpus overflows, and re-injected into every future prompt
+- **Interim questions** — while stages 1 and 2 run (~30–90s of dead time), the backend asks 1–3 short questions about gaps the drafts hand-wave; answers feed the current chairman synthesis AND accumulate as durable facts
+- **Chairman clarification** — right before stage 3, the chairman gets one final chance to ask the user a question pinned to a specific vague claim in the drafts
+- **Voice library scaffold** — an invisible random voice anchor borrowed from a curated library of example voices to give each essay rhythmic spine
+
+**Key technical move**: hybrid provider architecture supports OpenRouter (cloud), Ollama (local), Groq (fast inference), direct providers (OpenAI/Anthropic/Google/Mistral/DeepSeek), and custom OpenAI-compatible endpoints.
 
 ## Running the Application
 
@@ -60,37 +71,62 @@ This fixes binary incompatibilities (e.g., `@rollup/rollup-darwin-*` variants).
 ### Backend (`backend/`)
 
 **Provider System** (`backend/providers/`)
-- **Base**: `base.py` - Abstract interface for all LLM providers
+- **Base**: `base.py` — Abstract interface for all LLM providers
 - **Implementations**: `openrouter.py`, `ollama.py`, `groq.py`, `openai.py`, `anthropic.py`, `google.py`, `mistral.py`, `deepseek.py`, `custom_openai.py`
-- **Auto-routing**: Model IDs with prefix (e.g., `openai:gpt-4.1`, `ollama:llama3`, `custom:model-name`) route to correct provider
-- **Routing logic**: `council.py:get_provider_for_model()` handles prefix parsing
+- **Auto-routing**: Model IDs with prefix (`openai:gpt-4.1`, `ollama:llama3`, `custom:model-name`, `google:gemini-2.5-flash`, …) route to the correct provider
+- **Routing logic**: `council.py:get_provider_for_model()` parses the prefix
 
-**Core Modules**
+**Core orchestration**
 
 | Module | Purpose |
 |--------|---------|
-| `council.py` | Orchestration: stage1/2/3 collection, rankings, title generation |
-| `search.py` | Web search: DuckDuckGo, Tavily, Brave with Jina Reader content fetch |
-| `settings.py` | Config management, persisted to `data/settings.json` |
-| `prompts.py` | Default system prompts for all stages |
-| `main.py` | FastAPI app with streaming SSE endpoint |
-| `storage.py` | Conversation persistence in `data/conversations/{id}.json` |
+| `council.py` | Stage 1 / 2 / 3 collection, rankings, title generation. Stage 3 now accepts `in_flight_qa_block` and folds it into `student_profile_block`. |
+| `main.py` | FastAPI app, SSE streaming endpoint (`/api/conversations/{id}/message/stream`), all intake/voice/memory/auth endpoints. |
+| `prompts.py` | Default system prompts for all stages plus templates for `essay_mode_block`, `word_target_block`. |
+| `search.py` | Web search: DuckDuckGo, Tavily, Brave + Jina Reader for full article fetch. |
+| `settings.py` | App-level config persisted to `data/settings.json` (provider keys, defaults). |
+| `storage.py` | Conversation persistence in `data/conversations/{id}.json` (per-user when authed). |
+
+**Auth + Supabase**
+
+| Module | Purpose |
+|--------|---------|
+| `auth.py` | Email/password signup + login, Google OAuth, JWT validation (`get_current_user` dependency), refresh-token rotation. |
+| `supabase_client.py` | Dual Supabase clients (service-role for backend writes; anon for safe selects). |
+| `sessions.py` | `/sessions/*` router: create/read/update `essay_sessions`, memory-check against prior topics. |
+
+**Essay coach surface**
+
+| Module | Purpose |
+|--------|---------|
+| `essay_memory.py` | Upsert one durable row per completed essay into `essay_memory`; feedback recording. |
+| `voice_profile.py` | Per-user `voice_profiles` CRUD, review queue (`pending_suggestions`), `format_voice_profile_block()`. **Holds `DEFAULT_VOICE_RULES` (~28 anti-AI-tell rules); seeds on first read.** |
+| `voice_library.py` | Read-only voice scaffold pool seeded from `voices/*.json`; `pick_random_voice()` deterministically seeded by `session_id`. |
+| `user_facts.py` | Per-user `user_fact` table with category + source. `load_recent_user_facts()` is the hot-path loader; `maybe_summarize_overflow()` folds the oldest active facts into one `'summary'` row when corpus > 8000 chars. Active vs archived split. |
+| `memory_extraction.py` | Gemini-Flash extractor that pulls categorized facts from completed essays and short interim Q&A snippets. Calls `maybe_summarize_overflow()` after every insert. |
+| `interim_questions.py` | Question generator for the in-flight Q&A (1–2 questions per batch, max 3 per run); chairman clarification generator; process-local answer buffer; `wait_for_answer()` poll helper; `format_in_flight_qa_block()` rendering. |
 
 ### Frontend (`frontend/src/`)
 
 | Component | Purpose |
 |-----------|---------|
-| `App.jsx` | Main orchestration, SSE streaming, conversation state |
-| `ChatInterface.jsx` | User input, web search toggle, execution mode |
-| `Stage1.jsx` | Tab view of individual model responses |
-| `Stage2.jsx` | Peer rankings with de-anonymization, aggregate scores |
-| `Stage3.jsx` | Chairman synthesis (final answer) |
-| `CouncilGrid.jsx` | Visual grid of council members with provider icons |
-| `Settings.jsx` | 5-section settings: LLM API Keys, Council Config, System Prompts, Search Providers, Backup & Reset |
-| `Sidebar.jsx` | Conversation list with inline delete confirmation |
-| `SearchableModelSelect.jsx` | Searchable dropdown for model selection |
+| `App.jsx` | Main orchestration, SSE streaming, conversation state. Handles `interim_question`, `clarification_question`, and `interim_question_answered` events. |
+| `contexts/AuthContext.jsx` | Supabase JWT lifecycle: restore from localStorage on mount, refresh tokens, sign-out. |
+| `components/Login.jsx` | Email/password + Google OAuth screen. |
+| `components/EssayFlow.jsx` | 4-step intake (topic → questions → core idea → voice). Bypassable via draft mode. |
+| `components/ChatInterface.jsx` | Main chat surface; renders `<EssayLoadingStatus>` + `<InterimQuestions>` during streaming, `<FinalEssay>` when stage 3 lands. |
+| `components/EssayLoadingStatus.jsx` | Terminal-style "the council is working" panel with stage label, progress counter, minimize, tip line about editing rules. |
+| `components/InterimQuestions.jsx` | Gold-accented side panel that surfaces interim questions one at a time. Renders chairman clarifications with `interim-questions--chairman` variant. Includes "Here's what the council heard" bullets. |
+| `components/FinalEssay.jsx` | Final essay block with regenerate button and council-notes toggle. |
+| `components/Stage1.jsx` / `Stage2.jsx` / `Stage3.jsx` | Legacy stage inspectors (shown only for chat_only / chat_ranking modes). |
+| `components/CouncilGrid.jsx` / `CouncilChips.jsx` | Visual grid + persona-chip row of council members with provider icons. |
+| `components/Sidebar.jsx` | Conversation list (per-user). |
+| `components/Settings.jsx` | 7-section settings: Council, System Prompts, **My Voice**, **What We Know** (new), Search Providers, Backup & Reset, plus the LLM API Keys section (hosted-mode hidden). |
+| `components/settings/VoiceProfileSettings.jsx` | Edit voice rules (auto-grow textareas so long rules display fully), reference paragraphs, preferred authors, review queue. |
+| `components/settings/MemorySettings.jsx` | "What We Know" — facts grouped by category with per-row Forget button; summary rows visually distinct. |
+| `components/SearchableModelSelect.jsx` | Searchable dropdown for model selection. |
 
-**Styling**: "Council Chamber" dark theme (refined Midnight Glass). CSS variables in `index.css` (`--font-display`: Syne, `--font-ui`: Plus Jakarta Sans, `--font-content`: Source Serif 4, `--font-code`: JetBrains Mono). Primary accent blue (#3b82f6), chairman gold (#fbbf24). Staggered hero/card animations; glass panels with backdrop-filter.
+**Styling**: "Council Chamber" dark theme (refined Midnight Glass). CSS variables in `index.css` (`--font-display`: Syne, `--font-ui`: Plus Jakarta Sans, `--font-content`: Source Serif 4, `--font-code`: JetBrains Mono). Primary accent blue (#3b82f6), chairman gold (#fbbf24). InterimQuestions panel uses chairman-gold accents; chairman-variant adds a thicker border + inner glow.
 
 ## Critical Implementation Details
 
@@ -177,6 +213,75 @@ useEffect(() => {
 }, [responses.length]);
 ```
 
+### Auth + Supabase
+
+- **Auth provider**: Supabase (email/password + Google OAuth). JWT issued by Supabase; access + refresh tokens stored in `localStorage` under key `llm_council_session` by `AuthContext.jsx`.
+- **Backend**: every protected endpoint depends on `get_current_user` (`backend/auth.py:111`), which validates the JWT and returns an `AuthUser{id, email}`. The FastAPI app uses the Supabase **service-role** key to bypass RLS and always scopes queries by `user_id` in app code.
+- **Env vars required**: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`. See `backend/supabase_client.py` and `backend/auth.py`.
+- **Migrations**: every essay/voice/memory table FKs to `auth.users(id)` (NOT a local `users` table). RLS policies are belt-and-suspenders against the anon key. See `supabase/migrations/`.
+
+### Essay flow + interim questions
+
+The streaming endpoint (`POST /api/conversations/{id}/message/stream`) yields these SSE event types in order:
+
+```
+search_start → search_complete | search_error       (if web_search=true; either-or)
+stage1_start → stage1_init → stage1_progress(×N) → stage1_complete
+interim_question(×0–2)                              (chat_ranking / full only)
+stage2_start → stage2_init → stage2_progress(×N) → stage2_complete
+interim_question(×0–1)                              (full only, if budget remains)
+clarification_question(×0–1)                        (full only, chairman pre-pass)
+stage3_start → stage3_complete                      (full only)
+title_complete                                       (first message in conversation)
+run_finished                                         (always, just before complete/error)
+complete | error                                     (terminal)
+```
+
+**`search_error`** is emitted when `perform_web_search` returns the failure placeholder (or raises). The run continues with empty `search_context` — Stage 1 prompts get no web grounding, but the user sees a banner in the assistant message. Frontend persists `metadata.search_error = { provider, message }` on the message.
+
+**`run_finished`** fires immediately before `complete` (or before `error`) so the frontend can lock interim-question inputs. Any late `/api/intake/answer` POST still persists to `user_fact` (good for the next essay) but cannot land in the just-finished chairman synthesis.
+
+**Budget**: `interim_questions.MAX_QUESTIONS_PER_RUN = 3`, `MAX_QUESTIONS_PER_BATCH = 2`. The chairman clarification is **in addition** to that budget — it's the chairman's voice, not the interim coach's.
+
+**Answer flow**: the client POSTs to `/api/intake/answer` with `{conversation_id, question_id, question, answer, skipped, session_id}`. The endpoint:
+1. Always appends to a **process-local run buffer** in `interim_questions._run_buffers[conversation_id]` (skips are recorded with `skipped=True, answer=""` so `wait_for_answer` can short-circuit).
+2. If `session_id` is present, persists the Q&A onto `essay_sessions.conversation` JSONB for audit and restart safety.
+3. Fires `extract_and_store(source="intake", min_chars=40)` so durable facts accumulate in `user_fact` for future essays.
+
+**In-flight injection**: at stage 3, `format_in_flight_qa_block(get_run_buffer(conversation_id))` renders submitted answers into a block that's appended to `student_profile_block`. Existing custom prompt templates pick it up automatically without a new placeholder.
+
+**Chairman clarification**: `generate_chairman_clarification()` is a single Gemini-Flash call seeded by drafts + facts + already-asked. It quotes a specific vague phrase from the drafts and asks one question, or returns `SKIP`. After emitting the SSE event, `wait_for_answer(timeout_s=25)` polls the buffer until the entry appears (answer or skip) or the timeout elapses. Frontend renders it with `chairmanAsk: true` and the `interim-questions--chairman` CSS variant.
+
+### Memory + voice rules
+
+**Voice rules** (`backend/voice_profile.py`):
+- `DEFAULT_VOICE_RULES` is a ~28-rule list covering punctuation, sentence structures, vocabulary, structural patterns, tone, and positive rules (the anti-"AI tells" baseline).
+- `load_voice_profile()` **seeds on first read**: if no row exists for the user + essay_type, inserts one preloaded with the defaults and returns it. From that moment the row is theirs to edit — emptying the rules list later does **not** reseed.
+- Defaults are also exposed at `GET /api/voice-profile/defaults` for a "restore defaults" UI.
+- Rule editor in `VoiceProfileSettings.jsx` uses `<AutoGrowTextarea>` so long rules display fully (don't regress this back to `<input>`).
+
+**User facts** (`backend/user_facts.py`):
+- One `user_fact` row per durable fact, with `category` (biography / experience / belief / interest / achievement / relationship / reference / general) and `source` (manual / intake / chat / feedback / essay / summary).
+- **Active vs archived**: `load_recent_user_facts` filters `archived_at IS NULL`. Archived rows stay in the table so the user can see history in the Memory panel.
+- **Summarization on overflow**: `maybe_summarize_overflow()` runs after every `extract_and_store`. When active facts exceed `PROFILE_BLOCK_BUDGET_CHARS = 8000`, it folds the oldest half into one `'summary'` fact (Gemini Flash), inserts it, then marks the originals as `archived_at + superseded_by`. Idempotent and safe to call frequently.
+- **Dedupe**: case- and punctuation-insensitive normalization, scanning the user's most recent 200 **active** rows.
+
+**Prompt injection**: both stage 1 and stage 3 call `format_student_profile_block(facts)` which groups facts by category and emits a section like `FACTS THE USER HAS SHARED ABOUT THEMSELVES: …`. The block is rendered into `{student_profile_block}` in every persona template that references it.
+
+### Database schema (migrations)
+
+| File | What it adds |
+| --- | --- |
+| `001_initial.sql` | `voice_profiles`, `essay_memory`, `essay_sessions` with RLS + `updated_at` triggers. All FK to `auth.users(id)`. |
+| `002_essay_extensions.sql` | `essay_sessions.word_target` + `council_config`; new `user_council_config` (per-user default council). |
+| `003_voice_library_and_review_queue.sql` | `voice_library` read-only pool; `essay_sessions.voice_library_id`; `voice_profiles.pending_suggestions` (review queue) + `preferred_authors`. |
+| `004_essay_memory_and_user_facts.sql` | Links `essay_sessions ↔ conversations`; adds feedback columns to `essay_memory`; creates `user_fact` with category enum. |
+| `005_user_fact_categories.sql` | Adds category check (biography / experience / belief / …), `source_essay_id` FK, relevant indexes. |
+| `006_conversations.sql` | `conversations` table for per-user chat history JSONB. |
+| `007_fact_archive_and_cleanup.sql` | Drops stray `user_profiles` + `brainstorm_drafts`; adds `user_fact.archived_at` + `superseded_by` (self-FK); adds `'summary'` source; active-only index. |
+
+**Always FK to `auth.users(id)`**, never a local `users` table. If you see SQL referencing `users(id)` you have a foreign migration that doesn't fit this codebase — drop it before applying.
+
 ## Common Gotchas
 
 1. **Port Conflicts**: Backend uses 8001 (not 8000). Update `backend/main.py` and `frontend/src/api.js` together.
@@ -197,22 +302,37 @@ useEffect(() => {
 
 9. **Custom Endpoint Icons**: Models from custom endpoints may match name patterns (e.g., "claude"). Check `custom:` prefix first.
 
+10. **Settings endpoints are global + auth-gated**: All `/api/settings*`, `/api/models*`, `/api/ollama/tags`, `/api/custom-endpoint/models` now require `Depends(get_current_user)`. The storage is still `data/settings.json` (process-global) — any authed user can mutate prompts/council models for everyone. Migrating to per-user settings is open work.
+
 ## Data Flow
 
 ```
-User Query (+ optional web search)
+EssayFlow (topic → intake Q&A → core idea → voice) → essay_sessions row
     ↓
-[Web Search: DuckDuckGo/Tavily/Brave + Jina Reader]
+POST /api/conversations/{id}/message/stream  (auth-required, SSE)
     ↓
-Stage 1: Parallel queries → Stream individual responses
+[Web Search: DuckDuckGo / Tavily / Brave + Jina Reader]  (optional)
+    ↓
+Stage 1: 4 personas draft in parallel  → stage1_progress(×N)
+   prompt = persona + voice_profile_block + student_profile_block
+          + library_voice_block + essay_mode_block + word_target_block
+    ↓
+[interim_question(×0–2)]  ←→  user POSTs to /api/intake/answer
     ↓
 Stage 2: Anonymize → Parallel peer rankings → Parse rankings
     ↓
-Calculate aggregate rankings
+[interim_question(×0–1)]  ←→  user answers
     ↓
-Stage 3: Chairman synthesis → Stream final answer
+[clarification_question(×0–1) — chairman pre-pass; wait up to 25s]
     ↓
-Save conversation (stage1, stage2, stage3 only)
+Stage 3: Chairman synthesizes
+   prompt includes in_flight_qa_block folded into student_profile_block
+    ↓
+Persist:
+   - conversations/{id}.json  (stage1, stage2, stage3, metadata)
+   - essay_memory  (one durable row per completed essay)
+   - user_fact  (fire-and-forget extraction via memory_extraction)
+     → maybe_summarize_overflow() folds oldest half if corpus > 8000 chars
 ```
 
 ## Execution Modes
@@ -248,11 +368,13 @@ curl https://your-endpoint.com/v1/models -H "Authorization: Bearer $API_KEY"
 ## Settings
 
 **UI Sections** (sidebar navigation):
-1. **LLM API Keys**: OpenRouter, Groq, Ollama, Direct providers, Custom endpoint
-2. **Council Config**: Model selection with Remote/Local toggles, temperature controls, "I'm Feeling Lucky" randomizer
-3. **System Prompts**: Stage 1/2/3 prompts with reset-to-default
-4. **Search Providers**: DuckDuckGo, Tavily, Brave + Jina full content settings
-5. **Backup & Reset**: Import/Export config, reset to defaults
+1. **Council**: Per-user council config — 4 persona slots + chairman + per-persona temperature; "I'm Feeling Lucky" randomizer. Persisted to `user_council_config` table.
+2. **System Prompts**: Stage 1/2/3 prompts with reset-to-default (kept in `data/settings.json` — global, not per-user).
+3. **My Voice**: User voice rules (auto-grow textareas, seeded with `DEFAULT_VOICE_RULES`), reference paragraphs, preferred authors, AI-suggested rules review queue. Persisted to `voice_profiles` table.
+4. **What We Know**: Read view of every active `user_fact` grouped by category with per-row Forget button. Summary rows (`source='summary'`) are visually distinct.
+5. **Search Providers**: DuckDuckGo, Tavily, Brave + Jina full-content settings.
+6. **Backup & Reset**: Import/Export config, reset to defaults.
+7. **LLM API Keys** (hidden in hosted mode): only used in self-hosted dev where keys live in `data/settings.json` instead of env vars.
 
 **Auto-Save Behavior**:
 - **Credentials auto-save**: API keys and URLs save immediately on successful test

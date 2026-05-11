@@ -2,7 +2,7 @@
 
 ![LLM Council Plus](header.png)
 
-> **Collective AI Intelligence** — Instead of asking one LLM, convene a council of AI models that deliberate, peer-review, and synthesize the best answer.
+> **An AI essay coach built on a council of models.** Four AI personas draft your essay in parallel, anonymously rank each other, and a Chairman synthesizes a final draft that respects your voice rules and known biographical facts. While the council drafts, the coach asks you short questions to ground vague claims in real specifics.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://reactjs.org/)
@@ -13,13 +13,14 @@
 
 ## What is LLM Council Plus?
 
-Instead of asking a single LLM (like ChatGPT or Claude) for an answer, **LLM Council Plus** assembles a council of multiple AI models that:
+**LLM Council Plus** is a multi-user **essay coach** built on a 3-stage LLM council architecture. You give it a topic (or a draft); four AI personas — the Architect, the Editor, the Devil's Advocate, the Voice Guardian — each write a full essay; they anonymously rank each other; a Chairman synthesizes the final.
 
-1. **Independently answer** your question (Stage 1)
-2. **Anonymously peer-review** each other's responses (Stage 2)
-3. **Synthesize a final answer** through a Chairman model (Stage 3)
+What makes it more than a model bundle:
 
-The result? More balanced, accurate, and thoroughly vetted responses that leverage the collective intelligence of multiple AI models.
+- **Persistent memory of you.** Every essay extracts durable facts about the writer (biography, beliefs, experiences). They're injected into every future prompt so essays stay grounded in your actual life. Old facts are folded into a compact summary when they overflow the prompt budget; originals are kept in your "What We Know" panel.
+- **Anti-AI-tell voice rules.** Every new user starts with ~28 default rules (no em-dashes, no "delve," no rhetorical-colon noun phrases, no false balance, etc.). All rules are editable; the Voice Guardian and Chairman are required to apply every rule.
+- **Interim coaching while we draft.** Stage 1 + Stage 2 takes ~60–90 seconds. The coach uses that time to ask 1–3 short questions about gaps the drafts hand-waved. Your answers feed the chairman synthesis happening right now AND accumulate as durable facts.
+- **Chairman clarification.** Right before the final synthesis, the chairman gets one chance to ask you to ground a specific vague claim from the drafts. If everything's already specific, it stays quiet.
 
 <p align="center">
   <div align="center">
@@ -94,6 +95,62 @@ Then open **http://localhost:5173** and configure your API keys in Settings.
 │                      FINAL ANSWER                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Essay Coach Features
+
+### Smart intake → council → final essay
+
+```
+TOPIC (or draft)
+   │
+   ▼
+INTAKE: 3–5 short Q&A → 1-paragraph core-idea brief
+   │
+   ▼
+COUNCIL (parallel drafts by 4 personas)
+   │  ◄── interim_question(×0–2)   "We need one specific moment to ground this."
+   ▼
+PEER RANKINGS (anonymized)
+   │  ◄── interim_question(×0–1)   "Last quick ask before stage 3."
+   ▼
+CHAIRMAN CLARIFICATION (×0–1)      "About to write your final essay. Confirm one thing."
+   │
+   ▼
+CHAIRMAN SYNTHESIS                 (applies voice rules; folds in your answers)
+   │
+   ▼
+FINAL ESSAY + Refinement chips
+```
+
+Every completed essay also extracts categorized facts about you and stores them in your private memory (`user_fact` table). The next essay starts with that memory pre-loaded.
+
+### Voice rules (anti-AI-tell baseline)
+
+Every new user is seeded with ~28 default rules — editable from **Settings → My Voice**. The baseline covers:
+
+| Category | Examples |
+|---|---|
+| Punctuation | No em-dashes; no rhetorical colon ("The takeaway: …"); semicolons sparingly. |
+| Sentence structures | No "It's not X. It's Y." flip; no default tricolons; no "It's worth noting that…" preambles; no "From X to Y" sweeps. |
+| Vocabulary | Avoid *delve, navigate, leverage, robust, seamless, holistic, tapestry, journey, foster, pivotal, crucial, paramount*; avoid "in today's fast-paced world," "at the heart of," "speaks volumes." |
+| Structure | Don't end every paragraph with a summary; don't open with a question-then-answer; don't begin with a sweeping universal claim; vary paragraph length. |
+| Tone | No false balance; no throat-clearing about complexity; no warm-but-empty closer; specifics over abstractions. |
+| Positive moves | Concrete nouns and verbs; uneven sentence lengths; name specific people / numbers / works; let the essay have an argument with a stake. |
+
+The Voice Guardian (Stage 1) and the Chairman (Stage 3) are required to apply every active rule. The user's rules override stylistic preferences of any individual model.
+
+### Memory: "What We Know"
+
+A dedicated **Settings → What We Know** panel shows every active fact the council has remembered about you, grouped by category (Biography / Experiences / Beliefs / Interests / Achievements / Relationships / Writers admired / Other). Each row has a **Forget** button. When the memory corpus exceeds the prompt budget, the oldest half is folded into a single summary row — visually distinct — but the originals stay visible in the panel.
+
+### Multi-user, hosted-ready
+
+- **Supabase auth** (email/password + Google OAuth) — every user has their own conversations, voice rules, facts, council config.
+- **Row-Level Security** on every table, scoped to `auth.users(id)`.
+- The backend uses the service-role key and scopes every query by the JWT-validated user id.
+- Self-hosted dev mode keeps the legacy `data/settings.json` config for solo use.
 
 ---
 
@@ -370,8 +427,14 @@ Connect to any OpenAI-compatible API:
 
 ## Data Storage
 
-All data is stored locally in the `data/` directory:
+Two modes, depending on how the app is deployed:
 
+**Hosted mode (Supabase auth on):**
+- `voice_profiles`, `essay_sessions`, `essay_memory`, `user_fact`, `conversations`, `user_council_config`, `voice_library` — all in Supabase, RLS-protected per user, FK'd to `auth.users(id)`.
+- Provider API keys live in env vars on the server, never in the browser.
+- `data/conversations/{user_id}/{conversation_id}.json` for the streaming chat surface.
+
+**Self-hosted dev mode (no Supabase):**
 ```
 data/
 ├── settings.json          # Your configuration (includes API keys)
@@ -380,7 +443,7 @@ data/
     └── ...
 ```
 
-**Privacy**: No data is sent to external servers except API calls to your configured LLM providers.
+**Privacy**: No data is sent to external servers except API calls to your configured LLM providers (and Supabase, when auth is enabled).
 
 > **⚠️ Security Warning: API Keys Stored in Plain Text**
 >

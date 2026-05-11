@@ -1,5 +1,21 @@
 # Gemini Interaction & Project Context
 
+> **Historical note (2026-05-11):** this document captures the project as it
+> stood in November 2025, when it was still a single-user local council app.
+> The project has since evolved into a multi-user **Essay Coach** with
+> Supabase auth, persistent voice rules, durable user-fact memory, interim
+> questions during drafting, and a chairman clarification step. For the
+> current architecture see:
+> - `CLAUDE.md` — full architecture + critical implementation details
+> - `README.md` — product overview
+> - `QUICKSTART.md` — setup (hosted vs self-hosted dev mode)
+> - `supabase/README.md` — schema migrations
+> - `CHANGELOG.md` — what changed and when
+>
+> Kept below for historical context only.
+
+---
+
 **Date:** November 27, 2025
 **Project:** LLM Council with Search (Hybrid OpenRouter + Ollama)
 
