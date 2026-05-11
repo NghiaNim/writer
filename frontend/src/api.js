@@ -758,6 +758,24 @@ export const api = {
       }
       return response.json();
     },
+    async answer({ conversationId, questionId, question, answer = '', sessionId = null, skipped = false }) {
+      const response = await authedFetch(`${API_BASE}/api/intake/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          question_id: questionId,
+          question,
+          answer,
+          session_id: sessionId,
+          skipped,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to record answer'));
+      }
+      return response.json();
+    },
     async coreIdea({ topic, audience = '', qa = [], essayType = 'general', sessionId = null }) {
       const response = await authedFetch(`${API_BASE}/api/intake/core-idea`, {
         method: 'POST',
