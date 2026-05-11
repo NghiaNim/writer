@@ -8,6 +8,7 @@ import Stage3, { Stage3Skeleton } from './Stage3';
 import CouncilGrid from './CouncilGrid';
 import CouncilChips from './CouncilChips';
 import EssayLoadingStatus from './EssayLoadingStatus';
+import InterimQuestions from './InterimQuestions';
 import FinalEssay from './FinalEssay';
 import { api } from '../api';
 import MicButton from './common/MicButton';
@@ -139,6 +140,7 @@ export default function ChatInterface({
     onSendMessage,
     onAbort,
     onRegenerate,
+    onAnswerInterim,
     isLoading,
     councilConfigured,
     onOpenSettings,
@@ -538,6 +540,7 @@ export default function ChatInterface({
                                         chairmanModel={chairmanModel}
                                         isLoading={isLoading}
                                         onRegenerate={onRegenerate}
+                                        onAnswerInterim={onAnswerInterim}
                                         activeCouncil={activeCouncil}
                                         activeWordTarget={activeWordTarget}
                                         essayVersionLabel={versionLabelForAssistant}
@@ -1110,6 +1113,7 @@ function AssistantMessageBody({
     chairmanModel,
     isLoading,
     onRegenerate,
+    onAnswerInterim,
     activeCouncil = null,
     activeWordTarget = null,
     essayVersionLabel = null,
@@ -1161,6 +1165,15 @@ function AssistantMessageBody({
 
         return (
             <>
+                {msg.metadata?.search_error && (
+                    <div className="search-warning" role="status">
+                        <span className="search-warning__icon" aria-hidden="true">⚠️</span>
+                        <span>
+                            {msg.metadata.search_error.message ||
+                                'Web search failed — council ran without web context.'}
+                        </span>
+                    </div>
+                )}
                 {msg.metadata?.search_context && (
                     <SearchContext
                         searchQuery={msg.metadata?.search_query}
@@ -1183,6 +1196,21 @@ function AssistantMessageBody({
                     <EssayLoadingStatus
                         loading={msg.loading}
                         progress={msg.progress}
+                    />
+                )}
+
+                {/* Stay visible while streaming, or briefly after the run
+                    finishes if the user still has unanswered questions —
+                    surfaces the "saved for next time" lock state instead of
+                    silently disappearing. */}
+                {((isStreaming && !msg.stage3) ||
+                    (msg.runFinished && msg.interimQuestions?.some((q) => q.status === 'pending'))) &&
+                    (msg.interimQuestions?.length > 0) && (
+                    <InterimQuestions
+                        questions={msg.interimQuestions}
+                        onAnswer={onAnswerInterim}
+                        runFinished={Boolean(msg.runFinished)}
+                        runFinishedReason={msg.runFinishedReason}
                     />
                 )}
 
@@ -1246,6 +1274,15 @@ function AssistantMessageBody({
                 </div>
             )}
 
+            {msg.metadata?.search_error && (
+                <div className="search-warning" role="status">
+                    <span className="search-warning__icon" aria-hidden="true">⚠️</span>
+                    <span>
+                        {msg.metadata.search_error.message ||
+                            'Web search failed — council ran without web context.'}
+                    </span>
+                </div>
+            )}
             {msg.metadata?.search_context && (
                 <SearchContext
                     searchQuery={msg.metadata?.search_query}
