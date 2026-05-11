@@ -6,6 +6,7 @@ import UserCouncilConfig from './CouncilConfig';
 import SearchSettings from './settings/SearchSettings';
 import PromptSettings from './settings/PromptSettings';
 import VoiceProfileSettings from './settings/VoiceProfileSettings';
+import MemorySettings from './settings/MemorySettings';
 import './Settings.css';
 
 
@@ -1495,6 +1496,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               My Voice
             </button>
             <button
+              className={`sidebar-nav-item ${activeSection === 'memory' ? 'active' : ''}`}
+              onClick={() => setActiveSection('memory')}
+            >
+              What We Know
+            </button>
+            <button
               className={`sidebar-nav-item ${activeSection === 'search' ? 'active' : ''}`}
               onClick={() => setActiveSection('search')}
             >
@@ -1598,6 +1605,11 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
             {/* MY VOICE (Phase 2: voice profile) */}
             {activeSection === 'voice' && (
               <VoiceProfileSettings />
+            )}
+
+            {/* WHAT WE KNOW — user_fact memory viewer with delete */}
+            {activeSection === 'memory' && (
+              <MemorySettings />
             )}
 
             {/* SEARCH PROVIDERS (New Section) */}
