@@ -1017,6 +1017,7 @@ async def send_message_stream(
                 user_id=user.id,
                 library_voice=library_voice,
                 in_flight_qa_block=in_flight_block,
+                spine_index=spine_index,
             )
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 

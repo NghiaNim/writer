@@ -834,45 +834,51 @@ async def stage3_synthesize_final(
     essay_type: str = "general",
     library_voice: Optional[Dict[str, Any]] = None,
     in_flight_qa_block: str = "",
+    spine_index: int = 0,
 ) -> Dict[str, Any]:
     """
-    Stage 3: Chairman synthesizes final response.
+    Stage 3 (revision, not synthesis). The chairman REVISES the spine
+    draft picked in pick_strongest_draft() using the consolidated
+    critiques from stage2_collect_critiques(). This is a directed
+    revision task — much easier and more reliable than fusing 4 full
+    essays into 1 from scratch.
 
     Args:
-        user_query: The original user query
-        stage1_results: Individual model responses from Stage 1
-        stage2_results: Rankings from Stage 2
-        essay_mode: 'topic' or 'draft' — controls whether the chairman
-            writes from scratch or refines the user's draft.
-        chairman_model_override: per-call chairman model; if None, uses
-            settings.chairman_model.
-        word_target: optional length target rendered into {word_target_block}.
-
-    Returns:
-        Dict with 'model' and 'response' keys
+        spine_index: which Stage 1 result is the spine. Defaults to 0
+            if not provided (legacy callers).
     """
     settings = get_settings()
+    from .prompts import STAGE3_REVISION_PROMPT_DEFAULT
 
-    # Build comprehensive context for chairman (only include successful responses)
-    stage1_text = "\n\n".join([
-        f"Model: {result['model']}\nResponse: {result.get('response', 'No response')}"
-        for result in stage1_results
-        if result.get('response') is not None
-    ])
+    # Pick the spine. Fall back to the first successful Stage 1 result if
+    # the requested index is out of bounds or failed.
+    successful_drafts = [r for r in stage1_results if not r.get("error") and r.get("response")]
+    if not successful_drafts:
+        return {
+            "model": chairman_model_override or get_chairman_model(),
+            "response": "Error: no Stage 1 drafts succeeded.",
+            "error": True,
+            "error_message": "no successful drafts",
+        }
 
-    stage2_text = "\n\n".join([
-        f"Model: {result['model']}\nRanking: {result.get('ranking', 'No ranking')}"
-        for result in stage2_results
-        if result.get('ranking') is not None
-    ])
+    if 0 <= spine_index < len(stage1_results) and stage1_results[spine_index].get("response"):
+        spine = stage1_results[spine_index]
+    else:
+        spine = successful_drafts[0]
+    spine_text = (spine.get("response") or "").strip()
+
+    # Consolidated critique text from Stage 2 (CUT / SHARPEN / KEEP / BORROW).
+    critiques_text = "\n\n---\n\n".join(
+        f"FROM {r.get('persona') or r.get('model') or 'critic'}:\n{(r.get('critique') or '').strip()}"
+        for r in stage2_results
+        if not r.get("error") and r.get("critique")
+    ) or "(no critiques succeeded — revise the spine using your own judgment)"
 
     search_context_block = ""
     if search_context:
         search_context_block = f"Context from Web Search:\n{search_context}\n"
 
-    # Render the user's voice profile so the Chairman applies every rule
-    # before returning the final essay. Loaded per-user from Supabase.
-    # Empty string when no profile is configured.
+    # User voice profile.
     profile: Optional[VoiceProfile] = None
     if user_id:
         try:
@@ -886,35 +892,28 @@ async def stage3_synthesize_final(
     fact_rows = load_recent_user_facts(user_id) if user_id else []
     student_profile_block = format_student_profile_block(fact_rows)
 
-    # Fold any answers the user gave to interim questions during stages 1-2
-    # into the same block so existing custom prompt templates automatically
-    # pick them up via {student_profile_block}.
+    # Fold any interim Q&A answers into student_profile_block so the
+    # revision prompt picks them up automatically.
     if in_flight_qa_block and in_flight_qa_block.strip():
         student_profile_block = (
             (student_profile_block + "\n\n") if student_profile_block else ""
         ) + in_flight_qa_block.strip()
 
-    # Library voice scaffolding (invisible to user).
     library_voice_block = format_library_voice_block(library_voice)
-
-    # Tell the Chairman whether this is topic-mode (write fresh) or
-    # draft-mode (refine the user's draft).
     essay_mode_block = format_essay_mode_block(essay_mode)
-
-    # Optional word target.
     word_target_block = format_word_target_block(word_target)
 
+    # The user-customizable stage3_prompt now expects revision-style fields
+    # (spine_text + critiques_text). If the user previously customized the
+    # stage 3 prompt, it may use the OLD fields (stage1_text, stage2_text)
+    # and fail to format. Fall back to the default revision prompt in that
+    # case so the run still completes.
+    prompt_template = settings.stage3_prompt or STAGE3_REVISION_PROMPT_DEFAULT
     try:
-        # Ensure prompt is not None
-        prompt_template = settings.stage3_prompt
-        if not prompt_template:
-            from .prompts import STAGE3_PROMPT_DEFAULT
-            prompt_template = STAGE3_PROMPT_DEFAULT
-
         chairman_prompt = prompt_template.format(
             user_query=user_query,
-            stage1_text=stage1_text,
-            stage2_text=stage2_text,
+            spine_text=spine_text,
+            critiques_text=critiques_text,
             search_context_block=search_context_block,
             voice_profile_block=voice_profile_block,
             student_profile_block=student_profile_block,
@@ -923,31 +922,49 @@ async def stage3_synthesize_final(
             word_target_block=word_target_block,
         )
     except (KeyError, AttributeError, TypeError) as e:
-        logger.warning(f"Error formatting Stage 3 prompt: {e}. Using fallback.")
-        chairman_prompt = f"Question: {user_query}\n\nSynthesis required."
+        logger.warning(
+            f"Stage 3 prompt format failed (likely an old custom prompt using "
+            f"stage1_text/stage2_text): {e}. Falling back to default revision prompt."
+        )
+        try:
+            chairman_prompt = STAGE3_REVISION_PROMPT_DEFAULT.format(
+                user_query=user_query,
+                spine_text=spine_text,
+                critiques_text=critiques_text,
+                search_context_block=search_context_block,
+                voice_profile_block=voice_profile_block,
+                student_profile_block=student_profile_block,
+                library_voice_block=library_voice_block,
+                essay_mode_block=essay_mode_block,
+                word_target_block=word_target_block,
+            )
+        except Exception:
+            chairman_prompt = (
+                f"Revise this essay using the critique notes:\n\n"
+                f"SPINE:\n{spine_text}\n\nCRITIQUES:\n{critiques_text}"
+            )
 
-    # Determine message structure based on whether the prompt is default or custom
-    from .prompts import STAGE3_PROMPT_DEFAULT
-    
-    # Check if we are using the default prompt (or if it's empty/None, which falls back to default)
-    is_default_prompt = (not settings.stage3_prompt) or (settings.stage3_prompt.strip() == STAGE3_PROMPT_DEFAULT.strip())
+    is_default_prompt = (
+        not settings.stage3_prompt
+        or settings.stage3_prompt.strip() == STAGE3_REVISION_PROMPT_DEFAULT.strip()
+    )
 
     if is_default_prompt:
-        # If using default, split into System (Persona) and User (Data) for better adherence at low temp
         messages = [
             {
                 "role": "system",
                 "content": (
                     "You are the Chairman of an essay-writing council. "
-                    "Synthesize the council members' draft essays into a single polished final essay. "
-                    "If the user has provided a voice profile, apply every rule before returning the essay; "
-                    "the user's voice rules override the stylistic preferences of any individual council member."
+                    "Revise the spine draft below using the council's critique "
+                    "notes. You are improving an existing essay, not synthesizing "
+                    "from scratch. Apply every CUT, SHARPEN, KEEP, and BORROW "
+                    "directive. If the user has provided a voice profile, every "
+                    "rule in it overrides your stylistic preferences."
                 ),
             },
             {"role": "user", "content": chairman_prompt},
         ]
     else:
-        # If custom prompt, send as single User message to respect user's custom persona/structure
         messages = [{"role": "user", "content": chairman_prompt}]
 
     # Query the chairman model with error handling. Per-call override beats

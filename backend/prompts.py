@@ -361,80 +361,13 @@ In draft mode: the user's original draft IS the spine. Improve it using the crit
 Output only the revised essay. No preface, no "Here is the revision", no section headers."""
 
 
-STAGE2_PROMPT_DEFAULT = """You are evaluating different draft essays written in response to the same topic or rough draft.
-
-Topic / draft from user: {user_query}
-
-{search_context_block}
-Here are the essays from different council members (anonymized):
-
-{responses_text}
-
-Your task:
-1. First, evaluate each essay individually. For each one, explain what it does well (structure, prose, argument, voice) and what it does poorly.
-2. Then, at the very end of your response, provide a final ranking from best to worst.
-
-IMPORTANT: Your final ranking MUST be formatted EXACTLY as follows:
-- Start with the line "FINAL RANKING:" (all caps, with colon)
-- Then list the responses from best to worst as a numbered list
-- Each line should be: number, period, space, then ONLY the response label (e.g., "1. Response A")
-- Do not add any other text or explanations in the ranking section
-
-Example of the correct format for your ENTIRE response:
-
-Response A has the strongest thesis but loose middle paragraphs...
-Response B is well-paced but leans on cliches...
-Response C is the leanest and most human...
-
-FINAL RANKING:
-1. Response C
-2. Response A
-3. Response B
-
-Now provide your evaluation and ranking:"""
-
-STAGE3_PROMPT_DEFAULT = """You are the Chairman of an essay-writing council. Multiple council members have each produced a draft essay in response to the user, and then ranked each other's drafts.
-
-Original topic or draft from user: {user_query}
-
-{essay_mode_block}
-
-{word_target_block}
-
-{search_context_block}
-STAGE 1 - Individual draft essays:
-{stage1_text}
-
-STAGE 2 - Peer rankings and critiques:
-{stage2_text}
-
-{voice_profile_block}
-{student_profile_block}
-{library_voice_block}
-YOUR JOB — CHOOSE, DO NOT BLEND.
-
-Pick the highest-ranked draft (by aggregate peer position) as your SPINE and rebuild from it. You are choosing, not averaging. Only borrow from the other drafts where they out-execute the spine on a specific sentence, image, move, or argumentative beat — and when you do, take the SHARPER version, not the safer one.
-
-Why this matters: synthesis tends to average. Average essays are smooth, competent, and forgettable. The bold sentence one draft risked is the sentence that makes the essay memorable. If the spine made a risky move and the peer reviewers respected it, keep the move. Do not soften it for "balance." Do not split the difference between a sharp draft and a safe one — pick the sharp one.
-
-Then, in this order:
-- Apply the cuts the peer reviewers actually identified (not generic tightening).
-- Honor the strongest counterargument-handling from any draft, even if it's not in the spine.
-- Preserve a consistent, human voice throughout.
-- For any sentence you keep, prefer the version that surprises over the version that signals competence.
-
-In topic mode: rebuild the spine into a complete essay; integrate sharper moments from other drafts only where they clearly out-execute.
-In draft mode: the user's original draft IS the spine. The council's drafts are reference. Improve the user's draft while preserving their voice and claims. Do not rewrite it as a generic essay.
-
-Personal essays succeed on specificity and risk, not on polish. The version that could have been written by anyone has failed. If you find yourself smoothing an asymmetric sentence, stop — the asymmetry is probably the point.
-
-If a USER VOICE PROFILE is provided above, you MUST apply every rule it contains before returning the final essay. Walk through the rules mentally and revise any sentence that violates one. The user's voice rules take precedence over the stylistic preferences of any individual council member.
-
-If a VOICE INSPIRATION block is provided, treat it as a tonal anchor only. Match its rhythm and concrete-detail density. Do NOT borrow its content, places, or anecdotes.
-
-If a TARGET LENGTH is given above, treat it as a soft target — be within ±10%, but do not pad with filler to reach it.
-
-Output only the final essay. Do not preface it with "Here is the synthesized essay" or describe your process. Do not include section headers like "FINAL ESSAY". Just write the essay."""
+# Backwards-compatible aliases. Stage 2 used to be "rank these essays" and
+# Stage 3 used to be "synthesize from 4 rankings"; both were replaced in
+# 0.4.0 with the critique + revise flow. We keep the OLD names pointing
+# at the NEW templates so any caller that imports STAGE2_PROMPT_DEFAULT
+# or STAGE3_PROMPT_DEFAULT keeps working.
+STAGE2_PROMPT_DEFAULT = STAGE2_CRITIQUE_PROMPT_DEFAULT
+STAGE3_PROMPT_DEFAULT = STAGE3_REVISION_PROMPT_DEFAULT
 
 TITLE_PROMPT_DEFAULT = """Generate a very short title (3-5 words maximum) that summarizes the following essay topic or draft.
 The title should be concise and descriptive. Do not use quotes or punctuation in the title.
