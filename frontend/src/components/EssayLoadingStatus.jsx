@@ -7,26 +7,31 @@ const MESSAGES = {
         'pulling sources for context...',
         'reading what the internet thinks...',
     ],
+    pitch: [
+        'council members are pitching angles in parallel...',
+        'the architect is proposing a structural spine...',
+        'the devil\'s advocate is pitching an inversion...',
+        'the voice guardian is picking a concrete opening...',
+        'picking the strongest pitch...',
+    ],
     stage1: [
-        'council members are drafting in parallel...',
-        'the architect is sketching the spine of the essay...',
-        'the editor is reaching for the scissors...',
-        'the devil\'s advocate is loading objections...',
-        'the voice guardian is listening for AI tells...',
-        'reviewing structure and pacing...',
-        'tightening prose...',
+        'council members are drafting in parallel from the chosen angle...',
+        'the architect is writing in long, load-bearing paragraphs...',
+        'the editor is leaning into short paragraphs and white space...',
+        'the devil\'s advocate is opening with the strongest counter...',
+        'the voice guardian is grounding paragraph one in a real moment...',
     ],
     stage2: [
-        'council members are reading each other\'s drafts...',
-        'ranking the strongest essays anonymously...',
-        'comparing structure, argument, and voice...',
+        'critiquing the strongest draft...',
+        'flagging cuts, sharpens, and what to keep...',
+        'pulling sharper sentences from the runner-up drafts...',
     ],
     stage3: [
-        'chairman is synthesizing the final draft...',
-        'applying voice rules...',
-        'cutting the corporate-blog phrasing...',
-        'polishing prose...',
-        'making final calls on structure...',
+        'chairman is revising the spine...',
+        'applying every cut the critics agreed on...',
+        'sharpening the flagged passages...',
+        'protecting the kept sentences...',
+        'applying voice rules before the final pass...',
     ],
     idle: ['standing by...'],
 };
@@ -36,6 +41,7 @@ function pickStage({ loading }) {
     if (loading.stage3) return 'stage3';
     if (loading.stage2) return 'stage2';
     if (loading.stage1) return 'stage1';
+    if (loading.pitch) return 'pitch';
     if (loading.search) return 'search';
     return 'idle';
 }
@@ -44,12 +50,14 @@ function describeStage(stage) {
     switch (stage) {
         case 'search':
             return 'Web search';
+        case 'pitch':
+            return 'Pitching angles';
         case 'stage1':
             return 'Council drafting';
         case 'stage2':
-            return 'Peer review';
+            return 'Critique';
         case 'stage3':
-            return 'Chairman synthesis';
+            return 'Final revision';
         default:
             return 'Working';
     }
@@ -79,15 +87,18 @@ export default function EssayLoadingStatus({ loading, progress, aborted }) {
     }, [messages]);
 
     const stageLabel = describeStage(stage);
+    const pitchProgress = progress?.pitch;
     const stage1Progress = progress?.stage1;
     const stage2Progress = progress?.stage2;
 
     let progressLabel = null;
-    if (stage === 'stage1' && stage1Progress?.total) {
+    if (stage === 'pitch' && pitchProgress?.total) {
+        progressLabel = `${pitchProgress.count} of ${pitchProgress.total} pitches in`;
+    } else if (stage === 'stage1' && stage1Progress?.total) {
         progressLabel = `${stage1Progress.count} of ${stage1Progress.total} drafts complete`;
     } else if (stage === 'stage2' && stage2Progress?.total) {
-        const noun = stage2Progress.total === 1 ? 'review' : 'reviews';
-        progressLabel = `${stage2Progress.count} of ${stage2Progress.total} peer ${noun} complete`;
+        const noun = stage2Progress.total === 1 ? 'critique' : 'critiques';
+        progressLabel = `${stage2Progress.count} of ${stage2Progress.total} ${noun} in`;
     }
 
     if (minimized) {

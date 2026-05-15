@@ -485,6 +485,94 @@ function AppShell() {
               });
               break;
 
+            case 'pitch_start':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                const updatedLastMsg = {
+                  ...lastMsg,
+                  loading: { ...lastMsg.loading, pitch: true },
+                  timers: { ...lastMsg.timers, pitchStart: Date.now() },
+                };
+                messages[messages.length - 1] = updatedLastMsg;
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'pitch_init':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  progress: {
+                    ...lastMsg.progress,
+                    pitch: { count: 0, total: event.total },
+                  },
+                };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'pitch_progress':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                const updatedPitches = lastMsg.pitches
+                  ? [...lastMsg.pitches, event.data]
+                  : [event.data];
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  pitches: updatedPitches,
+                  progress: {
+                    ...lastMsg.progress,
+                    pitch: { count: event.count, total: event.total },
+                  },
+                };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'pitch_complete':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  pitches: event.data,
+                  loading: { ...lastMsg.loading, pitch: false },
+                  timers: { ...lastMsg.timers, pitchEnd: Date.now() },
+                };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'pitch_picked':
+              // event.data = {winner_index, reason, pitch}
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  pickedPitch: event.data,
+                };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'spine_picked':
+              // event.data = {winner_index, reason, persona, model}
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  pickedSpine: event.data,
+                };
+                return { ...prev, messages };
+              });
+              break;
+
             case 'stage1_start':
               setCurrentConversation((prev) => {
                 const messages = [...prev.messages];
