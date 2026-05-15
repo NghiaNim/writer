@@ -5,6 +5,39 @@ All notable changes to LLM Council Plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-05-13
+
+### Changed
+- **Council pipeline rewrite (B + C).** Replaces "4 parallel essays → peer rankings → chairman synthesizes from 4 essays" with a pipeline that's better suited to producing one well-written essay:
+
+  ```
+  pitch race (parallel) → pitch picker (Flash) → 4 parallel drafts
+  from the shared angle → spine picker (Flash) → 4 parallel critiques
+  of the spine → chairman revises the spine
+  ```
+
+  - **Pitch race**: every persona produces a one-paragraph pitch (THESIS / LEAD / KEY MOVE / WHY) in parallel. Higher temperature than drafts so the angle space is genuinely divergent.
+  - **Pitch picker**: single Gemini-Flash call picks the strongest pitch. The picked text is prepended to every Stage 1 prompt as the COUNCIL-AGREED ANGLE, so all 4 essays share a thesis and synthesis later is "merge variations on a theme" instead of "fuse 4 different visions."
+  - **Differentiated structural constraints**: each default persona prompt now carries a different structural commitment (Architect: 3-4 long paragraphs / Editor: 8-12 short paragraphs / Devil's Advocate: open with counterargument / Voice Guardian: open with sensory detail). User-customized prompts pass through unchanged.
+  - **Spine picker**: a second Flash call picks the strongest Stage 1 draft. This becomes the SPINE.
+  - **Stage 2 = critiques, not rankings**. Each council member reads the spine and writes a surgical critique with CUT / SHARPEN / KEEP / BORROW directives. The runner-up drafts are reference for BORROW only.
+  - **Stage 3 = revision, not synthesis**. The chairman REVISES the spine using the consolidated critiques. Directed revision is a much easier task than fusing four full essays, and models are reliably better at "improve this paragraph" than "merge these three into one."
+
+### Added
+- **New SSE events**: `pitch_start`, `pitch_init`, `pitch_progress`, `pitch_complete`, `pitch_picked`, `spine_picked`. Frontend tracks pitches and the spine pick on the message object so they can be surfaced under "Show council notes" later.
+- **New default prompts**: `PITCH_PROMPT_DEFAULT`, `PITCH_PICKER_PROMPT_DEFAULT`, `STAGE2_CRITIQUE_PROMPT_DEFAULT`, `STAGE3_REVISION_PROMPT_DEFAULT` in `backend/prompts.py`.
+- **New backend functions**: `council.collect_pitches`, `council.pick_strongest_pitch`, `council.pick_strongest_draft`, `council.stage2_collect_critiques`.
+- **EssayLoadingStatus** gains a `pitch` stage with its own rotating messages and a "N of M pitches in" progress label. Stage labels updated: "Peer review" → "Critique"; "Chairman synthesis" → "Final revision".
+
+### Removed
+- **`council.stage2_collect_rankings`**, `council.calculate_aggregate_rankings`, `council.parse_ranking_from_text` — no longer used. Stage 2 is now critique-based.
+- **`aggregate_rankings` / `label_to_model`** fields in the saved assistant-message metadata. Replaced with `spine_index`.
+- Old `STAGE2_PROMPT_DEFAULT` and `STAGE3_PROMPT_DEFAULT` content is gone; the names remain as backwards-compatible aliases pointing at the new critique and revision templates.
+
+### Migration notes
+- If you customized `stage2_prompt` or `stage3_prompt` in `data/settings.json`, those customizations are likely broken: the old templates used `{responses_text}` / `{stage1_text}` / `{stage2_text}` fields that no longer exist. The new templates use `{spine_text}` and `{critiques_text}` instead. On format failure, the chairman falls back to the default revision template so essays still complete — but you'll see a warning logged.
+- No DB migration required.
+
 ## [0.3.1] - 2026-05-11
 
 ### Removed

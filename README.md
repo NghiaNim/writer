@@ -13,14 +13,16 @@
 
 ## What is LLM Council Plus?
 
-**LLM Council Plus** is a multi-user **essay coach** built on a 3-stage LLM council architecture. You give it a topic (or a draft); four AI personas — the Architect, the Editor, the Devil's Advocate, the Voice Guardian — each write a full essay; they anonymously rank each other; a Chairman synthesizes the final.
+**LLM Council Plus** is a multi-user **essay coach** built on an LLM council architecture. You give it a topic (or a draft); four AI personas — the Architect, the Editor, the Devil's Advocate, the Voice Guardian — each pitch a different angle; a picker chooses the strongest; all four then write essays from that shared angle (each with a different structural commitment); a second picker selects the best draft as the spine; every persona critiques that spine (cut / sharpen / keep / borrow); the Chairman revises the spine using those critiques.
+
+The key design move: parallel exploration happens at the cheap step (one-paragraph pitches), and the expensive step (full prose) converges on a single shared thesis. The chairman never has to fuse four different essays from scratch — it revises one draft using concrete instructions.
 
 What makes it more than a model bundle:
 
 - **Persistent memory of you.** Every essay extracts durable facts about the writer (biography, beliefs, experiences). They're injected into every future prompt so essays stay grounded in your actual life. Old facts are folded into a compact summary when they overflow the prompt budget; originals are kept in your "What We Know" panel.
 - **Anti-AI-tell voice rules.** Every new user starts with ~28 default rules (no em-dashes, no "delve," no rhetorical-colon noun phrases, no false balance, etc.). All rules are editable; the Voice Guardian and Chairman are required to apply every rule.
-- **Interim coaching while we draft.** Stage 1 + Stage 2 takes ~60–90 seconds. The coach uses that time to ask 1–3 short questions about gaps the drafts hand-waved. Your answers feed the chairman synthesis happening right now AND accumulate as durable facts.
-- **Chairman clarification.** Right before the final synthesis, the chairman gets one chance to ask you to ground a specific vague claim from the drafts. If everything's already specific, it stays quiet.
+- **Interim coaching while we draft.** The pitch + stage 1 + stage 2 work takes ~60–90 seconds. The coach uses that time to ask 1–3 short questions about gaps the drafts hand-waved. Your answers feed the chairman revision happening right now AND accumulate as durable facts.
+- **Chairman clarification.** Right before the final revision, the chairman gets one chance to ask you to ground a specific vague claim from the drafts. If everything's already specific, it stays quiet.
 
 <p align="center">
   <div align="center">
@@ -58,41 +60,57 @@ Then open **http://localhost:5173** and configure your API keys in Settings.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        YOUR QUESTION                             │
-│            (+ optional web search for real-time info)            │
+│                       YOUR TOPIC                                 │
+│             (+ optional web search for grounding)                │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    STAGE 1: DELIBERATION                         │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐             │
-│  │ Claude  │  │  GPT-4  │  │ Gemini  │  │  Llama  │  ...        │
-│  └────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘             │
-│       │            │            │            │                   │
-│       ▼            ▼            ▼            ▼                   │
-│  Response A   Response B   Response C   Response D               │
+│                    PITCH RACE (parallel)                         │
+│   Each persona pitches THESIS / LEAD / KEY MOVE (one paragraph)  │
+│        Architect • Editor • Devil's Advocate • Voice Guardian    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+       ┌──────── PITCH PICKER (Gemini Flash, ~3s) ────────┐
+       │   Picks the strongest angle. Becomes the shared  │
+       │   thesis every draft writes toward.              │
+       └─────────────────┬────────────────────────────────┘
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  STAGE 1: 4 PARALLEL DRAFTS                      │
+│   All 4 personas write the full essay from the SAME picked       │
+│   angle. Each persona has a different structural commitment:     │
+│     Architect       3–4 long load-bearing paragraphs             │
+│     Editor          8–12 short paragraphs with white space       │
+│     Devil's Advocate Open with the strongest counterargument     │
+│     Voice Guardian  Open with a concrete sensory detail          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+       ┌──────── SPINE PICKER (Gemini Flash, ~3s) ────────┐
+       │   Picks the strongest draft. Becomes the spine   │
+       │   the chairman will revise.                      │
+       └─────────────────┬────────────────────────────────┘
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                STAGE 2: CRITIQUES (parallel)                     │
+│   Every persona reads the spine and writes:                      │
+│     CUT      specific phrases to remove                          │
+│     SHARPEN  specific places to commit harder                    │
+│     KEEP     specific moves not to touch                         │
+│     BORROW   sharper sentences from runner-up drafts             │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    STAGE 2: PEER REVIEW                          │
-│  Each model reviews ALL responses (anonymized as A, B, C, D)     │
-│  and ranks them by accuracy, insight, and completeness           │
-│                                                                   │
-│  Rankings are aggregated to identify the best responses          │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    STAGE 3: SYNTHESIS                            │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                    CHAIRMAN MODEL                        │    │
-│  │  Reviews all responses + rankings + search context       │    │
-│  │  Synthesizes the council's collective wisdom             │    │
-│  └─────────────────────────────────────────────────────────┘    │
+│              STAGE 3: CHAIRMAN REVISES THE SPINE                 │
+│   Applies every cut, sharpens flagged passages, preserves        │
+│   protected sentences, borrows only where sharper. Not a         │
+│   synthesis-from-scratch — a directed revision.                  │
 │                              │                                   │
 │                              ▼                                   │
-│                      FINAL ANSWER                                │
+│                      FINAL ESSAY                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -109,16 +127,22 @@ TOPIC (or draft)
 INTAKE: 3–5 short Q&A → 1-paragraph core-idea brief
    │
    ▼
-COUNCIL (parallel drafts by 4 personas)
-   │  ◄── interim_question(×0–2)   "We need one specific moment to ground this."
-   ▼
-PEER RANKINGS (anonymized)
-   │  ◄── interim_question(×0–1)   "Last quick ask before stage 3."
-   ▼
-CHAIRMAN CLARIFICATION (×0–1)      "About to write your final essay. Confirm one thing."
+PITCH RACE: 4 personas pitch parallel angles → picker picks one
    │
    ▼
-CHAIRMAN SYNTHESIS                 (applies voice rules; folds in your answers)
+STAGE 1: 4 parallel drafts from the shared angle (differing structures)
+   │  ◄── interim_question(×0–2)   "We need one specific moment to ground this."
+   ▼
+SPINE PICK: picker chooses the strongest draft
+   │
+   ▼
+STAGE 2: 4 parallel critiques of the spine (CUT/SHARPEN/KEEP/BORROW)
+   │  ◄── interim_question(×0–1)   "Last quick ask before revision."
+   ▼
+CHAIRMAN CLARIFICATION (×0–1)      "About to revise. Confirm one specific thing."
+   │
+   ▼
+CHAIRMAN REVISION                  (applies voice rules; folds in your answers)
    │
    ▼
 FINAL ESSAY + Refinement chips

@@ -4,19 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LLM Council Plus is a **multi-user Essay Coach** built on a 3-stage LLM council architecture. A user feeds in a topic (or a draft), four AI council personas write competing essays in parallel, anonymously rank each other, and a Chairman model synthesizes a final essay that respects the user's voice rules and known biographical facts.
+LLM Council Plus is a **multi-user Essay Coach** built on an LLM council architecture. A user feeds in a topic (or a draft); four AI council personas pitch competing angles in parallel, a picker chooses one, all four write essays from that shared angle, each persona critiques the strongest draft, and the Chairman revises that draft using the critiques. The final essay respects the user's voice rules and known biographical facts.
 
-**The 3-stage council loop:**
-1. **Stage 1**: Each council persona drafts the essay (with optional web search context, the user's voice rules, and the user's known facts)
-2. **Stage 2**: Anonymous peer review/ranking to prevent bias
-3. **Stage 3**: Chairman synthesis — applies voice rules, weaves in any interim Q&A, produces the final essay
+**The council pipeline (0.4.0):**
+1. **Pitch race** — every persona pitches one paragraph (THESIS / LEAD / KEY MOVE) in parallel; a Gemini-Flash call picks the strongest. All Stage 1 drafts then share that angle.
+2. **Stage 1** — 4 personas draft the full essay in parallel from the picked angle. Each persona has a different structural commitment so the drafts diverge in shape, not in thesis.
+3. **Spine pick** — a Gemini-Flash call picks the strongest Stage 1 draft. This becomes the SPINE that gets revised.
+4. **Stage 2** — each persona produces a surgical critique of the spine (CUT / SHARPEN / KEEP / BORROW from runner-up drafts). NOT a ranking.
+5. **Stage 3** — the Chairman REVISES the spine using the consolidated critiques. A directed revision task, not synthesis-from-scratch.
 
 **On top of that loop, the coach adds:**
 - **Supabase Auth** (email/password + Google OAuth) — every user has their own profile, conversations, voice, and memory
 - **Smart intake** — before the council runs, a short Q&A flow distills the user's topic into a core-idea brief
 - **Voice profile** — every new user is seeded with ~28 anti-AI-tell writing rules they can edit; the Voice Guardian and Chairman are required to apply them
 - **User facts memory** — facts about the user (biography, beliefs, experiences) are extracted from every completed essay and from interim Q&A, deduped, archived when the corpus overflows, and re-injected into every future prompt
-- **Interim questions** — while stages 1 and 2 run (~30–90s of dead time), the backend asks 1–3 short questions about gaps the drafts hand-wave; answers feed the current chairman synthesis AND accumulate as durable facts
+- **Interim questions** — while stages 1 and 2 run (~30–90s of dead time), the backend asks 1–3 short questions about gaps the drafts hand-wave; answers feed the current chairman revision AND accumulate as durable facts
 - **Chairman clarification** — right before stage 3, the chairman gets one final chance to ask the user a question pinned to a specific vague claim in the drafts
 - **Voice library scaffold** — an invisible random voice anchor borrowed from a curated library of example voices to give each essay rhythmic spine
 
@@ -226,8 +228,11 @@ The streaming endpoint (`POST /api/conversations/{id}/message/stream`) yields th
 
 ```
 search_start → search_complete | search_error       (if web_search=true; either-or)
+pitch_start → pitch_init → pitch_progress(×N) → pitch_complete
+pitch_picked                                         (Flash picks the winning angle)
 stage1_start → stage1_init → stage1_progress(×N) → stage1_complete
 interim_question(×0–2)                              (after stage 1)
+spine_picked                                         (Flash picks the strongest draft)
 stage2_start → stage2_init → stage2_progress(×N) → stage2_complete
 interim_question(×0–1)                              (after stage 2, if budget remains)
 clarification_question(×0–1)                        (chairman pre-pass)
@@ -236,6 +241,17 @@ title_complete                                       (first message in conversat
 run_finished                                         (always, just before complete/error)
 complete | error                                     (terminal)
 ```
+
+**What each phase produces:**
+
+| Phase | What's actually happening |
+| --- | --- |
+| `pitch_*` | Each council persona writes a one-paragraph pitch (THESIS / LEAD / KEY MOVE / WHY) in parallel. Higher temperature than drafts (~+0.2) so the angle space is genuinely diverged. |
+| `pitch_picked` | Single Gemini-Flash call picks the strongest pitch. The picked text is prepended to every Stage 1 prompt as the COUNCIL-AGREED ANGLE so all 4 essays share a thesis. |
+| `stage1_*` | 4 personas write the full essay in parallel. Each persona has a STRUCTURAL COMMITMENT (Architect: 3-4 long paragraphs / Editor: 8-12 short paragraphs / Devil's Advocate: open with counterargument / Voice Guardian: open with concrete sensory detail) so the drafts diverge in visible, useful ways. |
+| `spine_picked` | Single Flash call picks the strongest draft. This becomes the SPINE the chairman will revise. |
+| `stage2_*` | Each council member writes a surgical critique of the spine: CUT / SHARPEN / KEEP / BORROW. NOT a ranking. The runner-up drafts are reference for BORROW only. |
+| `stage3_*` | The chairman REVISES the spine using the consolidated critiques. Not a synthesis-from-scratch — a directed revision. |
 
 **`search_error`** is emitted when `perform_web_search` returns the failure placeholder (or raises). The run continues with empty `search_context` — Stage 1 prompts get no web grounding, but the user sees a banner in the assistant message. Frontend persists `metadata.search_error = { provider, message }` on the message.
 
@@ -313,20 +329,30 @@ POST /api/conversations/{id}/message/stream  (auth-required, SSE)
     ↓
 [Web Search: DuckDuckGo / Tavily / Brave + Jina Reader]  (optional)
     ↓
-Stage 1: 4 personas draft in parallel  → stage1_progress(×N)
+Pitch race: 4 personas pitch THESIS/LEAD/KEY MOVE in parallel
+    ↓
+Pitch picker (Flash, ~3s) → SHARED ANGLE prepended to every Stage 1 prompt
+    ↓
+Stage 1: 4 personas draft in parallel from the shared angle
+   each persona has a STRUCTURAL COMMITMENT (long-paragraph / short-paragraph
+   / counterargument-first / sensory-first) so the drafts diverge usefully
    prompt = persona + voice_profile_block + student_profile_block
           + library_voice_block + essay_mode_block + word_target_block
+          + shared_pitch (prepended)
     ↓
 [interim_question(×0–2)]  ←→  user POSTs to /api/intake/answer
     ↓
-Stage 2: Anonymize → Parallel peer rankings → Parse rankings
+Spine picker (Flash, ~3s) → picks the strongest Stage 1 draft
+    ↓
+Stage 2: Critique (parallel) — each member produces CUT/SHARPEN/KEEP/BORROW
+   notes against the spine. NOT a ranking.
     ↓
 [interim_question(×0–1)]  ←→  user answers
     ↓
 [clarification_question(×0–1) — chairman pre-pass; wait up to 25s]
     ↓
-Stage 3: Chairman synthesizes
-   prompt includes in_flight_qa_block folded into student_profile_block
+Stage 3: Chairman REVISES the spine using the consolidated critiques
+   (not a synthesis-from-scratch). Critiques + in_flight_qa_block folded in.
     ↓
 Persist:
    - conversations/{id}.json  (stage1, stage2, stage3, metadata)
