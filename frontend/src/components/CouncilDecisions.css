@@ -1,0 +1,146 @@
+/* PitchSummary + SpinePick — both surfaces share the same visual language:
+   muted card stack, chairman-gold accent on the picked item, no
+   interactivity. */
+
+.council-decisions__section {
+    margin-bottom: 22px;
+    padding: 16px 18px;
+    background: rgba(15, 23, 42, 0.45);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 12px;
+}
+
+.council-decisions__head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.council-decisions__title {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: #93c5fd;
+}
+
+.council-decisions__hint {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: #94a3b8;
+    font-style: italic;
+    flex: 1 1 240px;
+}
+
+.council-decisions__pitches {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.council-decisions__pitch {
+    padding: 12px 14px;
+    background: rgba(2, 6, 23, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 10px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.council-decisions__pitch--picked {
+    background:
+        radial-gradient(120% 80% at 0% 0%, rgba(251, 191, 36, 0.07), transparent 60%),
+        rgba(2, 6, 23, 0.55);
+    border-color: rgba(251, 191, 36, 0.55);
+    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.15) inset;
+}
+
+.council-decisions__pitch--error {
+    border-color: rgba(248, 113, 113, 0.35);
+    opacity: 0.7;
+}
+
+.council-decisions__pitch-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.council-decisions__pitch-persona {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
+    color: #e2e8f0;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.council-decisions__badge {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fde68a;
+    border: 1px solid rgba(251, 191, 36, 0.5);
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.council-decisions__pitch-body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: #cbd5e1;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: transparent;
+}
+
+.council-decisions__pitch-error {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: #fca5a5;
+    font-style: italic;
+}
+
+.council-decisions__reason {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed rgba(148, 163, 184, 0.15);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: #94a3b8;
+    line-height: 1.5;
+}
+
+.council-decisions__reason-label {
+    font-weight: 600;
+    color: #fcd34d;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+}
+
+.council-decisions__spine {
+    padding: 12px 14px;
+    background:
+        radial-gradient(120% 80% at 0% 0%, rgba(251, 191, 36, 0.06), transparent 60%),
+        rgba(2, 6, 23, 0.55);
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    border-radius: 10px;
+}
+
+.council-decisions__spine-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}

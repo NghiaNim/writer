@@ -113,8 +113,9 @@ export default function FinalEssay({
             {showNotes && councilNotes && (
                 <div className="final-essay-council-notes">
                     <div className="council-notes-intro">
-                        How the council got here — individual drafts, then anonymous peer
-                        rankings.
+                        How the council got here — the pitches considered, the draft
+                        picked as the spine, every member's draft, and the critiques the
+                        chairman applied during revision.
                     </div>
                     {councilNotes}
                 </div>

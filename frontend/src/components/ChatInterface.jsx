@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import SearchContext from './SearchContext';
 import Stage1 from './Stage1';
 import Stage2 from './Stage2';
+import { PitchSummary, SpinePick } from './CouncilDecisions';
 import CouncilGrid from './CouncilGrid';
 import CouncilChips from './CouncilChips';
 import EssayLoadingStatus from './EssayLoadingStatus';
@@ -1101,10 +1102,21 @@ function AssistantMessageBody({
     // we don't know which council ran.
     const chipState = isLastMessage ? buildChipState(activeCouncil, msg) : null;
 
-    // Council notes (Stage 1 + Stage 2) are hidden by default and shown
-    // through the FinalEssay's toggle once the essay is ready.
-    const councilNotes = (msg.stage1 || msg.stage2) ? (
+    // Council notes (pitch race + spine pick + Stage 1 drafts + Stage 2
+    // critiques) are hidden by default and shown through the FinalEssay's
+    // toggle once the essay is ready. Each subsection is gated on its own
+    // data being present so older essays without the new fields still render.
+    const hasAnyCouncilData =
+        msg.stage1 || msg.stage2 || msg.pitches || msg.pickedSpine;
+    const councilNotes = hasAnyCouncilData ? (
         <>
+            {msg.pitches && msg.pitches.length > 0 && (
+                <PitchSummary
+                    pitches={msg.pitches}
+                    pickedPitch={msg.pickedPitch}
+                />
+            )}
+            {msg.pickedSpine && <SpinePick pickedSpine={msg.pickedSpine} />}
             {msg.stage1 && (
                 <Stage1
                     responses={msg.stage1}
