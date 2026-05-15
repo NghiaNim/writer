@@ -40,13 +40,18 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
     const currentRanking = rankings[safeActiveTab] || {};
     const hasError = currentRanking?.error || false;
 
+    // 0.4.0 rows have a `.critique` field; older rows (pre-rewrite) have
+    // `.ranking`. We accept either so historical conversations still render.
+    const currentText =
+        (typeof currentRanking?.critique === 'string' ? currentRanking.critique : '') ||
+        (typeof currentRanking?.ranking === 'string' ? currentRanking.ranking : '');
+    const isCritique = !!currentRanking?.critique;
+
     // Get visuals for current tab
     const currentVisuals = getModelVisuals(currentRanking?.model);
 
     const handleCopy = async () => {
-        const ranking = currentRanking?.ranking;
-        const rankingText = typeof ranking === 'string' ? ranking : String(ranking || '');
-        const textToCopy = deAnonymizeText(rankingText, labelToModel);
+        const textToCopy = deAnonymizeText(currentText, labelToModel);
 
         if (!textToCopy) return;
 
@@ -64,15 +69,17 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
             <div className="stage-header">
                 <div className="stage-title">
                     <span className="stage-icon">⚖️</span>
-                    Stage 2: Peer Rankings
+                    Stage 2: {rankings.some((r) => r?.critique) ? 'Critiques' : 'Peer Rankings'}
                 </div>
                 <StageTimer startTime={startTime} endTime={endTime} label="Duration" />
             </div>
 
-            <h4>Raw Evaluations</h4>
+            <h4>Council critiques of the spine</h4>
             <p className="stage-description">
-                Each council member read every draft (shown anonymously as Draft A, B, C…) and ranked them.
-                Below, real names are shown in <strong>bold</strong> for readability, but the actual review used anonymous labels.
+                Each council member read the strongest draft (the spine) and wrote
+                a surgical critique — what to cut, what to sharpen, what to keep, and
+                which sentences from the other drafts the chairman should borrow.
+                Other drafts were reference only.
             </p>
 
             {/* Avatar Tabs */}
@@ -154,11 +161,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
                     <>
                         <div className="ranking-content markdown-content">
                             <ReactMarkdown>
-                                {(() => {
-                                    const ranking = currentRanking?.ranking;
-                                    const rankingText = typeof ranking === 'string' ? ranking : String(ranking || '');
-                                    return deAnonymizeText(rankingText, labelToModel);
-                                })()}
+                                {deAnonymizeText(currentText, labelToModel)}
                             </ReactMarkdown>
                         </div>
 
