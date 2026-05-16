@@ -66,8 +66,13 @@ function describeStage(stage) {
 /**
  * Terminal-style "the council is working" panel shown in place of the raw
  * deliberation while an essay is being generated.
+ *
+ * `onAbort` is the stop-this-stream callback. When provided, the panel
+ * renders a visible Stop button in its top bar — previously this control
+ * only existed in the sidebar conversation row, which the user's eye
+ * rarely lands on during the 60-90s wait.
  */
-export default function EssayLoadingStatus({ loading, progress, aborted }) {
+export default function EssayLoadingStatus({ loading, progress, aborted, onAbort }) {
     const stage = pickStage({ loading });
     const messages = useMemo(() => MESSAGES[stage] || MESSAGES.idle, [stage]);
     const [messageIdx, setMessageIdx] = useState(0);
@@ -133,15 +138,28 @@ export default function EssayLoadingStatus({ loading, progress, aborted }) {
                 {progressLabel && (
                     <span className="essay-loading-progress">{progressLabel}</span>
                 )}
-                <button
-                    type="button"
-                    className="essay-loading-minimize"
-                    onClick={() => setMinimized(true)}
-                    aria-expanded={true}
-                    title="Hide this panel to see persona progress above. The council is still running."
-                >
-                    Minimize
-                </button>
+                <div className="essay-loading-bar-actions">
+                    {onAbort && !aborted && (
+                        <button
+                            type="button"
+                            className="essay-loading-stop"
+                            onClick={onAbort}
+                            title="Stop this run"
+                        >
+                            <span className="essay-loading-stop-icon" aria-hidden="true">■</span>
+                            Stop
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        className="essay-loading-minimize"
+                        onClick={() => setMinimized(true)}
+                        aria-expanded={true}
+                        title="Hide this panel to see persona progress above. The council is still running."
+                    >
+                        Minimize
+                    </button>
+                </div>
             </div>
             <div className="essay-loading-line">
                 <span className="essay-loading-prompt">&gt;</span>
@@ -150,7 +168,8 @@ export default function EssayLoadingStatus({ loading, progress, aborted }) {
             </div>
             <div className="essay-loading-hint">
                 Live status while members draft privately — final essay appears below when ready.
-                You can minimize this bar anytime.
+                A full run usually takes about a minute and a half. You can minimize this bar
+                anytime.
             </div>
             <div className="essay-loading-tip">
                 Want different questions or a different council? Tune your council members and voice
