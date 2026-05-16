@@ -144,7 +144,21 @@ export default function Sidebar({
       <div className="conversation-list">
         {filteredConversations.length === 0 ? (
           <div className="sidebar-empty-state">
-            {searchQuery ? 'No matching conversations' : 'No history'}
+            {searchQuery ? (
+              <>
+                <div className="sidebar-empty-state-title">No matches</div>
+                <div className="sidebar-empty-state-hint">
+                  Nothing here for "{searchQuery}". Clear the search to see every essay.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="sidebar-empty-state-title">No essays yet</div>
+                <div className="sidebar-empty-state-hint">
+                  Hit <strong>+ New Discussion</strong> above to start one. Past essays land here.
+                </div>
+              </>
+            )}
           </div>
         ) : (
           filteredConversations.map((conv) => {

@@ -228,8 +228,28 @@
 .sidebar-empty-state {
   text-align: center;
   color: var(--text-muted);
-  padding: 40px 20px;
+  padding: 32px 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sidebar-empty-state-title {
+  font-family: var(--font-ui);
   font-size: 14px;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-bottom: 6px;
+}
+
+.sidebar-empty-state-hint {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.sidebar-empty-state-hint strong {
+  color: #93c5fd;
+  font-weight: 600;
 }
 
 .conversation-title {
