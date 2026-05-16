@@ -1,12 +1,18 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { api } from '../api';
 import SearchableModelSelect from './SearchableModelSelect';
-import ProviderSettings from './settings/ProviderSettings';
 import UserCouncilConfig from './CouncilConfig';
-import SearchSettings from './settings/SearchSettings';
-import PromptSettings from './settings/PromptSettings';
+// Personal sections load eagerly — they're what most users land on, and
+// they're already in the chunk that ships with the modal open.
 import VoiceProfileSettings from './settings/VoiceProfileSettings';
 import MemorySettings from './settings/MemorySettings';
+// Advanced + admin-only sections are code-split: the JS isn't fetched
+// until the user actually opens that tab. Cuts the initial bundle for
+// the (large) Settings modal substantially.
+const PromptSettings = lazy(() => import('./settings/PromptSettings'));
+const SearchSettings = lazy(() => import('./settings/SearchSettings'));
+const BackupSettings = lazy(() => import('./settings/BackupSettings'));
+const ProviderSettings = lazy(() => import('./settings/ProviderSettings'));
 import './Settings.css';
 
 const ADVANCED_SECTIONS = new Set(['prompts', 'search', 'import_export']);
@@ -1225,8 +1231,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     downloadAnchorNode.remove();
   };
 
-  const handleImportCouncil = (event) => {
-    const file = event.target.files[0];
+  const handleImportCouncil = (file) => {
     if (!file) return;
 
     const reader = new FileReader();
@@ -1569,8 +1574,20 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
             />
           </div>
 
-          {/* Main Content Area */}
+          {/* Main Content Area. Suspense covers the lazy-loaded sections
+              (Advanced + admin-only); Personal sections render synchronously
+              so the initial landing has zero loading flicker. */}
           <div className="settings-main-panel">
+            <Suspense
+              fallback={
+                <div
+                  className="settings-section-loading"
+                  style={{ padding: '32px 8px', color: 'var(--text-muted, #94a3b8)' }}
+                >
+                  Loading…
+                </div>
+              }
+            >
 
             {/* API KEYS (LLM API Keys) */}
             {activeSection === 'llm_keys' && (
@@ -1705,59 +1722,16 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               />
             )}
 
-            {/* IMPORT & EXPORT (New Section) */}
+            {/* IMPORT & EXPORT */}
             {activeSection === 'import_export' && (
-              <section className="settings-section">
-                <h3>Backup & Reset</h3>
-                <p className="section-description">
-                  Save or restore your council configuration (models, prompts, settings).
-                  <br /><em>Note: API keys are NOT exported for security.</em>
-                </p>
-
-                <div className="subsection">
-                  <div className="council-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <input
-                      type="file"
-                      id="import-council"
-                      style={{ display: 'none' }}
-                      accept=".json"
-                      onChange={handleImportCouncil}
-                    />
-                    <button
-                      className="action-btn"
-                      onClick={() => document.getElementById('import-council').click()}
-                      title="Import Configuration"
-                    >
-                      Import Config
-                    </button>
-                    <button
-                      className="action-btn"
-                      onClick={handleExportCouncil}
-                      title="Export Configuration"
-                    >
-                      Export Config
-                    </button>
-                  </div>
-                </div>
-
-                <div className="subsection" style={{ marginTop: '32px', paddingTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                  <h4 style={{ color: '#f87171' }}>Danger Zone</h4>
-                  <p className="section-description">
-                    Reset all settings to their default values. This will clear your council selection and custom prompts.
-                    API keys will be preserved.
-                  </p>
-                  <button
-                    className="reset-button"
-                    type="button"
-                    onClick={handleResetToDefaults}
-                    style={{ marginTop: '10px' }}
-                  >
-                    Reset to Defaults
-                  </button>
-                </div>
-              </section>
+              <BackupSettings
+                onImport={handleImportCouncil}
+                onExport={handleExportCouncil}
+                onResetDefaults={handleResetToDefaults}
+              />
             )}
 
+            </Suspense>
           </div>
         </div>
 
