@@ -34,6 +34,19 @@ const DEFAULT_WORD_TARGET = 650;
  * and resume.
  */
 
+// Common audiences as quick-pick chips on the topic step. The free-text
+// input stays available alongside — these are starting points, not the
+// only options. Order is rough-frequency for the user base we expect:
+// admissions essays first, then academic, then publishing, then journal.
+const AUDIENCE_PRESETS = [
+    'An admissions officer',
+    'A graduate admissions committee',
+    'A creative writing professor',
+    'A magazine editor',
+    'A general reader',
+    'Yourself (a journal entry)',
+];
+
 function buildDraftMessage({ topic, audience, draft }) {
     return [
         `TOPIC: ${topic}`,
@@ -651,12 +664,37 @@ export default function EssayFlow({
                             <p className="essay-flow-field-hint">
                                 Who's reading this? Be specific — the answer changes everything.
                             </p>
+                            <div
+                                className="essay-flow-audience-chips"
+                                role="group"
+                                aria-label="Common audiences"
+                            >
+                                {AUDIENCE_PRESETS.map((preset) => {
+                                    const isActive =
+                                        audience.trim().toLowerCase() ===
+                                        preset.toLowerCase();
+                                    return (
+                                        <button
+                                            key={preset}
+                                            type="button"
+                                            className={
+                                                'essay-flow-chip ' +
+                                                (isActive ? 'essay-flow-chip--active' : '')
+                                            }
+                                            onClick={() => setAudience(preset)}
+                                            disabled={disabled}
+                                        >
+                                            {preset}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                             <input
                                 id="essay-flow-audience"
                                 type="text"
                                 value={audience}
                                 onChange={(e) => setAudience(e.target.value)}
-                                placeholder="e.g. an MIT admissions officer, a creative writing professor"
+                                placeholder="Or type your own — e.g. a magazine editor, your future self"
                                 disabled={disabled}
                                 className="essay-flow-input"
                                 maxLength={250}
