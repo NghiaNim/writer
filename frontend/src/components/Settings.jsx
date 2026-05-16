@@ -9,12 +9,62 @@ import VoiceProfileSettings from './settings/VoiceProfileSettings';
 import MemorySettings from './settings/MemorySettings';
 import './Settings.css';
 
+const ADVANCED_SECTIONS = new Set(['prompts', 'search', 'import_export']);
+
+/**
+ * Collapsible "Advanced" group in the Settings sidebar — System Prompts,
+ * Search Providers, Backup & Reset. Hidden behind a chevron by default
+ * because the typical user never touches these surfaces. Auto-expands
+ * when the active section happens to be one of the advanced ones (e.g.
+ * arrived via initialSection prop or a direct deep link).
+ */
+function SettingsAdvancedGroup({ activeSection, setActiveSection }) {
+    const [open, setOpen] = useState(() => ADVANCED_SECTIONS.has(activeSection));
+    useEffect(() => {
+        if (ADVANCED_SECTIONS.has(activeSection)) setOpen(true);
+    }, [activeSection]);
+    return (
+        <div className="settings-nav-group">
+            <button
+                type="button"
+                className="settings-nav-group-toggle"
+                onClick={() => setOpen((v) => !v)}
+                aria-expanded={open}
+            >
+                <span className="settings-nav-group-chevron" aria-hidden="true">
+                    {open ? '▾' : '▸'}
+                </span>
+                Advanced
+            </button>
+            {open && (
+                <div className="settings-nav-group-body">
+                    <button
+                        className={`sidebar-nav-item ${activeSection === 'prompts' ? 'active' : ''}`}
+                        onClick={() => setActiveSection('prompts')}
+                    >
+                        System Prompts
+                    </button>
+                    <button
+                        className={`sidebar-nav-item ${activeSection === 'search' ? 'active' : ''}`}
+                        onClick={() => setActiveSection('search')}
+                    >
+                        Search Providers
+                    </button>
+                    <button
+                        className={`sidebar-nav-item ${activeSection === 'import_export' ? 'active' : ''}`}
+                        onClick={() => setActiveSection('import_export')}
+                    >
+                        Backup & Reset
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
 
 
-
-
-export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initialSection = 'llm_keys' }) {
-  const [activeSection, setActiveSection] = useState(initialSection); // 'llm_keys', 'council', 'prompts', 'search', 'import_export'
+export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initialSection = 'voice' }) {
+  const [activeSection, setActiveSection] = useState(initialSection); // 'voice', 'memory', 'council', 'prompts', 'search', 'import_export', 'llm_keys' (admin only)
 
   const [settings, setSettings] = useState(null);
   const [selectedSearchProvider, setSelectedSearchProvider] = useState('duckduckgo');
@@ -1027,7 +1077,21 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       });
       setCouncilPersonas((defaults.council_personas || []).map(p => ({ ...p })));
 
-      // 5. Save the reset settings to backend
+      // 5. Restore default voice rules. Other voice-profile fields
+      //    (reference_paragraphs, inferred_style, preferred_authors) are
+      //    user-entered content, not configurable defaults, so we leave
+      //    them alone. Best-effort — if the defaults endpoint fails we
+      //    still complete the rest of the reset.
+      try {
+        const { rules: voiceDefaults = [] } = await api.voice.defaults();
+        if (voiceDefaults.length) {
+          await api.voice.save({ rules: voiceDefaults });
+        }
+      } catch (err) {
+        console.warn('Voice rules reset failed:', err);
+      }
+
+      // 6. Save the reset settings to backend
       const updates = {
         search_provider: 'duckduckgo',
         full_content_results: 3,
@@ -1470,49 +1534,39 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         </div>
 
         <div className="settings-body">
-          {/* Sidebar Navigation */}
+          {/* Sidebar Navigation — grouped into "Personal" (everyday user
+              tuning) vs "Advanced" (operator-level surfaces most users
+              never touch). Advanced collapses by default to keep the
+              nav from looking overwhelming on first visit. */}
           <div className="settings-sidebar">
-            {/* LLM API Keys tab intentionally hidden: the hosted product
-                supplies OPENROUTER_API_KEY server-side via env vars, so users
-                never need to configure keys. The section is still rendered
-                conditionally below for /admin use, but is unreachable from
-                the sidebar. */}
-            <button
-              className={`sidebar-nav-item ${activeSection === 'council' ? 'active' : ''}`}
-              onClick={() => setActiveSection('council')}
-            >
-              Council
-            </button>
-            <button
-              className={`sidebar-nav-item ${activeSection === 'prompts' ? 'active' : ''}`}
-              onClick={() => setActiveSection('prompts')}
-            >
-              System Prompts
-            </button>
-            <button
-              className={`sidebar-nav-item ${activeSection === 'voice' ? 'active' : ''}`}
-              onClick={() => setActiveSection('voice')}
-            >
-              My Voice
-            </button>
-            <button
-              className={`sidebar-nav-item ${activeSection === 'memory' ? 'active' : ''}`}
-              onClick={() => setActiveSection('memory')}
-            >
-              What We Know
-            </button>
-            <button
-              className={`sidebar-nav-item ${activeSection === 'search' ? 'active' : ''}`}
-              onClick={() => setActiveSection('search')}
-            >
-              Search Providers
-            </button>
-            <button
-              className={`sidebar-nav-item ${activeSection === 'import_export' ? 'active' : ''}`}
-              onClick={() => setActiveSection('import_export')}
-            >
-              Backup & Reset
-            </button>
+            <div className="settings-nav-group">
+              <div className="settings-nav-group-label">Personal</div>
+              <button
+                className={`sidebar-nav-item ${activeSection === 'voice' ? 'active' : ''}`}
+                onClick={() => setActiveSection('voice')}
+              >
+                My Voice
+              </button>
+              <button
+                className={`sidebar-nav-item ${activeSection === 'memory' ? 'active' : ''}`}
+                onClick={() => setActiveSection('memory')}
+              >
+                What We Know
+              </button>
+              <button
+                className={`sidebar-nav-item ${activeSection === 'council' ? 'active' : ''}`}
+                onClick={() => setActiveSection('council')}
+              >
+                Council
+              </button>
+            </div>
+
+            {/* LLM API Keys nav item intentionally absent in hosted mode —
+                see below for the conditional content render. */}
+            <SettingsAdvancedGroup
+              activeSection={activeSection}
+              setActiveSection={setActiveSection}
+            />
           </div>
 
           {/* Main Content Area */}
@@ -1756,6 +1810,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                     <li>Council size → Reset to 2 members</li>
                     <li>Temperatures → Defaults (0.5 / 0.4 / 0.3)</li>
                     <li>System prompts → Defaults</li>
+                    <li>Voice rules (My Voice) → Defaults restored</li>
                     <li>Search provider → DuckDuckGo</li>
                     <li>Jina fetch count → 3</li>
                     <li>Ollama URL → localhost:11434</li>
