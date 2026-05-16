@@ -99,6 +99,90 @@
     color: var(--text-secondary);
 }
 
+/* Field group — wraps a label + per-field hint + input so the two
+   fields on the topic step read as distinct sections instead of one
+   continuous stack of identical-looking inputs. */
+.essay-flow-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 18px;
+}
+
+.essay-flow-field:last-of-type {
+    margin-bottom: 4px;
+}
+
+.essay-flow-label {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #93c5fd;
+}
+
+.essay-flow-field-hint {
+    margin: 0 0 4px 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Step indicator at the top of the intake flow — "Step 2 of 4 · A few
+   questions" plus a row of dots. Replaces the prior "you're somewhere
+   in a sequence but who knows where" feeling. */
+.essay-flow-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 14px 0;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.essay-flow-stepper-label {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #93c5fd;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.essay-flow-stepper-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.essay-flow-stepper-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transition: background 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+}
+
+.essay-flow-stepper-dot--pending {
+    background: rgba(148, 163, 184, 0.22);
+}
+
+.essay-flow-stepper-dot--done {
+    background: rgba(59, 130, 246, 0.55);
+}
+
+.essay-flow-stepper-dot--active {
+    background: #60a5fa;
+    transform: scale(1.4);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
 .essay-flow-progress {
     font-family: var(--font-ui);
     font-size: 12px;
@@ -481,6 +565,73 @@
     margin-bottom: 0;
     flex: 1 1 auto;
     min-width: 0;
+}
+
+/* Right-aligned cluster of per-question controls: mic + Skip. Keeps the
+   tools tight against the question text instead of floating somewhere
+   the user has to search for. */
+.essay-flow-exchange-q-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.essay-flow-skip-question {
+    background: transparent;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.essay-flow-skip-question:hover:not(:disabled) {
+    background: rgba(148, 163, 184, 0.12);
+    border-color: rgba(148, 163, 184, 0.55);
+    color: var(--text-primary);
+}
+
+.essay-flow-skip-question:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Skipped state — the question row dims and shows an inline banner
+   with an Undo. Saves vertical space (no textarea) while keeping the
+   question visible so the user remembers what they passed on. */
+.essay-flow-exchange--skipped {
+    opacity: 0.65;
+}
+
+.essay-flow-exchange--skipped .essay-flow-exchange-q {
+    text-decoration: line-through;
+    text-decoration-color: rgba(148, 163, 184, 0.3);
+}
+
+.essay-flow-skipped-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px dashed rgba(148, 163, 184, 0.3);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.essay-flow-link--inline {
+    padding: 0;
+    font-size: 12px;
 }
 
 .essay-flow-textarea-with-mic {

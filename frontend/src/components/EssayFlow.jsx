@@ -118,6 +118,11 @@ export default function EssayFlow({
     const [questions, setQuestions] = useState([]);
     const [questionsLoading, setQuestionsLoading] = useState(false);
     const [answers, setAnswers] = useState({}); // { [questionIdx]: 'answer text' }
+    // Questions the user has intentionally chosen to skip. Continue is
+    // gated on every question being either answered OR explicitly
+    // skipped, so users move forward without being forced to answer
+    // each one.
+    const [skippedQuestions, setSkippedQuestions] = useState(new Set());
 
     // Step 3 state
     const [coreIdea, setCoreIdea] = useState('');
@@ -299,29 +304,60 @@ export default function EssayFlow({
     // -----------------------------------------------------------------------
     // Step 2 — Answer the LLM-generated questions
     // -----------------------------------------------------------------------
-    const allQuestionsAnswered = useMemo(() => {
+    // "Ready to continue" = every question is either answered OR
+    // explicitly skipped via its per-question Skip button. This lets users
+    // bypass individual questions they have nothing for without having to
+    // figure out an unrelated "Skip the rest" link.
+    const allQuestionsHandled = useMemo(() => {
         if (!questions.length) return false;
-        return questions.every((_, i) => (answers[i] || '').trim().length > 0);
-    }, [questions, answers]);
+        return questions.every(
+            (_, i) => (answers[i] || '').trim().length > 0 || skippedQuestions.has(i)
+        );
+    }, [questions, answers, skippedQuestions]);
 
     const handleAnswerChange = (idx, value) => {
         setAnswers((prev) => ({ ...prev, [idx]: value }));
+        // Typing into a previously-skipped question un-skips it
+        // automatically — the user clearly has something to say.
+        if (skippedQuestions.has(idx) && value.trim().length > 0) {
+            setSkippedQuestions((prev) => {
+                const next = new Set(prev);
+                next.delete(idx);
+                return next;
+            });
+        }
+    };
+
+    const handleSkipQuestion = (idx) => {
+        setSkippedQuestions((prev) => {
+            const next = new Set(prev);
+            next.add(idx);
+            return next;
+        });
+        // Clear any partial text so the saved Q&A doesn't accidentally
+        // include "ugh I don't know" or a half-thought.
+        setAnswers((prev) => {
+            if (!prev[idx]) return prev;
+            const next = { ...prev };
+            delete next[idx];
+            return next;
+        });
+    };
+
+    const handleUnskipQuestion = (idx) => {
+        setSkippedQuestions((prev) => {
+            if (!prev.has(idx)) return prev;
+            const next = new Set(prev);
+            next.delete(idx);
+            return next;
+        });
     };
 
     const handleSubmitAnswers = async () => {
         setError(null);
-        if (!allQuestionsAnswered) {
-            setError('Add at least a sentence to each question (or use the link below to skip a few).');
-            return;
-        }
-        await advanceToCoreIdea();
-    };
-
-    const handleSkipRemaining = async () => {
-        setError(null);
         const answeredCount = questions.filter((_, i) => (answers[i] || '').trim()).length;
         if (answeredCount < 1) {
-            setError('Answer at least one question before continuing.');
+            setError("Answer at least one question — even one short reply gives the council something concrete to work with.");
             return;
         }
         await advanceToCoreIdea();
@@ -517,6 +553,19 @@ export default function EssayFlow({
     const disabled = submitting || isBusy;
     const showTopicChip = step !== 'topic';
 
+    // Visible step indicator — only for the main 4-step intake. The draft
+    // branch (topic → draft) is a 2-step express path and the chip in the
+    // header is enough orientation there.
+    const STEP_ORDER = ['topic', 'questions', 'core_idea', 'voice'];
+    const STEP_LABELS = {
+        topic: 'Topic & audience',
+        questions: 'A few questions',
+        core_idea: 'Your core idea',
+        voice: 'Voice & ready',
+    };
+    const stepIndex = STEP_ORDER.indexOf(step);
+    const showStepper = stepIndex >= 0;
+
     return (
         <div className="essay-flow">
             <div className="essay-flow-card">
@@ -547,31 +596,73 @@ export default function EssayFlow({
                     </div>
                 )}
 
+                {showStepper && (
+                    <div className="essay-flow-stepper" aria-label="Intake progress">
+                        <div className="essay-flow-stepper-label">
+                            Step {stepIndex + 1} of {STEP_ORDER.length} · {STEP_LABELS[step]}
+                        </div>
+                        <div className="essay-flow-stepper-dots">
+                            {STEP_ORDER.map((s, i) => (
+                                <span
+                                    key={s}
+                                    className={
+                                        'essay-flow-stepper-dot ' +
+                                        (i < stepIndex
+                                            ? 'essay-flow-stepper-dot--done'
+                                            : i === stepIndex
+                                                ? 'essay-flow-stepper-dot--active'
+                                                : 'essay-flow-stepper-dot--pending')
+                                    }
+                                    aria-label={`Step ${i + 1}`}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {step === 'topic' && (
                     <form onSubmit={handleSubmitTopic} className="essay-flow-step">
                         <h1 className="essay-flow-question">What is your essay about?</h1>
-                        <p className="essay-flow-hint">
-                            One sentence on the topic, plus who it's for.
-                        </p>
-                        <input
-                            ref={topicRef}
-                            type="text"
-                            value={topic}
-                            onChange={(e) => setTopic(e.target.value)}
-                            placeholder="e.g. The summer I learned my mother had been a smuggler"
-                            disabled={disabled}
-                            className="essay-flow-input"
-                            maxLength={500}
-                        />
-                        <input
-                            type="text"
-                            value={audience}
-                            onChange={(e) => setAudience(e.target.value)}
-                            placeholder="Audience — e.g. an MIT admissions officer, a creative writing professor"
-                            disabled={disabled}
-                            className="essay-flow-input"
-                            maxLength={250}
-                        />
+
+                        <div className="essay-flow-field">
+                            <label htmlFor="essay-flow-topic" className="essay-flow-label">
+                                Topic
+                            </label>
+                            <p className="essay-flow-field-hint">
+                                One sentence — the smallest true thing about your essay.
+                            </p>
+                            <input
+                                id="essay-flow-topic"
+                                ref={topicRef}
+                                type="text"
+                                value={topic}
+                                onChange={(e) => setTopic(e.target.value)}
+                                placeholder="e.g. The summer I learned my mother had been a smuggler"
+                                disabled={disabled}
+                                className="essay-flow-input"
+                                maxLength={500}
+                            />
+                        </div>
+
+                        <div className="essay-flow-field">
+                            <label htmlFor="essay-flow-audience" className="essay-flow-label">
+                                Audience
+                            </label>
+                            <p className="essay-flow-field-hint">
+                                Who's reading this? Be specific — the answer changes everything.
+                            </p>
+                            <input
+                                id="essay-flow-audience"
+                                type="text"
+                                value={audience}
+                                onChange={(e) => setAudience(e.target.value)}
+                                placeholder="e.g. an MIT admissions officer, a creative writing professor"
+                                disabled={disabled}
+                                className="essay-flow-input"
+                                maxLength={250}
+                            />
+                        </div>
+
                         {error && <div className="essay-flow-error">{error}</div>}
                         <div className="essay-flow-actions">
                             <button
@@ -678,27 +769,62 @@ export default function EssayFlow({
                             {questions.map((q, i) => {
                                 const ex = examples[i];
                                 const exVisible = ex && ex.text && !ex.hidden;
+                                const isSkipped = skippedQuestions.has(i);
                                 return (
-                                    <div key={i} className="essay-flow-exchange">
+                                    <div
+                                        key={i}
+                                        className={
+                                            'essay-flow-exchange ' +
+                                            (isSkipped ? 'essay-flow-exchange--skipped' : '')
+                                        }
+                                    >
                                         <div className="essay-flow-exchange-q-row">
                                             <div className="essay-flow-exchange-q">{q}</div>
-                                            <MicButton
-                                                value={answers[i] || ''}
-                                                onChange={(next) => handleAnswerChange(i, next)}
-                                                disabled={disabled}
-                                                size="sm"
-                                                title="Talk through your answer"
-                                            />
+                                            {!isSkipped && (
+                                                <div className="essay-flow-exchange-q-tools">
+                                                    <MicButton
+                                                        value={answers[i] || ''}
+                                                        onChange={(next) => handleAnswerChange(i, next)}
+                                                        disabled={disabled}
+                                                        size="sm"
+                                                        title="Talk through your answer"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className="essay-flow-skip-question"
+                                                        onClick={() => handleSkipQuestion(i)}
+                                                        disabled={disabled}
+                                                        title="Skip this one — you don't have to answer every question"
+                                                    >
+                                                        Skip
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
-                                        <textarea
-                                            value={answers[i] || ''}
-                                            onChange={(e) => handleAnswerChange(i, e.target.value)}
-                                            placeholder="Type a sentence or two… or tap the mic to talk it through."
-                                            rows={2}
-                                            disabled={disabled}
-                                            className="essay-flow-textarea"
-                                            style={{ minHeight: 60 }}
-                                        />
+                                        {isSkipped ? (
+                                            <div className="essay-flow-skipped-banner">
+                                                <span>Skipped — the council won't ask about this.</span>
+                                                <button
+                                                    type="button"
+                                                    className="essay-flow-link essay-flow-link--inline"
+                                                    onClick={() => handleUnskipQuestion(i)}
+                                                    disabled={disabled}
+                                                >
+                                                    Undo
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <textarea
+                                                value={answers[i] || ''}
+                                                onChange={(e) => handleAnswerChange(i, e.target.value)}
+                                                placeholder="Type a sentence or two… or tap the mic to talk it through."
+                                                rows={2}
+                                                disabled={disabled}
+                                                className="essay-flow-textarea"
+                                                style={{ minHeight: 60 }}
+                                            />
+                                        )}
+                                        {!isSkipped && (
                                         <div className="essay-flow-example-row">
                                             <button
                                                 type="button"
@@ -715,12 +841,13 @@ export default function EssayFlow({
                                                       : 'Stuck? Show me an example'}
                                             </button>
                                         </div>
-                                        {ex && ex.error && (
+                                        )}
+                                        {!isSkipped && ex && ex.error && (
                                             <div className="essay-flow-example-error">
                                                 {ex.error}
                                             </div>
                                         )}
-                                        {exVisible && (
+                                        {!isSkipped && exVisible && (
                                             <div className="essay-flow-example">
                                                 <div className="essay-flow-example-label">
                                                     Example — not your answer, just a nudge
@@ -750,17 +877,14 @@ export default function EssayFlow({
                         <div className="essay-flow-actions">
                             <button
                                 type="button"
-                                className="essay-flow-link"
-                                onClick={handleSkipRemaining}
-                                disabled={disabled || questionsLoading}
-                            >
-                                Skip the rest →
-                            </button>
-                            <button
-                                type="button"
                                 className="essay-flow-primary"
                                 onClick={handleSubmitAnswers}
-                                disabled={disabled || questionsLoading}
+                                disabled={disabled || questionsLoading || !allQuestionsHandled}
+                                title={
+                                    allQuestionsHandled
+                                        ? 'Continue to your core idea'
+                                        : 'Answer or skip each question to continue'
+                                }
                             >
                                 {submitting ? 'Saving…' : 'Continue'}
                             </button>
