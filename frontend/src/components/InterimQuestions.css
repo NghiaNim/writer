@@ -191,7 +191,7 @@
     gap: 10px;
 }
 
-.interim-questions__heard-list li {
+.interim-questions__heard-list > li.interim-questions__heard-item {
     position: relative;
     padding-left: 14px;
     font-size: 13px;
@@ -199,7 +199,7 @@
     color: #cbd5e1;
 }
 
-.interim-questions__heard-list li::before {
+.interim-questions__heard-list > li.interim-questions__heard-item::before {
     content: '•';
     position: absolute;
     left: 0;
@@ -211,12 +211,146 @@
     display: block;
     color: #94a3b8;
     font-style: italic;
-    margin-bottom: 2px;
+    margin-bottom: 6px;
 }
 
 .interim-questions__heard-a {
     display: block;
     color: #e2e8f0;
+}
+
+/* Structured bullets — second-level list, no marker, indented from the
+   outer gold dot. */
+.interim-questions__heard-bullets {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.interim-questions__heard-bullets > li {
+    position: relative;
+    padding-left: 14px;
+    color: #e2e8f0;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.interim-questions__heard-bullets > li::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: rgba(251, 191, 36, 0.6);
+    font-weight: 700;
+}
+
+/* Entity chips — flex row of tagged values, color-tinted by type. */
+.interim-questions__heard-entities {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 4px 0 8px;
+}
+
+.heard-chip {
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(15, 23, 42, 0.7);
+    color: #cbd5e1;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.heard-chip--person   { border-color: rgba(167, 139, 250, 0.45); color: #c4b5fd; }
+.heard-chip--place    { border-color: rgba(74, 222, 128, 0.45);  color: #86efac; }
+.heard-chip--date     { border-color: rgba(96, 165, 250, 0.45);  color: #93c5fd; }
+.heard-chip--number   { border-color: rgba(251, 191, 36, 0.45);  color: #fcd34d; }
+.heard-chip--org      { border-color: rgba(244, 114, 182, 0.45); color: #f9a8d4; }
+.heard-chip--work     { border-color: rgba(56, 189, 248, 0.45);  color: #7dd3fc; }
+.heard-chip--other    { border-color: rgba(148, 163, 184, 0.35); color: #cbd5e1; }
+
+/* Inferred + related-facts sub-sections share label styling but each
+   gets its own accent strip to distinguish "we guessed" from "we
+   remembered". */
+.interim-questions__heard-inferred,
+.interim-questions__heard-related {
+    margin: 6px 0 8px;
+    padding: 6px 10px 6px 10px;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.55);
+    border-left: 2px solid rgba(148, 163, 184, 0.3);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+.interim-questions__heard-inferred {
+    border-left-color: rgba(251, 191, 36, 0.55);
+}
+
+.interim-questions__heard-related {
+    border-left-color: rgba(96, 165, 250, 0.55);
+}
+
+.heard-section-label {
+    display: block;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #94a3b8;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.interim-questions__heard-inferred .heard-section-label {
+    color: #fcd34d;
+}
+
+.interim-questions__heard-related .heard-section-label {
+    color: #93c5fd;
+}
+
+.interim-questions__heard-inferred ul,
+.interim-questions__heard-related ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.interim-questions__heard-inferred li,
+.interim-questions__heard-related li {
+    color: #cbd5e1;
+    font-style: italic;
+}
+
+.interim-questions__heard-loading {
+    display: block;
+    color: #94a3b8;
+    font-style: italic;
+    font-size: 12.5px;
+    position: relative;
+    padding-right: 18px;
+}
+
+.interim-questions__heard-loading::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    margin-top: -4px;
+    border-radius: 50%;
+    background: rgba(251, 191, 36, 0.55);
+    animation: interim-pulse 1.4s infinite;
 }
 
 .interim-questions__skipped-note {

@@ -2,6 +2,100 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import './InterimQuestions.css';
 
 /**
+ * One row in "Here's what the council heard". Renders the question line
+ * as the title, then either:
+ *   - the structured expansion (bullets + entity chips + inferred +
+ *     related facts) if /api/intake/expand has returned for this entry, OR
+ *   - a brief "listening…" placeholder while expansion is pending, OR
+ *   - the verbatim answer as a fallback (expansion failed or wasn't run).
+ */
+function HeardItem({ entry }) {
+    const expansion = entry?.expansion;
+    const isLoading = !!entry?.expanding && !expansion;
+
+    const bullets = Array.isArray(expansion?.bullets) ? expansion.bullets : [];
+    const entities = Array.isArray(expansion?.entities) ? expansion.entities : [];
+    const inferred = Array.isArray(expansion?.inferred) ? expansion.inferred : [];
+    const relatedFacts = Array.isArray(expansion?.related_facts)
+        ? expansion.related_facts
+        : [];
+
+    const hasStructure =
+        bullets.length > 0 ||
+        entities.length > 0 ||
+        inferred.length > 0 ||
+        relatedFacts.length > 0;
+
+    return (
+        <li className="interim-questions__heard-item">
+            <span className="interim-questions__heard-q">{entry.question}</span>
+
+            {expansion && hasStructure ? (
+                <>
+                    {bullets.length > 0 ? (
+                        <ul className="interim-questions__heard-bullets">
+                            {bullets.map((b, i) => (
+                                <li key={i}>{b}</li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <span className="interim-questions__heard-a">
+                            {entry.answer}
+                        </span>
+                    )}
+
+                    {entities.length > 0 && (
+                        <div className="interim-questions__heard-entities">
+                            {entities.map((e, i) => (
+                                <span
+                                    key={i}
+                                    className={`heard-chip heard-chip--${e.type || 'other'}`}
+                                    title={e.type || 'other'}
+                                >
+                                    {e.value}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    {inferred.length > 0 && (
+                        <div className="interim-questions__heard-inferred">
+                            <span className="heard-section-label">
+                                The council inferred
+                            </span>
+                            <ul>
+                                {inferred.map((line, i) => (
+                                    <li key={i}>{line}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {relatedFacts.length > 0 && (
+                        <div className="interim-questions__heard-related">
+                            <span className="heard-section-label">
+                                Building on what you've told us before
+                            </span>
+                            <ul>
+                                {relatedFacts.map((f) => (
+                                    <li key={f.id}>{f.fact_text}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </>
+            ) : isLoading ? (
+                <span className="interim-questions__heard-loading">
+                    Listening — the council is organizing what you just said…
+                </span>
+            ) : (
+                <span className="interim-questions__heard-a">{entry.answer}</span>
+            )}
+        </li>
+    );
+}
+
+/**
  * Side panel that appears alongside EssayLoadingStatus while the council is
  * working. Shows up to MAX_QUESTIONS_PER_RUN questions the backend asked,
  * one at a time, with a textarea + skip/submit. Answers are POSTed to
@@ -158,14 +252,7 @@ export default function InterimQuestions({
                     </div>
                     <ul className="interim-questions__heard-list">
                         {heard.map((q) => (
-                            <li key={q.question_id}>
-                                <span className="interim-questions__heard-q">
-                                    {q.question}
-                                </span>
-                                <span className="interim-questions__heard-a">
-                                    {q.answer}
-                                </span>
-                            </li>
+                            <HeardItem key={q.question_id} entry={q} />
                         ))}
                     </ul>
                 </div>
