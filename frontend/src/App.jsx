@@ -9,6 +9,12 @@ import { api, warmUpBackend } from './api';
 import './App.css';
 import './components/StageCopyButtons.css';
 
+// Soft cap so a user can't fan out so many parallel streams that we hit
+// rate limits on the chosen council models. ~3 concurrent essays gives
+// "I started another one while the first finishes" headroom without
+// blowing past OpenRouter's free-tier RPM. Easy to bump later.
+const MAX_CONCURRENT_STREAMS = 3;
+
 /**
  * Mirror of `heuristic_conversation_title` in backend/council.py so the
  * sidebar gets a clean title BEFORE the backend's Flash polish round-trips.
@@ -105,6 +111,11 @@ function AppShell() {
   // button + busy-disabled inputs working with the parallel model. The
   // sidebar's pulse dot uses the full set via the `streamingIds` prop.
   const isLoading = !!currentConversationId && streamingIds.has(currentConversationId);
+
+  // Can the user start ANOTHER essay right now? True unless we're already
+  // at the concurrency cap. Used by the Sidebar's "New Discussion" button
+  // so users can fan out parallel runs.
+  const canStartNewConversation = streamingIds.size < MAX_CONCURRENT_STREAMS;
   // After EssayFlow creates a conversation, GET /api/conversations/:id would
   // return messages:[] until the stream persists — that fetch would clobber
   // optimistic UI. Skip exactly one load for that id hand-off.
@@ -1233,6 +1244,8 @@ function AppShell() {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         streamingIds={streamingIds}
+        canStartNewConversation={canStartNewConversation}
+        maxConcurrentStreams={MAX_CONCURRENT_STREAMS}
       />
       {essayFlowVisible ? (
         <EssayFlow

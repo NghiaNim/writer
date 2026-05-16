@@ -33,6 +33,12 @@ export default function Sidebar({
   // what the single-stream world tracked. Populated for real once
   // parallel-session support lands.
   streamingIds,
+  // True unless we're at the soft cap on concurrent streams. Controls
+  // the New Discussion button so the user can fan out parallel essays
+  // while existing ones are still drafting. When false, the button
+  // surfaces a tooltip explaining why.
+  canStartNewConversation = true,
+  maxConcurrentStreams = 3,
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -99,12 +105,18 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Prominent New Discussion Button */}
+      {/* Prominent New Discussion Button — enabled even when other
+          conversations are streaming, up to the soft concurrent-stream cap. */}
       <div className="sidebar-actions">
         <button
           className="new-council-btn"
           onClick={onNewConversation}
-          disabled={isLoading}
+          disabled={!canStartNewConversation}
+          title={
+            !canStartNewConversation
+              ? `Limit: ${maxConcurrentStreams} concurrent essays`
+              : 'Start a new essay (others keep running in the background)'
+          }
         >
           <span className="btn-icon">+</span>
           <span className="btn-text">New Discussion</span>
