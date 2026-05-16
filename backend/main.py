@@ -2000,6 +2000,57 @@ async def api_intake_answer(
     return {"ok": True, "skipped": is_skipped, "extracted_count": extracted_count}
 
 
+class IntakeExpandRequest(BaseModel):
+    """Request body for /api/intake/expand.
+
+    Same Q&A pair the client already POSTed to /api/intake/answer — we
+    take it as input again so this endpoint can be called fire-and-
+    forget without depending on internal buffer state.
+    """
+    conversation_id: str = Field(..., min_length=1)
+    question_id: str = Field(..., min_length=1)
+    question: str = Field(..., min_length=1, max_length=600)
+    answer: str = Field("", max_length=8000)
+
+
+@app.post("/api/intake/expand")
+async def api_intake_expand(
+    body: IntakeExpandRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Turn a freeform interim answer into structured bullets, tagged
+    entities, hedged inferred implications, and related prior facts.
+
+    Powers the "what the council heard" panel — the answer goes in
+    verbatim, and a more organized view comes back so users see the
+    council *processing*, not just transcribing. Failure-safe: if the
+    Flash call dies the response is empty and the UI falls back to
+    showing the raw answer.
+    """
+    from .intake_expansion import expand_intake_answer
+
+    convo = storage.get_conversation(body.conversation_id, user.id)
+    if convo is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    result = await expand_intake_answer(
+        user_id=user.id,
+        question=body.question,
+        answer=body.answer,
+    )
+    posthog.capture(
+        "intake_answer_expanded",
+        distinct_id=user.id,
+        properties={
+            "bullets": len(result.get("bullets") or []),
+            "entities": len(result.get("entities") or []),
+            "inferred": len(result.get("inferred") or []),
+            "related_facts": len(result.get("related_facts") or []),
+        },
+    )
+    return result
+
+
 class RefinementSuggestionsRequest(BaseModel):
     essay_text: str
     original_brief: str = ""
