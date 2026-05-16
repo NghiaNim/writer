@@ -71,6 +71,7 @@ DEFAULT_VOICE_RULES: List[str] = [
     "Don't begin with a sweeping universal claim (\"Throughout human history…\", \"Since the dawn of…\"). Start in a specific place.",
     "Don't write paragraphs of uniform length. Vary deliberately, including one- or two-sentence paragraphs.",
     "Avoid the \"zero-to-hero\" growth pattern. Do not jump directly from recognizing a problem to complete transformation. Show gradual, believable development through failed attempts, partial progress, reflection, and concrete intermediate steps. Growth should feel incremental, not instantaneous.",
+    "Don't repeat a sentence-opening phrase across the essay. If \"I feel like\" appears once, the next sentence that wants it should restructure. Same for \"I realized,\" \"I started to,\" \"What I learned was,\" \"The thing is,\" and any other recurring stem — vary the entry into each sentence so the prose doesn't acquire a rhythmic tic.",
 
     # Tone and voice
     "No false balance as a default move. If you have a view, state it. Don't \"on the one hand / on the other hand\" everything to seem neutral.",
