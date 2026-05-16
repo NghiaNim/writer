@@ -1,5 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+// Module-level singleton coordination. The browser exposes one mic; if two
+// MicButton instances both start their own SpeechRecognition engines, they
+// fight over audio capture and the second one usually wins silently while
+// the first stays stuck in its "listening" state with no events landing.
+// We track the currently-listening hook by a per-instance identity token
+// (a plain object whose reference is stable across renders) so claim and
+// release can match by identity even though the underlying stop closure
+// is allowed to change.
+let activeInstance = null; // { token, stop } | null
+
+function claimMic(token, stopFn) {
+    if (activeInstance && activeInstance.token !== token) {
+        const prev = activeInstance.stop;
+        activeInstance = null;
+        try {
+            prev();
+        } catch {
+            // The prior hook may already be torn down — fine.
+        }
+    }
+    activeInstance = { token, stop: stopFn };
+}
+
+function releaseMic(token) {
+    if (activeInstance && activeInstance.token === token) {
+        activeInstance = null;
+    }
+}
+
 /**
  * useSpeechRecognition — thin wrapper around the browser Web Speech API.
  *
@@ -116,6 +145,28 @@ export function useSpeechRecognition({
         return rec;
     }, [supported, continuous, interimResults, lang]);
 
+    // Stable stop function (no React state in its closure) so the
+    // module-level claimMic registry can call it even after this hook's
+    // owning component has re-rendered. Updated via the .current ref.
+    const stopRef = useRef(() => {});
+    stopRef.current = () => {
+        userStoppedRef.current = true;
+        const rec = recognitionRef.current;
+        if (rec) {
+            try {
+                rec.stop();
+            } catch (e) {
+                // Already stopped — fine.
+            }
+        }
+        setListening(false);
+        setInterim('');
+    };
+
+    // Stable identity for the module-level mic registry (one per hook
+    // instance, never reassigned across renders).
+    const tokenRef = useRef({});
+
     const start = useCallback(() => {
         if (!supported) {
             setError('Speech recognition is not supported in this browser. Try Chrome, Edge, or Safari.');
@@ -125,6 +176,9 @@ export function useSpeechRecognition({
         if (!rec) return;
         setError(null);
         userStoppedRef.current = false;
+        // Singleton coordination — if another MicButton is currently
+        // listening, stop it first so only one engine is ever live.
+        claimMic(tokenRef.current, () => stopRef.current());
         try {
             rec.start();
             setListening(true);
@@ -136,25 +190,16 @@ export function useSpeechRecognition({
     }, [supported, ensureRecognition]);
 
     const stop = useCallback(() => {
-        userStoppedRef.current = true;
-        const rec = recognitionRef.current;
-        if (!rec) {
-            setListening(false);
-            return;
-        }
-        try {
-            rec.stop();
-        } catch (e) {
-            // Already stopped — fine.
-        }
-        setListening(false);
-        setInterim('');
+        releaseMic(tokenRef.current);
+        stopRef.current();
     }, []);
 
     // Clean up when the consumer unmounts mid-session.
     useEffect(() => {
+        const myToken = tokenRef.current;
         return () => {
             userStoppedRef.current = true;
+            releaseMic(myToken);
             const rec = recognitionRef.current;
             if (rec) {
                 try {
