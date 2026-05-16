@@ -305,15 +305,33 @@ export default function VoiceProfileSettings() {
         }
         setRestoreConfirming(false);
         setRestoringDefaults(true);
+        setError(null);
         try {
             const { rules: defaults = [] } = await api.voice.defaults();
             const existing = new Set(rules.map((r) => (r || '').trim().toLowerCase()));
             const missing = defaults.filter(
                 (r) => r && !existing.has(r.trim().toLowerCase())
             );
-            if (missing.length) {
-                setRules((prev) => [...prev, ...missing]);
+            if (!missing.length) {
+                // Already have every default. Surface that explicitly so a
+                // user clicking the button doesn't think it silently failed.
+                setError('You already have all the default rules — nothing to restore.');
+                return;
             }
+            const nextRules = [...rules, ...missing];
+            setRules(nextRules);
+            // Persist immediately. The previous version stopped at setRules
+            // and required the user to ALSO press Save Voice Profile, which
+            // most people don't notice — making the button feel like a no-op.
+            const updated = await api.voice.save({
+                rules: nextRules,
+                reference_paragraphs: referenceParagraphs,
+                preferred_authors: preferredAuthors,
+                inferred_style: inferredStyle,
+            });
+            applyProfile(updated);
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 2500);
         } catch (e) {
             setError(e.message || 'Failed to restore default rules');
         } finally {
