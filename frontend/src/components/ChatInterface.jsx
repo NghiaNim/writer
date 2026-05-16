@@ -8,6 +8,7 @@ import { PitchSummary, SpinePick } from './CouncilDecisions';
 import CouncilGrid from './CouncilGrid';
 import CouncilChips from './CouncilChips';
 import EssayLoadingStatus from './EssayLoadingStatus';
+import UserBriefMessage from './UserBriefMessage';
 import InterimQuestions from './InterimQuestions';
 import FinalEssay from './FinalEssay';
 import { api } from '../api';
@@ -511,9 +512,7 @@ export default function ChatInterface({
 
                             <div className="message-content">
                                 {msg.role === 'user' ? (
-                                    <div className="markdown-content">
-                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                                    </div>
+                                    <UserBriefMessage content={msg.content} />
                                 ) : (
                                     <AssistantMessageBody
                                         msg={msg}
@@ -522,6 +521,7 @@ export default function ChatInterface({
                                         isLoading={isLoading}
                                         onRegenerate={onRegenerate}
                                         onAnswerInterim={onAnswerInterim}
+                                        onAbort={onAbort}
                                         activeCouncil={activeCouncil}
                                         activeWordTarget={activeWordTarget}
                                         essayVersionLabel={versionLabelForAssistant}
@@ -1087,6 +1087,7 @@ function AssistantMessageBody({
     isLoading,
     onRegenerate,
     onAnswerInterim,
+    onAbort,
     activeCouncil = null,
     activeWordTarget = null,
     essayVersionLabel = null,
@@ -1169,6 +1170,7 @@ function AssistantMessageBody({
                 <EssayLoadingStatus
                     loading={msg.loading}
                     progress={msg.progress}
+                    onAbort={onAbort}
                 />
             )}
 

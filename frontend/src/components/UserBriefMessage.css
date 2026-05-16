@@ -1,0 +1,116 @@
+/* UserBriefMessage — clean card view of the scaffolded first message.
+   Replaces the raw "TOPIC: ... AUDIENCE: ..." dump that used to leak into
+   the chat view. */
+
+.user-brief {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.user-brief-headline {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.user-brief-label {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #93c5fd;
+    flex-shrink: 0;
+}
+
+.user-brief-topic {
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-size: 18px;
+    line-height: 1.4;
+    color: #f1f5f9;
+    font-weight: 500;
+}
+
+.user-brief-audience {
+    font-size: 13px;
+    color: var(--text-secondary, #94a3b8);
+    font-style: italic;
+    margin-left: 0;
+}
+
+.user-brief-toggle {
+    align-self: flex-start;
+    margin-top: 6px;
+    background: transparent;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    color: var(--text-secondary, #94a3b8);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.user-brief-toggle:hover {
+    background: rgba(59, 130, 246, 0.10);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #bfdbfe;
+}
+
+.user-brief-toggle-icon {
+    font-size: 10px;
+}
+
+.user-brief-details {
+    margin-top: 8px;
+    padding: 12px 14px;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.user-brief-section h4 {
+    margin: 0 0 6px 0;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #94a3b8;
+}
+
+.user-brief-section .markdown-content {
+    font-size: 14px;
+    line-height: 1.55;
+    color: #cbd5e1;
+}
+
+.user-brief-section .markdown-content p {
+    margin: 0 0 6px 0;
+}
+
+.user-brief-section .markdown-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* Draft sub-block: a hair more visual weight since it's the actual
+   text the user wrote, not derived metadata. */
+.user-brief-draft {
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    color: #e2e8f0;
+}
+
+.user-brief-authors {
+    font-size: 13px;
+    color: #cbd5e1;
+    font-style: italic;
+}
