@@ -770,10 +770,10 @@ export default function EssayFlow({
 
                 {step === 'core_idea' && (
                     <div className="essay-flow-step">
-                        <h2 className="essay-flow-question">Here's what the council heard</h2>
+                        <h2 className="essay-flow-question">Your core idea</h2>
                         <p className="essay-flow-hint">
-                            This is the spine the council will write to. Edit anything that doesn't
-                            sound like you yet.
+                            This is the spine the council will write to — synthesized from your
+                            topic and answers. Edit anything that doesn't sound like you yet.
                         </p>
                         {coreIdeaLoading ? (
                             <div className="essay-flow-hint" style={{ opacity: 0.8 }}>
