@@ -9,6 +9,25 @@ import { api, warmUpBackend } from './api';
 import './App.css';
 import './components/StageCopyButtons.css';
 
+/**
+ * Mirror of `heuristic_conversation_title` in backend/council.py so the
+ * sidebar gets a clean title BEFORE the backend's Flash polish round-trips.
+ * Strips a leading "TOPIC:" / "DRAFT:" prefix, drops everything after the
+ * first newline (so AUDIENCE / KEY IDEA scaffolding doesn't leak into the
+ * sidebar), trims to ≤60 chars. Keep these two implementations in sync.
+ */
+function deriveTitleFromMessage(content) {
+  if (!content || typeof content !== 'string') return '';
+  let s = content.trim();
+  s = s.replace(/^(topic|draft)\s*:\s*/i, '');
+  const firstLineBreak = s.indexOf('\n');
+  if (firstLineBreak > 0) s = s.slice(0, firstLineBreak).trim();
+  s = s.replace(/^['"]+|['"]+$/g, '').trim();
+  if (!s) return '';
+  if (s.length > 60) s = s.slice(0, 57).trimEnd() + '…';
+  return s;
+}
+
 /** Matches backend council-config validation (≥2 enabled personas + models + chairman). */
 function isUserCouncilReady(cc) {
   if (!cc?.personas || !(cc.chairman_model || '').trim()) return false;
@@ -257,8 +276,17 @@ function AppShell() {
       // Prevent useEffect(loadConversation) from replacing optimistic messages
       // with the empty server file before the stream persists.
       skipNextConversationFetchRef.current = true;
+      // Optimistic title: derive locally from the topic line so the sidebar
+      // shows something meaningful from the very first moment instead of
+      // "New Conversation" until the backend's Flash polish lands.
+      const optimisticTitle = deriveTitleFromMessage(message) || 'Drafting…';
       setConversations((prev) => [
-        { id: newConv.id, created_at: newConv.created_at, message_count: 0 },
+        {
+          id: newConv.id,
+          created_at: newConv.created_at,
+          message_count: 0,
+          title: optimisticTitle,
+        },
         ...prev,
       ]);
       setCurrentConversationId(newConv.id);
@@ -266,7 +294,7 @@ function AppShell() {
       setCurrentConversation({
         id: newConv.id,
         created_at: newConv.created_at,
-        title: newConv.title || 'New Conversation',
+        title: newConv.title || optimisticTitle,
         messages: [],
       });
       setEssayMode(chosenMode);
@@ -846,10 +874,27 @@ function AppShell() {
               });
               break;
 
-            case 'title_complete':
-              // Reload conversations to get updated title
-              loadConversations();
+            case 'title_complete': {
+              // Patch the title in place — cheaper than a full reload and
+              // avoids a sidebar flicker. The backend fires this as early
+              // as it can (right after the pitch picker), so the sidebar
+              // upgrades from the optimistic heuristic title to the
+              // polished Flash title within ~5–8s of the user pressing Send.
+              const newTitle = event?.data?.title || '';
+              if (newTitle) {
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === currentConversationId ? { ...c, title: newTitle } : c
+                  )
+                );
+                setCurrentConversation((prev) =>
+                  prev && prev.id === currentConversationId
+                    ? { ...prev, title: newTitle }
+                    : prev
+                );
+              }
               break;
+            }
 
             case 'run_finished':
               // Backend has fully terminated this run (success, error, or

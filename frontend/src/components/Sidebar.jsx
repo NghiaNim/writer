@@ -1,6 +1,22 @@
 import React, { useState, useMemo } from 'react';
 import './Sidebar.css';
 
+/**
+ * Render-time cleanup for conversation titles. Strips any residual
+ * "TOPIC:" / "DRAFT:" prefix and collapses to the first non-empty line.
+ * Old conversations created before the backend started polishing titles
+ * via Flash carry raw form payload as their "title" — this helper makes
+ * them readable without a migration.
+ */
+function cleanTitle(raw) {
+  if (!raw) return '';
+  let s = String(raw).trim();
+  s = s.replace(/^(topic|draft)\s*:\s*/i, '');
+  const nl = s.indexOf('\n');
+  if (nl > 0) s = s.slice(0, nl).trim();
+  return s.trim();
+}
+
 export default function Sidebar({
   conversations,
   currentConversationId,
@@ -11,16 +27,28 @@ export default function Sidebar({
   isLoading,
   onAbort,
   isOpen,
-  onClose
+  onClose,
+  // Optional: set of conversation IDs that are currently streaming. When
+  // omitted, falls back to "isLoading && active conversation" which is
+  // what the single-stream world tracked. Populated for real once
+  // parallel-session support lands.
+  streamingIds,
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const isConversationStreaming = (convId) => {
+    if (streamingIds && typeof streamingIds.has === 'function') {
+      return streamingIds.has(convId);
+    }
+    return !!isLoading && convId === currentConversationId;
+  };
+
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
     const q = searchQuery.toLowerCase();
-    return conversations.filter(conv =>
-      (conv.title || 'New Conversation').toLowerCase().includes(q)
+    return conversations.filter((conv) =>
+      cleanTitle(conv.title || 'New Conversation').toLowerCase().includes(q)
     );
   }, [conversations, searchQuery]);
 
@@ -109,14 +137,25 @@ export default function Sidebar({
             {searchQuery ? 'No matching conversations' : 'No history'}
           </div>
         ) : (
-          filteredConversations.map((conv) => (
+          filteredConversations.map((conv) => {
+            const streaming = isConversationStreaming(conv.id);
+            const cleaned = cleanTitle(conv.title);
+            const display = cleaned || (streaming ? 'Drafting…' : 'New Conversation');
+            return (
             <div
               key={conv.id}
-              className={`conversation-item ${conv.id === currentConversationId ? 'active' : ''}`}
+              className={`conversation-item ${conv.id === currentConversationId ? 'active' : ''} ${streaming ? 'streaming' : ''}`}
               onClick={() => onSelectConversation(conv.id)}
             >
               <div className="conversation-title">
-                {conv.title || 'New Conversation'}
+                {streaming && (
+                  <span
+                    className="conversation-streaming-dot"
+                    title="Drafting in progress"
+                    aria-label="Drafting in progress"
+                  />
+                )}
+                <span className="conversation-title-text">{display}</span>
               </div>
               <div className="conversation-meta">
                 <span>{new Date(conv.created_at).toLocaleDateString()}</span>
@@ -152,7 +191,8 @@ export default function Sidebar({
                 )}
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
