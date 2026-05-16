@@ -854,6 +854,23 @@ async def send_message_stream(
                 yield f"data: {json.dumps({'type': 'pitch_picked', 'data': {'winner_index': pitch_pick['winner_index'], 'reason': pitch_pick.get('reason', ''), 'pitch': shared_pitch_text}})}\n\n"
                 await asyncio.sleep(0.05)
 
+            # Opportunistic title flush. The title task has been running
+            # in parallel since the start of the run (~5-8s ago by now,
+            # depending on web search + pitch race latency). The Flash
+            # title call typically takes 1-2s, so it's usually done. If
+            # it is, emit `title_complete` now so the sidebar upgrades
+            # from the optimistic heuristic title to the polished one
+            # BEFORE drafts start streaming. If it isn't done, leave it
+            # — the end-of-run await still runs as a fallback.
+            if title_task and title_task.done():
+                try:
+                    title = title_task.result()
+                    storage.update_conversation_title(conversation_id, user.id, title)
+                    yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
+                    title_task = None
+                except Exception as e:
+                    print(f"WARN: early title flush failed: {e}")
+
             # Stage 1: collect full essays, every persona writing toward the
             # picked pitch.
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"

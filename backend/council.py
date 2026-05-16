@@ -3,6 +3,7 @@
 from typing import List, Dict, Any, Optional, Tuple
 import asyncio
 import logging
+import re
 from . import openrouter
 from . import ollama_client
 from .config import get_council_models, get_chairman_model
@@ -1021,37 +1022,88 @@ async def stage3_synthesize_final(
         }
 
 
-async def generate_conversation_title(user_query: str) -> str:
+def heuristic_conversation_title(user_query: str) -> str:
+    """Fast, no-LLM title fallback used both as a safety net for the Flash
+    call below AND as the frontend's optimistic title (mirrored client-side
+    in App.jsx).
+
+    Strips the "TOPIC:" / "DRAFT:" prefixes and any newline-delimited meta
+    fields (AUDIENCE, KEY IDEA, …) so what shows up in the sidebar is the
+    actual topic line, not raw form payload.
     """
-    Generate a short title for a conversation based on the first user message.
-
-    Uses a simple heuristic (first few words) to avoid unnecessary API calls.
-
-    Args:
-        user_query: The first user message
-
-    Returns:
-        A short title (max 50 chars)
-    """
-    # Validate input
     if not user_query or not isinstance(user_query, str):
         return "Untitled Conversation"
 
-    # Simple heuristic: take first 50 chars
-    title = user_query.strip()
-
-    # If empty after stripping, return default
-    if not title:
+    s = user_query.strip()
+    # Strip leading TOPIC:/DRAFT: prefix (case-insensitive, with optional space).
+    s = re.sub(r"^(topic|draft)\s*:\s*", "", s, flags=re.IGNORECASE)
+    # Keep only the first non-empty line — the rest is intake metadata.
+    for line in s.split("\n"):
+        if line.strip():
+            s = line.strip()
+            break
+    s = s.strip('"\'').strip()
+    if not s:
         return "Untitled Conversation"
+    if len(s) > 60:
+        s = s[:57].rstrip() + "..."
+    return s
 
-    # Remove quotes if present
-    title = title.strip('"\'')
 
-    # Truncate if too long
-    if len(title) > 50:
-        title = title[:47] + "..."
+async def generate_conversation_title(user_query: str) -> str:
+    """Produce a 3–6 word conversation title from the first user message.
 
-    return title
+    Single Gemini Flash call (~1–2s, ~$0.0001). Falls back to the heuristic
+    above on any failure so the sidebar is never left titleless. The
+    heuristic alone is already cleaner than the raw form payload — Flash
+    just turns "Personal Statement AU admissions essay" into something
+    like "AU Personal Statement".
+    """
+    heuristic = heuristic_conversation_title(user_query)
+    if not user_query or not isinstance(user_query, str):
+        return heuristic
+
+    text = user_query.strip()
+    if not text or len(text) < 12:
+        return heuristic
+
+    # Cap input — the title only cares about the opening of the prompt.
+    if len(text) > 1200:
+        text = text[:1200]
+
+    sys_prompt = (
+        "You title essay conversations for a sidebar. Read the user's first "
+        "message and return a SHORT title — 3 to 6 words, no period, no "
+        "quotes, Title Case. Strip TOPIC:/DRAFT: scaffolding. Strip "
+        "AUDIENCE/KEY IDEA meta blocks. The title is the gist of the "
+        "essay's subject — what someone glancing at the sidebar would "
+        "recognize. Output the title text only, nothing else."
+    )
+
+    try:
+        res = await query_model(
+            "google:gemini-2.5-flash",
+            [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": text},
+            ],
+            timeout=15.0,
+            temperature=0.2,
+        )
+    except Exception as e:
+        print(f"WARN: title generation call failed: {e}")
+        return heuristic
+
+    if not res or res.get("error"):
+        return heuristic
+    polished = (res.get("content") or "").strip().strip('"\'').strip()
+    # Drop any trailing punctuation / hard length cap.
+    polished = re.sub(r"[\.\!\?]+$", "", polished).strip()
+    if not polished:
+        return heuristic
+    if len(polished) > 60:
+        polished = polished[:57].rstrip() + "..."
+    return polished
 
 
 def generate_search_query(user_query: str) -> str:
