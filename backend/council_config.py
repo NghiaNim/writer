@@ -64,14 +64,19 @@ router = APIRouter(prefix="/council-config", tags=["council-config"])
 # (https://openrouter.ai/api/v1/models), update the right-hand sides; nothing
 # else in the codebase depends on the exact strings.
 DEFAULT_PERSONA_MODELS = {
-    "architect": "openrouter:anthropic/claude-sonnet-4.6",
-    "editor": "openrouter:openai/gpt-5.1",
-    "devils_advocate": "openrouter:google/gemini-2.5-flash",
+    "architect": "openrouter:openai/gpt-5.1",
+    "editor": "openrouter:google/gemini-2.5-flash",
+    "devils_advocate": "openrouter:x-ai/grok-4.20",
     "voice_guardian": "openrouter:meta-llama/llama-3.3-70b-instruct",
 }
-# Chairman intentionally in a 5th family (xAI) and a non-thinking model —
-# see note above re: reasoning-by-default models eating the completion budget.
-DEFAULT_CHAIRMAN_MODEL = "openrouter:x-ai/grok-4.20"
+# Operator preference: Claude Opus 4.7 chairs the revision pass. Architect
+# was moved off the Anthropic family (now GPT-5.1) so the family-diversity
+# rule above still holds — the chairman doesn't share a model family with
+# any council member, so Stage 3 revision can't be biased toward a voice
+# that one of the Stage 1 drafters already produced. Opus 4.7 is not a
+# reasoning-by-default model in its standard OpenRouter slug, so it dodges
+# the completion-budget burn that motivated moving off Gemini 2.5 Pro.
+DEFAULT_CHAIRMAN_MODEL = "openrouter:anthropic/claude-opus-4.7"
 
 
 def factory_council_config() -> Dict[str, Any]:
