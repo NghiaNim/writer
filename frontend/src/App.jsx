@@ -950,8 +950,14 @@ function AppShell() {
   // Submit (or skip) an answer to one of the interim questions the backend
   // emitted while drafting. Updates local message state immediately so the
   // panel feels snappy, then posts to /api/intake/answer in the background.
+  // For non-empty answers, also fires /api/intake/expand to organize the
+  // reply into bullets + entities + inferred + related-facts that get
+  // rendered in the "what the council heard" panel.
   const handleAnswerInterim = async ({ questionId, question, answer, skipped }) => {
     if (!currentConversationId || !questionId) return;
+    const trimmedAnswer = skipped ? '' : (answer || '').trim();
+    const willExpand = !skipped && !!trimmedAnswer;
+
     setCurrentConversation((prev) => {
       if (!prev) return prev;
       const messages = [...prev.messages];
@@ -962,8 +968,12 @@ function AppShell() {
         q.question_id === questionId
           ? {
               ...q,
-              answer: skipped ? '' : (answer || '').trim(),
+              answer: trimmedAnswer,
               status: skipped ? 'skipped' : 'submitted',
+              // Mark expansion-pending so the panel can show a "listening…"
+              // shimmer instead of the verbatim echo while Flash works.
+              expanding: willExpand,
+              expansion: q.expansion || null,
             }
           : q
       );
@@ -975,13 +985,58 @@ function AppShell() {
         conversationId: currentConversationId,
         questionId,
         question,
-        answer: skipped ? '' : (answer || ''),
+        answer: trimmedAnswer,
         sessionId: currentSessionId,
         skipped: !!skipped,
       });
     } catch (e) {
       console.warn('Failed to record interim answer:', e);
     }
+
+    if (!willExpand) return;
+
+    // Fire-and-forget: organize the answer into structured bullets.
+    // Latency is ~1.5–2s (one Gemini Flash call); the UI shows a
+    // "listening…" state until it lands. Failure leaves expansion null
+    // and the heard panel falls back to the raw answer.
+    api.intake
+      .expand({
+        conversationId: currentConversationId,
+        questionId,
+        question,
+        answer: trimmedAnswer,
+      })
+      .then((expansion) => {
+        setCurrentConversation((prev) => {
+          if (!prev) return prev;
+          const messages = [...prev.messages];
+          const idx = messages.length - 1;
+          const lastMsg = messages[idx];
+          if (!lastMsg || lastMsg.role !== 'assistant') return prev;
+          const updated = (lastMsg.interimQuestions || []).map((q) =>
+            q.question_id === questionId
+              ? { ...q, expansion, expanding: false }
+              : q
+          );
+          messages[idx] = { ...lastMsg, interimQuestions: updated };
+          return { ...prev, messages };
+        });
+      })
+      .catch((e) => {
+        console.warn('Failed to expand interim answer:', e);
+        setCurrentConversation((prev) => {
+          if (!prev) return prev;
+          const messages = [...prev.messages];
+          const idx = messages.length - 1;
+          const lastMsg = messages[idx];
+          if (!lastMsg || lastMsg.role !== 'assistant') return prev;
+          const updated = (lastMsg.interimQuestions || []).map((q) =>
+            q.question_id === questionId ? { ...q, expanding: false } : q
+          );
+          messages[idx] = { ...lastMsg, interimQuestions: updated };
+          return { ...prev, messages };
+        });
+      });
   };
 
   // Phase 3: regenerate the most recent essay using the same user prompt.

@@ -783,6 +783,22 @@ export const api = {
       }
       return response.json();
     },
+    async expand({ conversationId, questionId, question, answer = '' }) {
+      const response = await authedFetch(`${API_BASE}/api/intake/expand`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          question_id: questionId,
+          question,
+          answer,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to expand answer'));
+      }
+      return response.json();
+    },
     async coreIdea({ topic, audience = '', qa = [], essayType = 'general', sessionId = null }) {
       const response = await authedFetch(`${API_BASE}/api/intake/core-idea`, {
         method: 'POST',
