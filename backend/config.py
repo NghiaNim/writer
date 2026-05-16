@@ -44,12 +44,14 @@ def get_chairman_model() -> str:
     return settings.chairman_model or DEFAULT_CHAIRMAN_MODEL
 
 
-# Legacy constants for backwards compatibility
+# Legacy constants for backwards compatibility. Mirror DEFAULT_PERSONA_MODELS
+# / DEFAULT_CHAIRMAN_MODEL in backend/council_config.py — see the note there
+# about why the chairman must not be a reasoning-by-default model.
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 COUNCIL_MODELS = [
-    "openai/gpt-4.1",
-    "google/gemini-2.5-pro",
-    "anthropic/claude-sonnet-4",
-    "x-ai/grok-3",
+    "anthropic/claude-sonnet-4.6",
+    "openai/gpt-5.1",
+    "google/gemini-2.5-flash",
+    "meta-llama/llama-3.3-70b-instruct",
 ]
-CHAIRMAN_MODEL = "google/gemini-2.5-pro"
+CHAIRMAN_MODEL = "x-ai/grok-4.20"

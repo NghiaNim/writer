@@ -1816,7 +1816,7 @@ async def api_delete_user_fact(
 #                                  brief. Single call, no council.
 
 
-_INTAKE_MODEL = "openrouter:anthropic/claude-sonnet-4"
+_INTAKE_MODEL = "openrouter:anthropic/claude-sonnet-4.6"
 
 
 class IntakeQuestionsRequest(BaseModel):
