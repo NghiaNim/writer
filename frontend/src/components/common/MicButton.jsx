@@ -7,10 +7,14 @@ import './MicButton.css';
  *
  * Usage:
  *   <MicButton value={input} onChange={setInput} disabled={isLoading} />
+ *   <MicButton value={input} onChange={setInput} showLabel /> // with "Dictate" text
  *
  * Behavior:
  *   - Toggle: click to start, click to stop. Brainstorming sessions can
  *     run minutes; push-to-hold would tire the hand.
+ *   - Singleton: starting one MicButton automatically stops any other
+ *     MicButton that's currently listening — only one engine on the mic
+ *     at a time. See useSpeechRecognition.js for the registry.
  *   - Each finalized utterance is appended to `value` with a single
  *     space, so the user keeps any text they typed before pressing mic.
  *   - Interim (still-being-recognized) text shows in a small floating
@@ -24,6 +28,10 @@ export default function MicButton({
     disabled = false,
     title = 'Dictate (talk to fill this field)',
     size = 'md',
+    // When true, the button renders with an inline "Dictate" label next
+    // to the icon so users actually notice it. Defaults off for surfaces
+    // that need a compact icon-only control (e.g. inside the chat input).
+    showLabel = false,
 }) {
     const handleFinalText = useCallback(
         (text) => {
@@ -53,7 +61,7 @@ export default function MicButton({
                 type="button"
                 onClick={handleClick}
                 disabled={disabled}
-                className={`mic-button mic-button--${size} ${listening ? 'mic-button--listening' : ''}`}
+                className={`mic-button mic-button--${size} ${showLabel ? 'mic-button--labeled' : ''} ${listening ? 'mic-button--listening' : ''}`}
                 title={listening ? 'Stop dictation' : title}
                 aria-pressed={listening}
                 aria-label={listening ? 'Stop dictation' : 'Start dictation'}
@@ -69,6 +77,11 @@ export default function MicButton({
                         '🎤'
                     )}
                 </span>
+                {showLabel && (
+                    <span className="mic-button-label">
+                        {listening ? 'Listening…' : 'Dictate'}
+                    </span>
+                )}
             </button>
             {listening && interim ? (
                 <span className="mic-button-interim" aria-live="polite">

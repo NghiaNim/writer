@@ -11,33 +11,70 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  color: #cbd5e1;
+  gap: 8px;
+  /* Brighter idle state — was rgba(30,41,59,0.7) which read as
+     "almost invisible" on the dark chamber background. Subtle blue tint
+     so users actually notice the affordance without it shouting. */
+  background: rgba(59, 130, 246, 0.10);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
   border-radius: 999px;
   cursor: pointer;
   font-family: var(--font-ui);
+  font-weight: 500;
   transition: background-color 120ms ease, border-color 120ms ease,
-    color 120ms ease, box-shadow 120ms ease;
+    color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
   flex-shrink: 0;
 }
 
-.mic-button--md {
-  width: 36px;
-  height: 36px;
-  font-size: 16px;
+.mic-button--sm {
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
 }
 
-.mic-button--sm {
-  width: 28px;
-  height: 28px;
+.mic-button--md {
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+}
+
+.mic-button--lg {
+  width: 48px;
+  height: 48px;
+  font-size: 22px;
+}
+
+/* Labeled variant — pill-shaped with "Dictate" text. Auto-sizes width
+   to fit the label so it stands out as an actual call-to-action. */
+.mic-button--labeled {
+  width: auto;
+  padding: 0 14px 0 12px;
+  border-radius: 22px;
+}
+
+.mic-button--labeled.mic-button--sm {
+  height: 30px;
+  padding: 0 12px 0 10px;
+}
+
+.mic-button--labeled.mic-button--lg {
+  height: 48px;
+  padding: 0 18px 0 14px;
+}
+
+.mic-button-label {
   font-size: 13px;
+  letter-spacing: 0.02em;
+  line-height: 1;
 }
 
 .mic-button:hover:not(:disabled) {
-  background: rgba(51, 65, 85, 0.9);
-  color: #f1f5f9;
-  border-color: rgba(148, 163, 184, 0.55);
+  background: rgba(59, 130, 246, 0.18);
+  color: #bfdbfe;
+  border-color: rgba(59, 130, 246, 0.55);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.18);
 }
 
 .mic-button:disabled {
