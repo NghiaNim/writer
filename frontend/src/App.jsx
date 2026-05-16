@@ -107,6 +107,15 @@ function AppShell() {
   // the active conversation so existing single-stream UX still works.
   const abortControllersRef = useRef(new Map());
 
+  // Per-conversation in-memory state cache. Lets SSE events for a stream
+  // the user has navigated AWAY from continue to accumulate progress, so
+  // when they switch back mid-stream they see live partial state instead
+  // of either a stale snapshot or an empty server fetch. Keyed by
+  // conversation id; values are the full conversation object (id, title,
+  // messages[]). Pruned when streams complete + the conv is reloaded
+  // from server.
+  const liveConversationsRef = useRef(new Map());
+
   // Derived "is the active conversation streaming?" — keeps Sidebar's Stop
   // button + busy-disabled inputs working with the parallel model. The
   // sidebar's pulse dot uses the full set via the `streamingIds` prop.
@@ -215,13 +224,22 @@ function AppShell() {
       skipNextConversationFetchRef.current = false;
       return;
     }
-    // If this conversation currently has a live stream, skip the server
-    // fetch: the visible state we have was either set by the active stream
-    // or it's empty/stale because we just switched into the conversation
-    // mid-flight. Once the stream finishes it triggers loadConversations
-    // (sidebar refresh); the user can switch out and back in to pull the
-    // finalized message list.
-    if (streamingIds.has(currentConversationId)) return;
+    // If this conversation has a live stream + cached state, restore from
+    // the in-memory cache so the user lands on whatever partial progress
+    // has accumulated while they were looking elsewhere. The cache is
+    // continuously updated by safeSetConv for every SSE event the stream
+    // emits, so this is always at least as fresh as the server.
+    if (streamingIds.has(currentConversationId)) {
+      const cached = liveConversationsRef.current.get(currentConversationId);
+      if (cached) {
+        setCurrentConversation(cached);
+        return;
+      }
+      // Streaming but no cache yet (rare race) — leave visible state alone
+      // until the next safeSetConv tick fills the cache and the active-conv
+      // branch of that setter syncs it to the view.
+      return;
+    }
     loadConversation(currentConversationId);
   }, [currentConversationId, streamingIds]);
 
@@ -424,14 +442,46 @@ function AppShell() {
       return next;
     });
 
-    // Stream-local setter that only applies updates if the visible
-    // conversation matches THIS stream's target. Background streams use
-    // this same handler — without the guard, their SSE events would
-    // overwrite whatever conversation the user has navigated to.
+    // Seed the in-memory cache from whatever the active view currently has
+    // (when handleSendMessage is called for the freshly-created conv, this
+    // is the seed object set by handleEssayFlowComplete; for a regenerate,
+    // it's the existing currentConversation). The cache becomes the source
+    // of truth for THIS stream so events still flow even if the user
+    // navigates away mid-run.
+    if (
+      !liveConversationsRef.current.has(targetConversationId) &&
+      currentConversation &&
+      currentConversation.id === targetConversationId
+    ) {
+      liveConversationsRef.current.set(targetConversationId, currentConversation);
+    }
+
+    // Stream-local setter: applies the updater to THIS stream's target
+    // conversation regardless of which conversation is currently visible,
+    // by keeping the in-memory cache as the source of truth. Visible
+    // state is then synced from the cache only when the active conv
+    // matches the target — so background streams continue accumulating
+    // progress in the cache while the user looks at a different
+    // conversation, and switching back to a streaming conv shows live
+    // partial state instead of stale or empty data.
     const safeSetConv = (updater) => {
+      const apply = (target) => {
+        if (!target) return target;
+        return typeof updater === 'function' ? updater(target) : updater;
+      };
+      const cached = liveConversationsRef.current.get(targetConversationId);
+      if (cached) {
+        const next = apply(cached);
+        if (next) liveConversationsRef.current.set(targetConversationId, next);
+      }
       setCurrentConversation((prev) => {
         if (!prev || prev.id !== targetConversationId) return prev;
-        return typeof updater === 'function' ? updater(prev) : updater;
+        const next = apply(prev);
+        // Keep the cache aligned with the visible state if both branches
+        // saw the update — guards against drift if React batches one
+        // setter but not the other.
+        if (next) liveConversationsRef.current.set(targetConversationId, next);
+        return next;
       });
     };
 
@@ -1066,6 +1116,12 @@ function AppShell() {
       if (abortControllersRef.current.get(targetConversationId) === controller) {
         abortControllersRef.current.delete(targetConversationId);
       }
+      // Drop the live-cache entry now that the stream is done. The next
+      // time the user navigates into this conversation, useEffect falls
+      // through to loadConversation() and picks up the server-persisted
+      // final state. Keeping the cache around past run-end risks showing
+      // stale optimistic data after the backend has saved its version.
+      liveConversationsRef.current.delete(targetConversationId);
       // Reload conversations to ensure title/messages are synced, even if aborted
       loadConversations();
     }
