@@ -919,7 +919,8 @@ export default function EssayFlow({
                                         value={coreIdea}
                                         onChange={setCoreIdea}
                                         disabled={disabled}
-                                        size="sm"
+                                        size="md"
+                                        showLabel
                                         title="Talk through changes to your core idea"
                                     />
                                 </div>

@@ -931,6 +931,7 @@ export default function ChatInterface({
                                 value={input}
                                 onChange={setInput}
                                 disabled={isLoading}
+                                showLabel
                                 title="Talk through what you want changed"
                             />
 
@@ -1048,6 +1049,7 @@ export default function ChatInterface({
                                 value={input}
                                 onChange={setInput}
                                 disabled={isLoading}
+                                showLabel
                                 title={
                                     essayMode === 'draft'
                                         ? 'Talk through your draft'
