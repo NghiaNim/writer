@@ -57,6 +57,7 @@ DEFAULT_VOICE_RULES: List[str] = [
     "Cut the \"From X to Y\" sweep (\"From beginners to experts, everyone benefits\"). Almost always vacuous.",
     "Cut participial wind-ups as transitions (\"Having considered the options, the decision was clear\").",
     "Don't default to the \"While X, Y\" concession opener (\"While the technology is promising, challenges remain\"). Useful occasionally; not as a default hedge.",
+    "Avoid rhetorical contrast structures and mirrored sentence patterns. Do not use formulations like \"It was not X. It was Y,\" \"X hadn't happened because Y,\" or short declarative reversals. Vary sentence structure and avoid dramatic realizations or rhythmic parallelism.",
 
     # Vocabulary to avoid
     "Avoid words that flag AI: delve, navigate (figurative), leverage, robust, seamless, holistic, multifaceted, nuanced, intricate, tapestry, landscape (figurative), realm, journey (figurative), underscore, foster, harness, pivotal, crucial, essential, vital, paramount.",
@@ -69,6 +70,7 @@ DEFAULT_VOICE_RULES: List[str] = [
     "Avoid the \"ultimately / in conclusion / in essence\" wrap-up at the end of sections.",
     "Don't begin with a sweeping universal claim (\"Throughout human history…\", \"Since the dawn of…\"). Start in a specific place.",
     "Don't write paragraphs of uniform length. Vary deliberately, including one- or two-sentence paragraphs.",
+    "Avoid the \"zero-to-hero\" growth pattern. Do not jump directly from recognizing a problem to complete transformation. Show gradual, believable development through failed attempts, partial progress, reflection, and concrete intermediate steps. Growth should feel incremental, not instantaneous.",
 
     # Tone and voice
     "No false balance as a default move. If you have a view, state it. Don't \"on the one hand / on the other hand\" everything to seem neutral.",
