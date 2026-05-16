@@ -93,8 +93,6 @@ export default function Sidebar({
         <div className="sidebar-header">
         <div className="sidebar-title-wrapper">
           <div className="sidebar-title"><span className="title-icon" aria-hidden="true">☕</span> MidnightCoffee</div>
-          <div className="sidebar-subtitle">Created by: Jacob Ben-David</div>
-          <div className="sidebar-version">v0.2.1</div>
         </div>
         <button
           className="icon-button"
