@@ -277,6 +277,14 @@ def save_voice_profile(
     endpoint a stable shape: rules / reference_paragraphs / inferred_style
     / preferred_authors only.
     """
+    # Trigger seed-on-first-read BEFORE our upsert so the row exists with
+    # DEFAULT_VOICE_RULES populated. Without this, the EssayFlow voice step
+    # — which saves only `preferred_authors` — would INSERT a fresh row
+    # whose `rules` defaulted to '[]'::jsonb (per migration 001), leaving
+    # the user with an empty voice profile even though they never opted out
+    # of any defaults.
+    load_voice_profile(user_id, essay_type)
+
     sb = get_supabase()
     update: Dict[str, Any] = {}
     if body.rules is not None:
