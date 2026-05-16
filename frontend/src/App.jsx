@@ -62,7 +62,11 @@ function AppShell() {
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // Set of conversation IDs that currently have an open SSE stream. Replaces
+  // the prior single `isLoading` boolean so multiple essays can stream in
+  // parallel — switching conversations no longer aborts the one you left.
+  // `isLoading` (below) is derived from this set + the active conversation.
+  const [streamingIds, setStreamingIds] = useState(() => new Set());
   const [showSettings, setShowSettings] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState('council');
   const [ollamaStatus, setOllamaStatus] = useState({
@@ -92,8 +96,15 @@ function AppShell() {
   // the user's saved default if EssayFlow doesn't supply one.
   const [currentCouncil, setCurrentCouncil] = useState(null);
   const [currentWordTarget, setCurrentWordTarget] = useState(null);
-  const abortControllerRef = useRef(null);
-  const requestIdRef = useRef(0);
+  // Per-conversation AbortControllers so streams in different conversations
+  // can run concurrently. handleAbort takes an optional convId; defaults to
+  // the active conversation so existing single-stream UX still works.
+  const abortControllersRef = useRef(new Map());
+
+  // Derived "is the active conversation streaming?" — keeps Sidebar's Stop
+  // button + busy-disabled inputs working with the parallel model. The
+  // sidebar's pulse dot uses the full set via the `streamingIds` prop.
+  const isLoading = !!currentConversationId && streamingIds.has(currentConversationId);
   // After EssayFlow creates a conversation, GET /api/conversations/:id would
   // return messages:[] until the stream persists — that fetch would clobber
   // optimistic UI. Skip exactly one load for that id hand-off.
@@ -193,8 +204,15 @@ function AppShell() {
       skipNextConversationFetchRef.current = false;
       return;
     }
+    // If this conversation currently has a live stream, skip the server
+    // fetch: the visible state we have was either set by the active stream
+    // or it's empty/stale because we just switched into the conversation
+    // mid-flight. Once the stream finishes it triggers loadConversations
+    // (sidebar refresh); the user can switch out and back in to pull the
+    // finalized message list.
+    if (streamingIds.has(currentConversationId)) return;
     loadConversation(currentConversationId);
-  }, [currentConversationId]);
+  }, [currentConversationId, streamingIds]);
 
   const loadConversations = async (retryCount = 0) => {
     try {
@@ -355,13 +373,21 @@ function AppShell() {
     }
   };
 
-  const handleAbort = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      // Don't set to null here - let the request handler clean up
-      // This prevents race conditions with rapid clicks
-      setIsLoading(false);
+  // Abort one specific conversation's stream. Defaults to the active one
+  // so the existing single-Stop-button UX is preserved; callers that want
+  // to stop a background stream can pass its conversation id.
+  const handleAbort = (convId = currentConversationId) => {
+    if (!convId) return;
+    const controller = abortControllersRef.current.get(convId);
+    if (controller) {
+      controller.abort();
     }
+    setStreamingIds((prev) => {
+      if (!prev.has(convId)) return prev;
+      const next = new Set(prev);
+      next.delete(convId);
+      return next;
+    });
   };
 
   const handleSendMessage = async (content, webSearch, options = {}) => {
@@ -374,18 +400,35 @@ function AppShell() {
     if (!targetConversationId) return;
     const requestEssayMode = streamOptions.essayMode || essayMode;
 
-    // Assign unique ID to this request to prevent race conditions
-    const currentRequestId = ++requestIdRef.current;
+    // Each conversation gets its own AbortController, scoped to this run.
+    // We deliberately do NOT cancel any other conversation's in-flight
+    // controller — that's what enables parallel streaming sessions.
+    const controller = new AbortController();
+    abortControllersRef.current.set(targetConversationId, controller);
 
-    // Create new AbortController for this request
-    abortControllerRef.current = new AbortController();
+    setStreamingIds((prev) => {
+      if (prev.has(targetConversationId)) return prev;
+      const next = new Set(prev);
+      next.add(targetConversationId);
+      return next;
+    });
 
-    setIsLoading(true);
+    // Stream-local setter that only applies updates if the visible
+    // conversation matches THIS stream's target. Background streams use
+    // this same handler — without the guard, their SSE events would
+    // overwrite whatever conversation the user has navigated to.
+    const safeSetConv = (updater) => {
+      setCurrentConversation((prev) => {
+        if (!prev || prev.id !== targetConversationId) return prev;
+        return typeof updater === 'function' ? updater(prev) : updater;
+      });
+    };
+
     let streamError = null;
     try {
       // Optimistically add user message to UI
       const userMessage = { role: 'user', content };
-      setCurrentConversation((prev) => ({
+      safeSetConv((prev) => ({
         ...prev,
         messages: [...prev.messages, userMessage],
       }));
@@ -418,7 +461,7 @@ function AppShell() {
       };
 
       // Add the partial assistant message
-      setCurrentConversation((prev) => ({
+      safeSetConv((prev) => ({
         ...prev,
         messages: [...prev.messages, assistantMessage],
       }));
@@ -441,7 +484,7 @@ function AppShell() {
         (eventType, event) => {
           switch (eventType) {
             case 'search_start':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -459,7 +502,7 @@ function AppShell() {
               break;
 
             case 'search_complete':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -486,7 +529,7 @@ function AppShell() {
             case 'search_error':
               // Search failed but the run continues — surface a warning so
               // the user knows the council is drafting without web context.
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -514,7 +557,7 @@ function AppShell() {
               break;
 
             case 'pitch_start':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
                 const updatedLastMsg = {
@@ -528,7 +571,7 @@ function AppShell() {
               break;
 
             case 'pitch_init':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
                 messages[messages.length - 1] = {
@@ -543,7 +586,7 @@ function AppShell() {
               break;
 
             case 'pitch_progress':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
                 const updatedPitches = lastMsg.pitches
@@ -562,7 +605,7 @@ function AppShell() {
               break;
 
             case 'pitch_complete':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
                 messages[messages.length - 1] = {
@@ -577,7 +620,7 @@ function AppShell() {
 
             case 'pitch_picked':
               // event.data = {winner_index, reason, pitch}
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
                 messages[messages.length - 1] = {
@@ -590,7 +633,7 @@ function AppShell() {
 
             case 'spine_picked':
               // event.data = {winner_index, reason, persona, model}
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
                 messages[messages.length - 1] = {
@@ -602,7 +645,7 @@ function AppShell() {
               break;
 
             case 'stage1_start':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -625,7 +668,7 @@ function AppShell() {
 
             case 'stage1_init':
               console.log('DEBUG: Received stage1_init', event);
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -647,7 +690,7 @@ function AppShell() {
               break;
 
             case 'stage1_progress':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -673,7 +716,7 @@ function AppShell() {
               break;
 
             case 'stage1_complete':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -697,7 +740,7 @@ function AppShell() {
               break;
 
             case 'stage2_start':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -719,7 +762,7 @@ function AppShell() {
               break;
 
             case 'stage2_init':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -741,7 +784,7 @@ function AppShell() {
               break;
 
             case 'stage2_progress':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -767,7 +810,7 @@ function AppShell() {
               break;
 
             case 'stage2_complete':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -795,7 +838,7 @@ function AppShell() {
               break;
 
             case 'stage3_start':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -817,7 +860,7 @@ function AppShell() {
               break;
 
             case 'stage3_complete':
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
 
@@ -838,8 +881,15 @@ function AppShell() {
                 messages[messages.length - 1] = updatedLastMsg;
                 return { ...prev, messages };
               });
-              // Hide loading indicator once final answer is shown
-              setIsLoading(false);
+              // Hide loading indicator once final answer is shown — for THIS
+              // conversation only. Other parallel streams stay marked
+              // streaming in the sidebar.
+              setStreamingIds((prev) => {
+                if (!prev.has(targetConversationId)) return prev;
+                const next = new Set(prev);
+                next.delete(targetConversationId);
+                return next;
+              });
               break;
 
             case 'interim_question':
@@ -848,7 +898,7 @@ function AppShell() {
               // council is still working. clarification_question is the
               // chairman's final ask right before stage 3 — same data shape,
               // different label (chairmanAsk: true).
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 if (!prev) return prev;
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
@@ -884,11 +934,11 @@ function AppShell() {
               if (newTitle) {
                 setConversations((prev) =>
                   prev.map((c) =>
-                    c.id === currentConversationId ? { ...c, title: newTitle } : c
+                    c.id === targetConversationId ? { ...c, title: newTitle } : c
                   )
                 );
-                setCurrentConversation((prev) =>
-                  prev && prev.id === currentConversationId
+                safeSetConv((prev) =>
+                  prev && prev.id === targetConversationId
                     ? { ...prev, title: newTitle }
                     : prev
                 );
@@ -901,7 +951,7 @@ function AppShell() {
               // shortly before either). Late interim-question answers will
               // still persist to user_fact but cannot land in this chairman
               // synthesis — freeze the panel.
-              setCurrentConversation((prev) => {
+              safeSetConv((prev) => {
                 if (!prev) return prev;
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
@@ -916,7 +966,12 @@ function AppShell() {
               break;
 
             case 'complete':
-              setIsLoading(false);
+              setStreamingIds((prev) => {
+                if (!prev.has(targetConversationId)) return prev;
+                const next = new Set(prev);
+                next.delete(targetConversationId);
+                return next;
+              });
               break;
 
             case 'error':
@@ -924,14 +979,19 @@ function AppShell() {
               streamError = new Error(
                 event.message || 'The council run failed partway through.'
               );
-              setIsLoading(false);
+              setStreamingIds((prev) => {
+                if (!prev.has(targetConversationId)) return prev;
+                const next = new Set(prev);
+                next.delete(targetConversationId);
+                return next;
+              });
               break;
 
             default:
               console.log('Unknown event type:', eventType);
           }
         },
-        abortControllerRef.current?.signal
+        controller.signal
       );
       if (streamError) {
         throw streamError;
@@ -941,7 +1001,7 @@ function AppShell() {
       if (error.name === 'AbortError') {
         console.log('Request aborted');
         // Mark the assistant message as aborted and stop timers
-        setCurrentConversation((prev) => {
+        safeSetConv((prev) => {
           if (!prev || prev.messages.length < 2) return prev;
           const messages = [...prev.messages];
           const lastMsg = messages[messages.length - 1];
@@ -972,20 +1032,28 @@ function AppShell() {
         return;
       }
       console.error('Failed to send message:', error);
-      // Remove optimistic messages on error
-      setCurrentConversation((prev) => ({
-        ...prev,
-        messages: prev.messages.slice(0, -2),
-      }));
-      setIsLoading(false);
+      // Remove optimistic messages on error — only if the user is still
+      // looking at this conversation. If they've navigated away, the
+      // stream's error shouldn't yank visible state out from under them.
+      safeSetConv((prev) => {
+        if (!prev || prev.id !== targetConversationId) return prev;
+        return { ...prev, messages: prev.messages.slice(0, -2) };
+      });
+      setStreamingIds((prev) => {
+        if (!prev.has(targetConversationId)) return prev;
+        const next = new Set(prev);
+        next.delete(targetConversationId);
+        return next;
+      });
       if (propagateError) {
         throw error;
       }
     } finally {
-      // Only clear the controller if this is still the current request
-      // This prevents race conditions if user rapidly sends multiple messages
-      if (requestIdRef.current === currentRequestId) {
-        abortControllerRef.current = null;
+      // Drop our controller from the map if it's still ours (a quick
+      // sequence of sends to the SAME conv would have replaced it
+      // already, in which case we leave the new one alone).
+      if (abortControllersRef.current.get(targetConversationId) === controller) {
+        abortControllersRef.current.delete(targetConversationId);
       }
       // Reload conversations to ensure title/messages are synced, even if aborted
       loadConversations();
@@ -1164,6 +1232,7 @@ function AppShell() {
         onAbort={handleAbort}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        streamingIds={streamingIds}
       />
       {essayFlowVisible ? (
         <EssayFlow
