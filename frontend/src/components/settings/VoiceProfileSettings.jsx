@@ -363,6 +363,36 @@ export default function VoiceProfileSettings() {
     const removeParagraph = (idx) =>
         setReferenceParagraphs((prev) => prev.filter((_, i) => i !== idx));
 
+    // Upload a plain-text or markdown writing sample. Splits the file
+    // into paragraphs on blank lines and appends each as its own
+    // reference. Caps each upload at 10 paragraphs and 8KB per
+    // paragraph so a runaway file can't blow up the voice profile.
+    const handleSampleFile = async (file) => {
+        if (!file) return;
+        if (file.size > 200_000) {
+            setError('That file is bigger than 200KB — try pasting a shorter excerpt instead.');
+            return;
+        }
+        setError(null);
+        try {
+            const text = await file.text();
+            const paragraphs = text
+                .split(/\n\s*\n+/)
+                .map((p) => p.trim())
+                .filter((p) => p.length > 30 && p.length <= 8000)
+                .slice(0, 10);
+            if (paragraphs.length === 0) {
+                setError('Could not find usable paragraphs in that file — make sure it has blank lines between paragraphs.');
+                return;
+            }
+            setReferenceParagraphs((prev) => [...prev, ...paragraphs]);
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 2500);
+        } catch (e) {
+            setError(e?.message || 'Could not read that file.');
+        }
+    };
+
     // ----- Preferred authors -----
     const addAuthor = () => {
         const v = newAuthor.trim();
@@ -776,8 +806,51 @@ export default function VoiceProfileSettings() {
                     rows={4}
                     style={{ ...inputStyle, fontFamily: 'var(--font-content, serif)', resize: 'vertical' }}
                 />
-                <div style={{ display: 'flex', gap: '8px', marginTop: '8px', justifyContent: 'flex-end' }}>
-                    <button type="button" style={secondaryButtonStyle} onClick={addParagraph} disabled={!newParagraph.trim()}>
+                <div
+                    style={{
+                        display: 'flex',
+                        gap: '8px',
+                        marginTop: '8px',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                    }}
+                >
+                    {/* Hidden input + clickable label = browser file picker.
+                        Limits to .txt and .md because we read with file.text();
+                        .docx and .pdf would need parsing libraries. Users with
+                        Word/Google Docs export to .txt first. */}
+                    <input
+                        type="file"
+                        id="voice-sample-upload"
+                        accept=".txt,.md,text/plain,text/markdown"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            handleSampleFile(file);
+                            e.target.value = '';
+                        }}
+                    />
+                    <label
+                        htmlFor="voice-sample-upload"
+                        style={{
+                            ...secondaryButtonStyle,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                        }}
+                        title="Upload a .txt or .md file of your own writing — paragraphs will be added as separate samples"
+                    >
+                        <span aria-hidden="true">📎</span>
+                        Upload a sample (.txt, .md)
+                    </label>
+                    <button
+                        type="button"
+                        style={secondaryButtonStyle}
+                        onClick={addParagraph}
+                        disabled={!newParagraph.trim()}
+                    >
                         Add sample
                     </button>
                 </div>
