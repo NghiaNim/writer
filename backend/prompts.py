@@ -10,6 +10,23 @@ CHRONOLOGY_BLOCK = """CHRONOLOGY:
 If the user's brief or facts contain time markers (years, ages, "when I was X", "two years ago", "before/after", "later"), respect the chronological order of events in the essay by default. You may invert the sequence only when a clear structural purpose justifies it — a deliberate flashback frame, or a present-day scene that reveals a past one. Do not jumble timelines arbitrarily."""
 
 
+# Anti-template directive. Personal essays from these models reliably
+# default to a five-paragraph-essay mold: hook intro, three body paragraphs
+# each with topic sentence + example + tie-back, then a synthesis closer.
+# That shape SCREAMS template — it's the high-school-essay default and the
+# strongest single signal that this wasn't actually written by a person.
+# This block tells the council to actively break that pattern.
+ANTI_TEMPLATE_BLOCK = """STRUCTURAL ANTI-TEMPLATE:
+Do not write a five-paragraph essay. Concretely, that means:
+  - Do NOT default to "hook intro → 3 body paragraphs → synthesis conclusion." The reader can smell that structure from a mile away.
+  - Do NOT start every paragraph with a topic sentence and end with a tie-back. Let paragraphs do different jobs: one might be a single image, one might be a long argument, one might be dialogue.
+  - Do NOT use even paragraph lengths. Uneven is the goal — including 1-sentence and 2-sentence paragraphs.
+  - Do NOT include a conclusion that restates the thesis. End where the thought ends. If the closing paragraph could be cut without losing meaning, cut it.
+  - Do NOT use connective words like "Furthermore", "Moreover", "In conclusion", "Additionally" — these are scaffolding from a school-essay shape that doesn't belong here.
+  - Do NOT use section headers (### Introduction, ### Body, etc.). Personal essays don't have headers.
+If the essay you produce could appear in a high-school AP-essay sample collection, you have failed."""
+
+
 STAGE1_PROMPT_DEFAULT = """You are a member of an essay-writing council.
 {search_context_block}
 {voice_profile_block}
@@ -18,6 +35,8 @@ STAGE1_PROMPT_DEFAULT = """You are a member of an essay-writing council.
 {word_target_block}
 
 """ + CHRONOLOGY_BLOCK + """
+
+""" + ANTI_TEMPLATE_BLOCK + """
 
 You will receive either a topic the user wants an essay on, or a rough draft they want improved. In either case, produce a single complete essay. Take creative risks; prefer the surprising sentence over the safe one. Do not preface, hedge, or apologize. Do not announce what you are about to do. Just write the essay.
 
@@ -119,6 +138,8 @@ In draft mode: produce a structurally improved version. You may reorganize, merg
 {library_voice_block}
 """ + CHRONOLOGY_BLOCK + """
 
+""" + ANTI_TEMPLATE_BLOCK + """
+
 Do not preface, hedge, apologize, or describe your process. Output only the essay itself.
 
 {search_context_block}
@@ -146,6 +167,8 @@ In draft mode: produce a tightened version. Cut without losing meaning. Preserve
 {library_voice_block}
 """ + CHRONOLOGY_BLOCK + """
 
+""" + ANTI_TEMPLATE_BLOCK + """
+
 Do not preface, hedge, apologize, or describe your process. Output only the essay itself.
 
 {search_context_block}
@@ -172,6 +195,8 @@ In draft mode: produce an improved version that strengthens the user's argument 
 {student_profile_block}
 {library_voice_block}
 """ + CHRONOLOGY_BLOCK + """
+
+""" + ANTI_TEMPLATE_BLOCK + """
 
 Do not preface, hedge, apologize, or describe your process. Output only the essay itself.
 
@@ -204,6 +229,8 @@ In topic mode: write the version that sounds like a thinking person, not a brand
 In draft mode: preserve the user's voice while removing generic or robotic phrasing. Do not flatten their idiosyncrasies into smooth AI prose. The quirks they wrote are the parts to keep.
 
 """ + CHRONOLOGY_BLOCK + """
+
+""" + ANTI_TEMPLATE_BLOCK + """
 
 Do not preface, hedge, apologize, or describe your process. Output only the essay itself.
 
@@ -361,6 +388,8 @@ COUNCIL CRITIQUES:
 {library_voice_block}
 
 """ + CHRONOLOGY_BLOCK + """
+
+""" + ANTI_TEMPLATE_BLOCK + """
 
 YOUR JOB — REVISE, DO NOT REWRITE.
 
