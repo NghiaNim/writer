@@ -40,10 +40,19 @@ function buildChipState(activeCouncil, msg) {
         ? { name: 'Chairman', model: activeCouncil.chairman_model }
         : null;
 
+    // Between SSE phases (e.g., the chairman-clarification wait between
+    // stage2_complete and stage3_start) all loading.* flags briefly go
+    // false simultaneously. The promote-after-completion fallbacks below
+    // keep chips moving forward instead of regressing to "queued" — each
+    // promote is gated on the previous stage's loading flag being OFF so
+    // we don't jump ahead during incremental streaming.
     let stage = 'idle';
     if (msg?.loading?.search) stage = 'search';
+    if (msg?.pitches?.length && !msg?.loading?.search) stage = 'stage1';
     if (msg?.loading?.stage1) stage = 'stage1';
+    if (msg?.stage1 && !msg?.loading?.stage1) stage = 'stage2';
     if (msg?.loading?.stage2) stage = 'stage2';
+    if (msg?.stage2 && !msg?.loading?.stage2) stage = 'stage3';
     if (msg?.loading?.stage3) stage = 'stage3';
     if (msg?.stage3) stage = 'done';
 
@@ -1094,13 +1103,12 @@ function AssistantMessageBody({
     activeWordTarget = null,
     essayVersionLabel = null,
 }) {
-    const isStreaming =
-        isLastMessage &&
-        isLoading &&
-        (msg.loading?.search ||
-            msg.loading?.stage1 ||
-            msg.loading?.stage2 ||
-            msg.loading?.stage3);
+    // Track the whole stream lifecycle, not individual stage flags — the
+    // backend yields events between stages (interim questions, the Flash
+    // pickers, the chairman's 25s clarification wait) where all loading.*
+    // are false. Gating on those flags makes the InterimQuestions side
+    // panel and EssayLoadingStatus disappear mid-run.
+    const isStreaming = isLastMessage && isLoading && !msg.stage3;
     // Persona chip row visible during generation. Falls back to null when
     // we don't know which council ran.
     const chipState = isLastMessage ? buildChipState(activeCouncil, msg) : null;
@@ -1172,6 +1180,7 @@ function AssistantMessageBody({
                 <EssayLoadingStatus
                     loading={msg.loading}
                     progress={msg.progress}
+                    msg={msg}
                     onAbort={onAbort}
                 />
             )}

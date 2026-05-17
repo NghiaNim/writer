@@ -84,13 +84,20 @@ const BREW_MESSAGES = {
     idle: ['cafe is open; standing by the machine...'],
 };
 
-function pickStage({ loading }) {
+function pickStage({ loading, msg }) {
     if (!loading) return 'idle';
+    // Live loading flag wins when set.
     if (loading.stage3) return 'stage3';
     if (loading.stage2) return 'stage2';
     if (loading.stage1) return 'stage1';
     if (loading.pitch) return 'pitch';
     if (loading.search) return 'search';
+    // Between SSE phases every flag is false — fall back to the highest
+    // stage we've already finished so the panel doesn't read "idle" while
+    // the chairman waits for a clarification answer.
+    if (msg?.stage2) return 'stage3';
+    if (msg?.stage1) return 'stage2';
+    if (msg?.pitches?.length) return 'stage1';
     return 'idle';
 }
 
@@ -136,9 +143,9 @@ function describeStage(stage, brew = false) {
  * only existed in the sidebar conversation row, which the user's eye
  * rarely lands on during the 60-90s wait.
  */
-export default function EssayLoadingStatus({ loading, progress, aborted, onAbort }) {
+export default function EssayLoadingStatus({ loading, progress, aborted, onAbort, msg }) {
     const brew = useTunable('brewMode');
-    const stage = pickStage({ loading });
+    const stage = pickStage({ loading, msg });
     const pool = brew ? BREW_MESSAGES : MESSAGES;
     const messages = useMemo(() => pool[stage] || pool.idle, [pool, stage]);
     const [messageIdx, setMessageIdx] = useState(0);
