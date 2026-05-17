@@ -783,6 +783,23 @@ export const api = {
       }
       return response.json();
     },
+    async regenerateQuestion({ topic, audience = '', essayType = 'general', alreadyAsked = [], rejectedQuestion = null }) {
+      const response = await authedFetch(`${API_BASE}/api/intake/regenerate-question`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic,
+          audience,
+          essay_type: essayType,
+          already_asked: alreadyAsked,
+          rejected_question: rejectedQuestion,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to swap question'));
+      }
+      return response.json();
+    },
     async example({ topic, audience = '', question }) {
       const response = await authedFetch(`${API_BASE}/api/intake/example`, {
         method: 'POST',

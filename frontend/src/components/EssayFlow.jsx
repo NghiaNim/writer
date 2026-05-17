@@ -130,6 +130,13 @@ export default function EssayFlow({
     // Step 2 state
     const [questions, setQuestions] = useState([]);
     const [questionsLoading, setQuestionsLoading] = useState(false);
+    // Which question the user is currently looking at — replaces the
+    // old "all questions on a page" layout with a one-at-a-time walk
+    // that feels more like a real coach than a form.
+    const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+    // Question index currently being swapped via the regenerate endpoint
+    // — used for the spinner state on the Swap button.
+    const [swappingIdx, setSwappingIdx] = useState(null);
     const [answers, setAnswers] = useState({}); // { [questionIdx]: 'answer text' }
     // Questions the user has intentionally chosen to skip. Continue is
     // gated on every question being either answered OR explicitly
@@ -265,6 +272,7 @@ export default function EssayFlow({
             // Kick off questions LLM call as we transition.
             setStep('questions');
             setQuestionsLoading(true);
+            setCurrentQuestionIdx(0);
             try {
                 const res = await api.intake.questions({
                     topic: trimmedTopic,
@@ -274,9 +282,9 @@ export default function EssayFlow({
             } catch (err) {
                 console.warn('intake/questions failed:', err);
                 setQuestions([
-                    "What's the strongest specific moment, scene, or example you'd build this around?",
-                    "What's the non-obvious thing you want this audience to understand?",
-                    "What contradiction or tension lives inside this topic for you?",
+                    "What's the first thing you remember about this — a sound, a face, a sentence someone said?",
+                    "What's the part of this you almost didn't put in the essay?",
+                    "Who in your life would roll their eyes at this — and why are they almost right?",
                 ]);
             } finally {
                 setQuestionsLoading(false);
@@ -364,6 +372,58 @@ export default function EssayFlow({
             next.delete(idx);
             return next;
         });
+    };
+
+    // Replace one intake question with a fresh one. Calls the regenerate
+    // endpoint with the full current question set so the model can pick a
+    // different angle. Clears any partial answer + skipped state for that
+    // index, since the new question is a different prompt.
+    const handleSwapQuestion = async (idx) => {
+        if (swappingIdx !== null) return;
+        const rejected = questions[idx];
+        setSwappingIdx(idx);
+        setError(null);
+        try {
+            const res = await api.intake.regenerateQuestion({
+                topic: topic.trim(),
+                audience: audience.trim(),
+                alreadyAsked: questions.filter((q, i) => i !== idx && q && q.trim()),
+                rejectedQuestion: rejected,
+            });
+            const fresh = (res?.question || '').trim();
+            if (!fresh) {
+                setError("Couldn't find a different angle — try the Skip button instead.");
+                return;
+            }
+            setQuestions((prev) => {
+                const next = [...prev];
+                next[idx] = fresh;
+                return next;
+            });
+            // The old answer doesn't apply to the new question.
+            setAnswers((prev) => {
+                if (!prev[idx]) return prev;
+                const next = { ...prev };
+                delete next[idx];
+                return next;
+            });
+            setSkippedQuestions((prev) => {
+                if (!prev.has(idx)) return prev;
+                const next = new Set(prev);
+                next.delete(idx);
+                return next;
+            });
+            setExamples((prev) => {
+                if (!prev[idx]) return prev;
+                const next = { ...prev };
+                delete next[idx];
+                return next;
+            });
+        } catch (e) {
+            setError(e.message || 'Failed to swap question.');
+        } finally {
+            setSwappingIdx(null);
+        }
     };
 
     const handleSubmitAnswers = async () => {
@@ -724,10 +784,11 @@ export default function EssayFlow({
 
                 {step === 'questions' && (
                     <div className="essay-flow-step">
-                        <h2 className="essay-flow-question">A few quick questions</h2>
+                        <h2 className="essay-flow-question">Let's get one detail at a time</h2>
                         <p className="essay-flow-hint">
-                            These help the council write something that actually sounds like you.
-                            Skim them — answers can be short.
+                            These help the council write something that actually sounds like
+                            you. One short answer is plenty. You can skip any question, or
+                            swap one that doesn't feel right.
                         </p>
                         {questionsLoading && (
                             <div className="essay-flow-hint" style={{ opacity: 0.8 }}>
@@ -803,14 +864,56 @@ export default function EssayFlow({
                                 )}
                             </div>
                         )}
-                        <div className="essay-flow-history expand">
-                            {questions.map((q, i) => {
-                                const ex = examples[i];
-                                const exVisible = ex && ex.text && !ex.hidden;
-                                const isSkipped = skippedQuestions.has(i);
-                                return (
+                        {/* One-question-at-a-time interview. The user walks
+                            forward through the questions with Prev/Next, can
+                            skip or swap any question without losing the others,
+                            and the last "Next" becomes the Continue submit. */}
+                        {questions.length > 0 && (() => {
+                            const safeIdx = Math.max(0, Math.min(currentQuestionIdx, questions.length - 1));
+                            const q = questions[safeIdx];
+                            const i = safeIdx;
+                            const ex = examples[i];
+                            const exVisible = ex && ex.text && !ex.hidden;
+                            const isSkipped = skippedQuestions.has(i);
+                            const isFirst = i === 0;
+                            const isLast = i === questions.length - 1;
+                            const isSwappingThis = swappingIdx === i;
+                            const isHandled =
+                                isSkipped || (answers[i] || '').trim().length > 0;
+                            return (
+                                <div className="essay-flow-interview">
+                                    <div className="essay-flow-interview-progress">
+                                        <span className="essay-flow-interview-progress-label">
+                                            Question {i + 1} of {questions.length}
+                                        </span>
+                                        <div className="essay-flow-interview-dots">
+                                            {questions.map((_, qi) => {
+                                                const wasHandled =
+                                                    skippedQuestions.has(qi) ||
+                                                    (answers[qi] || '').trim().length > 0;
+                                                return (
+                                                    <button
+                                                        key={qi}
+                                                        type="button"
+                                                        className={
+                                                            'essay-flow-interview-dot ' +
+                                                            (qi === i
+                                                                ? 'essay-flow-interview-dot--active'
+                                                                : wasHandled
+                                                                    ? 'essay-flow-interview-dot--done'
+                                                                    : 'essay-flow-interview-dot--pending')
+                                                        }
+                                                        onClick={() => setCurrentQuestionIdx(qi)}
+                                                        disabled={disabled}
+                                                        aria-label={`Jump to question ${qi + 1}`}
+                                                        title={`Jump to question ${qi + 1}`}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
                                     <div
-                                        key={i}
                                         className={
                                             'essay-flow-exchange ' +
                                             (isSkipped ? 'essay-flow-exchange--skipped' : '')
@@ -823,15 +926,24 @@ export default function EssayFlow({
                                                     <MicButton
                                                         value={answers[i] || ''}
                                                         onChange={(next) => handleAnswerChange(i, next)}
-                                                        disabled={disabled}
+                                                        disabled={disabled || isSwappingThis}
                                                         size="sm"
                                                         title="Talk through your answer"
                                                     />
                                                     <button
                                                         type="button"
                                                         className="essay-flow-skip-question"
+                                                        onClick={() => handleSwapQuestion(i)}
+                                                        disabled={disabled || isSwappingThis}
+                                                        title="This question doesn't fit — give me a different one"
+                                                    >
+                                                        {isSwappingThis ? 'Swapping…' : 'Swap'}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="essay-flow-skip-question"
                                                         onClick={() => handleSkipQuestion(i)}
-                                                        disabled={disabled}
+                                                        disabled={disabled || isSwappingThis}
                                                         title="Skip this one — you don't have to answer every question"
                                                     >
                                                         Skip
@@ -855,30 +967,30 @@ export default function EssayFlow({
                                             <textarea
                                                 value={answers[i] || ''}
                                                 onChange={(e) => handleAnswerChange(i, e.target.value)}
-                                                placeholder="Type a sentence or two… or tap the mic to talk it through."
-                                                rows={2}
-                                                disabled={disabled}
+                                                placeholder="One or two sentences is plenty. Tap the mic to talk it through."
+                                                rows={3}
+                                                disabled={disabled || isSwappingThis}
                                                 className="essay-flow-textarea"
-                                                style={{ minHeight: 60 }}
+                                                style={{ minHeight: 90 }}
                                             />
                                         )}
                                         {!isSkipped && (
-                                        <div className="essay-flow-example-row">
-                                            <button
-                                                type="button"
-                                                className="essay-flow-example-toggle"
-                                                onClick={() => handleShowExample(i, q)}
-                                                disabled={disabled || (ex && ex.loading)}
-                                            >
-                                                {ex && ex.loading
-                                                    ? 'Thinking…'
-                                                    : ex && ex.text
-                                                      ? exVisible
-                                                          ? 'Hide example'
-                                                          : 'Show example'
-                                                      : 'Stuck? Show me an example'}
-                                            </button>
-                                        </div>
+                                            <div className="essay-flow-example-row">
+                                                <button
+                                                    type="button"
+                                                    className="essay-flow-example-toggle"
+                                                    onClick={() => handleShowExample(i, q)}
+                                                    disabled={disabled || isSwappingThis || (ex && ex.loading)}
+                                                >
+                                                    {ex && ex.loading
+                                                        ? 'Thinking…'
+                                                        : ex && ex.text
+                                                          ? exVisible
+                                                              ? 'Hide example'
+                                                              : 'Show example'
+                                                          : 'Stuck? Show me an example'}
+                                                </button>
+                                            </div>
                                         )}
                                         {!isSkipped && ex && ex.error && (
                                             <div className="essay-flow-example-error">
@@ -908,25 +1020,57 @@ export default function EssayFlow({
                                             </div>
                                         )}
                                     </div>
-                                );
-                            })}
-                        </div>
-                        {error && <div className="essay-flow-error">{error}</div>}
-                        <div className="essay-flow-actions">
-                            <button
-                                type="button"
-                                className="essay-flow-primary"
-                                onClick={handleSubmitAnswers}
-                                disabled={disabled || questionsLoading || !allQuestionsHandled}
-                                title={
-                                    allQuestionsHandled
-                                        ? 'Continue to your core idea'
-                                        : 'Answer or skip each question to continue'
-                                }
-                            >
-                                {submitting ? 'Saving…' : 'Continue'}
-                            </button>
-                        </div>
+
+                                    {error && <div className="essay-flow-error">{error}</div>}
+
+                                    <div className="essay-flow-interview-nav">
+                                        <button
+                                            type="button"
+                                            className="essay-flow-link"
+                                            onClick={() => setCurrentQuestionIdx((v) => Math.max(0, v - 1))}
+                                            disabled={disabled || isFirst}
+                                        >
+                                            ← Previous
+                                        </button>
+                                        {isLast ? (
+                                            <button
+                                                type="button"
+                                                className="essay-flow-primary"
+                                                onClick={handleSubmitAnswers}
+                                                disabled={
+                                                    disabled || questionsLoading || !allQuestionsHandled
+                                                }
+                                                title={
+                                                    allQuestionsHandled
+                                                        ? 'Continue to your core idea'
+                                                        : 'Answer or skip each question to continue'
+                                                }
+                                            >
+                                                {submitting ? 'Saving…' : 'Continue'}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="essay-flow-primary"
+                                                onClick={() =>
+                                                    setCurrentQuestionIdx((v) =>
+                                                        Math.min(questions.length - 1, v + 1)
+                                                    )
+                                                }
+                                                disabled={disabled || !isHandled}
+                                                title={
+                                                    isHandled
+                                                        ? 'Next question'
+                                                        : 'Answer or skip this question to continue'
+                                                }
+                                            >
+                                                Next →
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
 

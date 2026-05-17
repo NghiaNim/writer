@@ -646,6 +646,80 @@
     cursor: not-allowed;
 }
 
+/* Interview-style "one question at a time" container. Replaces the old
+   "all questions stacked on a page" layout. The dots row shows progress
+   AND lets the user jump around — typing "1 of 5" without dots feels
+   linear; without the count the dots feel like decoration. */
+.essay-flow-interview {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.essay-flow-interview-progress {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.essay-flow-interview-progress-label {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #93c5fd;
+}
+
+.essay-flow-interview-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.essay-flow-interview-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    background: rgba(148, 163, 184, 0.22);
+    transition: background 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+}
+
+.essay-flow-interview-dot:hover:not(:disabled) {
+    background: rgba(148, 163, 184, 0.45);
+    transform: scale(1.15);
+}
+
+.essay-flow-interview-dot--done {
+    background: rgba(59, 130, 246, 0.55);
+}
+
+.essay-flow-interview-dot--active {
+    background: #60a5fa;
+    transform: scale(1.4);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+.essay-flow-interview-dot:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.essay-flow-interview-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 6px;
+}
+
 /* Skipped state — the question row dims and shows an inline banner
    with an Undo. Saves vertical space (no textarea) while keeping the
    question visible so the user remembers what they passed on. */
