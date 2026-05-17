@@ -103,15 +103,40 @@ async def _generate_intake_questions(topic: str, audience: str, essay_type: str)
 
     Returns a list of strings. On any failure, falls back to a small set of
     safe, generic prompts so the UI keeps moving.
+
+    The system prompt is written so questions land like a real coach across
+    the kitchen table — concrete, slightly uncomfortable, hard to answer in
+    a generic way. Students using the app should NOT be able to feed these
+    into ChatGPT and get a useful response, because the right answer for
+    each one is grounded in something only they know.
     """
     audience_part = f" The intended audience is: {audience}." if audience else ""
     sys_prompt = (
-        "You are an essay coach helping a student articulate the most interesting "
-        "version of an idea. Given a topic and audience, ask 3-5 short, "
-        "high-leverage questions that surface a non-obvious thesis. Each question "
-        "should be one sentence, conversational, and aimed at uncovering "
-        "concrete details, contradictions, or surprising stakes. Avoid generic "
-        "writing-class prompts. Avoid 'why is this important?'."
+        "You are sitting across from a high-school or college student who is "
+        "trying to write a personal essay. You are the coach who actually "
+        "knows them. Your job is to ask 3-5 questions that pull out the kind "
+        "of specific, lived detail an outside reader couldn't invent.\n\n"
+        "GOOD QUESTIONS:\n"
+        "  - Ask for a specific moment, sentence, or image. \"What's the "
+        "first thing you smelled when you walked in?\" not \"Set the scene.\"\n"
+        "  - Probe a contradiction the student probably hasn't admitted to "
+        "themselves yet. \"What did you almost not put in this essay?\"\n"
+        "  - Ask about the person who would disagree most. \"Who in your life "
+        "would roll their eyes at this — and why are they almost right?\"\n"
+        "  - Get at price/cost. \"What did this cost you that you've never "
+        "told anyone?\"\n"
+        "  - Force them to pick. \"If you had to cut everything but one "
+        "moment, which one survives?\"\n\n"
+        "BAD QUESTIONS (do NOT generate these):\n"
+        "  - \"Why is this important to you?\" / \"What did you learn?\"\n"
+        "  - Anything a generic writing teacher would ask.\n"
+        "  - Anything ChatGPT could answer plausibly without knowing the "
+        "student.\n"
+        "  - Open-ended philosophical questions (\"How do you see growth?\").\n"
+        "  - Questions with the word \"journey\", \"impact\", \"meaningful\".\n\n"
+        "Each question is ONE sentence, in the second person, written like "
+        "you're actually talking. Contractions are fine. Casual is fine. "
+        "Cutting is fine."
     )
     user_prompt = (
         f"TOPIC: {topic}.{audience_part}\n"
@@ -152,6 +177,82 @@ async def _generate_intake_questions(topic: str, audience: str, essay_type: str)
         "What contradiction or tension lives inside this topic for you?",
         "What's one detail you'd be embarrassed to leave out?",
     ]
+
+
+async def _regenerate_intake_question(
+    topic: str,
+    audience: str,
+    essay_type: str,
+    already_asked: List[str],
+    rejected_question: Optional[str] = None,
+) -> str:
+    """Generate ONE replacement question that fills a gap the already-asked
+    set doesn't cover. Used by the "Swap" button on each intake question
+    when the student feels the question doesn't relate to their essay.
+
+    `rejected_question` is the specific question the user wanted to drop;
+    we tell the model not to produce another in the same vein. Falls back
+    to a single generic question on any failure so the UI keeps moving.
+    """
+    audience_part = f" The intended audience is: {audience}." if audience else ""
+    asked_lines = "\n".join(f"  - {q}" for q in (already_asked or []) if q.strip())
+    rejected_line = (
+        f"\n\nThe student found this question unhelpful — DO NOT produce another "
+        f"in the same vein:\n  - {rejected_question.strip()}"
+        if rejected_question and rejected_question.strip()
+        else ""
+    )
+    sys_prompt = (
+        "You are sitting across from a student who wants a replacement for one "
+        "of the questions you already asked. Generate exactly ONE new question "
+        "that pulls out lived, specific detail the student couldn't fake. The "
+        "new question must:\n"
+        "  - Probe a DIFFERENT angle from anything you've already asked.\n"
+        "  - Be one sentence, second person, conversational.\n"
+        "  - Be answerable only by someone with this exact lived experience.\n"
+        "  - NOT use the words 'journey', 'impact', 'meaningful', 'learned'.\n"
+        "  - NOT be a generic writing-class prompt.\n\n"
+        "Good replacement angles to consider when the student dropped a "
+        "question: a specific moment vs. a sweeping arc; a contradiction vs. "
+        "a cost; a person who'd disagree vs. a person who'd applaud; the "
+        "thing they almost left out; the smallest detail they remember.\n\n"
+        "Output the question only, as a single line of plain text. No quotes, "
+        "no numbering, no preamble."
+    )
+    user_prompt = (
+        f"TOPIC: {topic}.{audience_part}\n"
+        f"ESSAY TYPE: {essay_type}.\n\n"
+        f"Questions already asked:\n{asked_lines or '  (none yet)'}"
+        f"{rejected_line}\n\n"
+        "Produce one replacement question."
+    )
+    from .council import query_model
+
+    try:
+        res = await query_model(
+            _INTAKE_MODEL,
+            [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            timeout=30.0,
+            temperature=0.75,
+        )
+    except Exception as e:
+        print(f"WARN: intake question regen LLM call failed: {e}")
+        res = None
+
+    text = (res or {}).get("content", "")
+    cleaned = (text or "").strip().strip('"').strip("'").strip()
+    # Strip a leading list marker if the model snuck one in.
+    cleaned = _re.sub(r"^[-\d.)\s]+", "", cleaned).strip()
+    # First sentence only — anything past the first question mark is noise.
+    if "?" in cleaned:
+        cleaned = cleaned.split("?")[0].strip() + "?"
+    if cleaned and len(cleaned) <= 280:
+        return cleaned
+
+    return "What's one small concrete detail from this story you've never told anyone?"
 
 
 async def _generate_example_answer(topic: str, audience: str, question: str) -> str:
@@ -1879,6 +1980,45 @@ async def api_intake_questions(
         },
     )
     return {"questions": questions}
+
+
+class IntakeRegenerateQuestionRequest(BaseModel):
+    """Request body for /api/intake/regenerate-question."""
+    topic: str
+    audience: str = ""
+    essay_type: str = "general"
+    already_asked: List[str] = Field(default_factory=list)
+    rejected_question: Optional[str] = None
+
+
+@app.post("/api/intake/regenerate-question")
+async def api_intake_regenerate_question(
+    body: IntakeRegenerateQuestionRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Replace one intake question that didn't land.
+
+    The student presses Swap on a question they don't connect with; this
+    endpoint produces a single fresh question that fills a different gap.
+    `already_asked` is the current question set (including the one being
+    swapped) so the regenerator avoids duplicates AND can probe a
+    different angle from the rest.
+    """
+    if not (body.topic or "").strip():
+        raise HTTPException(status_code=400, detail="topic is required")
+    question = await _regenerate_intake_question(
+        topic=body.topic.strip(),
+        audience=(body.audience or "").strip(),
+        essay_type=(body.essay_type or "general").strip() or "general",
+        already_asked=[q for q in (body.already_asked or []) if q],
+        rejected_question=body.rejected_question,
+    )
+    posthog.capture(
+        "intake_question_swapped",
+        distinct_id=user.id,
+        properties={"already_asked_count": len(body.already_asked or [])},
+    )
+    return {"question": question}
 
 
 class IntakeExampleRequest(BaseModel):
