@@ -1227,6 +1227,44 @@ async def send_message_stream(
             )
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
+            # Stage 4 — fact-check pass. Single Flash call compares the
+            # final essay against the user's known facts + interim Q&A
+            # answers and surfaces any claims that contradict known
+            # facts or look hallucinated. Failure-safe: empty flag list
+            # on any error so the essay stands regardless.
+            fact_check_flags: List[Dict[str, str]] = []
+            essay_text_for_check = ""
+            if stage3_result and not stage3_result.get("error"):
+                essay_text_for_check = (
+                    stage3_result.get("response")
+                    or stage3_result.get("content")
+                    or ""
+                )
+                if isinstance(essay_text_for_check, str) and essay_text_for_check.strip():
+                    yield f"data: {json.dumps({'type': 'fact_check_start'})}\n\n"
+                    try:
+                        from .fact_check import fact_check_essay
+                        from .user_facts import load_recent_user_facts
+                        from .interim_questions import get_run_buffer
+
+                        user_facts_for_check = await asyncio.to_thread(
+                            load_recent_user_facts, user.id, 60
+                        )
+                        interim_qa = [
+                            {"question": e.get("question", ""), "answer": e.get("answer", "")}
+                            for e in (get_run_buffer(conversation_id) or [])
+                            if not e.get("skipped") and e.get("answer")
+                        ]
+                        fact_check_flags = await fact_check_essay(
+                            essay_text=essay_text_for_check,
+                            facts=user_facts_for_check,
+                            intake_qa=interim_qa,
+                        )
+                    except Exception as e:
+                        print(f"WARN: fact_check pass failed: {e}")
+                        fact_check_flags = []
+                    yield f"data: {json.dumps({'type': 'fact_check_complete', 'data': {'flags': fact_check_flags}})}\n\n"
+
             # Wait for title generation if it was started
             if title_task:
                 try:
@@ -1245,6 +1283,8 @@ async def send_message_stream(
                 metadata["search_context"] = search_context
             if search_query:
                 metadata["search_query"] = search_query
+            if fact_check_flags:
+                metadata["fact_check_flags"] = fact_check_flags
 
             storage.add_assistant_message(
                 conversation_id,
