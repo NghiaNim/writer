@@ -73,10 +73,27 @@ function buildDraftMessage({ topic, audience, draft }) {
         .join('\n');
 }
 
-function buildInteractiveMessage({ topic, audience, qa, coreIdea, authors }) {
+function buildInteractiveMessage({ topic, audience, qa, coreIdea, authors, timeline }) {
     const briefLines = qa
         .map(({ question, answer }) => `- Q: ${question}\n  A: ${(answer || '').trim()}`)
         .join('\n');
+    const timelineBlock = (() => {
+        if (!Array.isArray(timeline) || timeline.length === 0) return '';
+        const lines = timeline
+            .map(({ when, what }, i) => {
+                const w = (when || '').trim();
+                const t = (what || '').trim();
+                if (!t) return null;
+                const prefix = w ? `${i + 1}. ${w} — ${t}` : `${i + 1}. ${t}`;
+                return prefix;
+            })
+            .filter(Boolean);
+        if (lines.length === 0) return '';
+        return (
+            'STORY TIMELINE (events in the order the user wants them narrated; do not reorder unless a clear structural purpose justifies it):\n' +
+            lines.join('\n')
+        );
+    })();
     return [
         `TOPIC: ${topic}`,
         audience ? `AUDIENCE: ${audience}` : '',
@@ -84,13 +101,15 @@ function buildInteractiveMessage({ topic, audience, qa, coreIdea, authors }) {
         coreIdea ? 'CORE IDEA:' : '',
         coreIdea || '',
         '',
+        timelineBlock,
+        timelineBlock ? '' : null,
         'USER BRIEF (collected from a short prep conversation):',
         briefLines || '(no notes)',
         authors && authors.length
             ? `\nAUTHORS THE USER ADMIRES (lean toward this stylistic register without naming them in the essay): ${authors.join(', ')}`
             : '',
     ]
-        .filter(Boolean)
+        .filter((line) => line !== null && line !== undefined && line !== false)
         .join('\n');
 }
 
@@ -172,6 +191,15 @@ export default function EssayFlow({
     // Step 3 state
     const [coreIdea, setCoreIdea] = useState('');
     const [coreIdeaLoading, setCoreIdeaLoading] = useState(false);
+
+    // Story-timeline step — students list the events they want to mention,
+    // each with an optional time marker. The order they end up in here is
+    // the order the council should respect in the essay (paired with the
+    // CHRONOLOGY_BLOCK directive on the backend). Empty list = the user
+    // doesn't have one; the timeline block is omitted from the brief.
+    const [timelineEvents, setTimelineEvents] = useState([]);
+    const [newTimelineWhen, setNewTimelineWhen] = useState('');
+    const [newTimelineWhat, setNewTimelineWhat] = useState('');
 
     // Step 4 state
     const [authorsText, setAuthorsText] = useState('');
@@ -558,12 +586,53 @@ export default function EssayFlow({
         setSubmitting(true);
         try {
             await api.sessions.update(session.id, { core_idea: trimmed });
-            setStep('voice');
+            setStep('timeline');
         } catch (err) {
             setError(err.message || 'Could not save the core idea.');
         } finally {
             setSubmitting(false);
         }
+    };
+
+    // ── Timeline handlers ───────────────────────────────────────────────
+    // The timeline is an ordered list of {when, what} events. `when` is
+    // optional — students who don't know the exact date can leave it
+    // blank. Order matters: the council will narrate events in the
+    // order they appear here.
+    const handleAddTimelineEvent = () => {
+        const what = newTimelineWhat.trim();
+        if (!what) return;
+        setTimelineEvents((prev) => [
+            ...prev,
+            { when: newTimelineWhen.trim(), what },
+        ]);
+        setNewTimelineWhen('');
+        setNewTimelineWhat('');
+    };
+
+    const handleRemoveTimelineEvent = (idx) => {
+        setTimelineEvents((prev) => prev.filter((_, i) => i !== idx));
+    };
+
+    const handleMoveTimelineEvent = (idx, direction) => {
+        setTimelineEvents((prev) => {
+            const next = [...prev];
+            const target = idx + direction;
+            if (target < 0 || target >= next.length) return prev;
+            [next[idx], next[target]] = [next[target], next[idx]];
+            return next;
+        });
+    };
+
+    const handleSubmitTimeline = async () => {
+        setError(null);
+        setStep('voice');
+    };
+
+    const handleSkipTimeline = () => {
+        setError(null);
+        setTimelineEvents([]);
+        setStep('voice');
     };
 
     // -----------------------------------------------------------------------
@@ -645,6 +714,7 @@ export default function EssayFlow({
                 qa,
                 coreIdea: coreIdea.trim(),
                 authors,
+                timeline: timelineEvents,
             });
             onComplete?.({
                 message,
@@ -706,11 +776,12 @@ export default function EssayFlow({
     // Visible step indicator — only for the main 4-step intake. The draft
     // branch (topic → draft) is a 2-step express path and the chip in the
     // header is enough orientation there.
-    const STEP_ORDER = ['topic', 'questions', 'core_idea', 'voice'];
+    const STEP_ORDER = ['topic', 'questions', 'core_idea', 'timeline', 'voice'];
     const STEP_LABELS = {
         topic: 'Topic & audience',
         questions: 'A few questions',
         core_idea: 'Your core idea',
+        timeline: 'Story timeline',
         voice: 'Voice & ready',
     };
     const stepIndex = STEP_ORDER.indexOf(step);
@@ -1325,6 +1396,135 @@ export default function EssayFlow({
                     </div>
                 )}
 
+                {step === 'timeline' && (
+                    <div className="essay-flow-step">
+                        <h2 className="essay-flow-question">Story timeline</h2>
+                        <p className="essay-flow-hint">
+                            Optional, but powerful. List the events you want the essay to mention,
+                            in the order they actually happened. The council will respect this
+                            sequence — no jumbled timelines. If a year or age helps, add it; if
+                            not, leave it blank. Skip this step entirely if you'd rather not
+                            plan the structure.
+                        </p>
+
+                        {timelineEvents.length > 0 && (
+                            <ol className="essay-flow-timeline-list">
+                                {timelineEvents.map((evt, idx) => (
+                                    <li key={idx} className="essay-flow-timeline-row">
+                                        <div className="essay-flow-timeline-arrows">
+                                            <button
+                                                type="button"
+                                                className="essay-flow-timeline-arrow"
+                                                onClick={() => handleMoveTimelineEvent(idx, -1)}
+                                                disabled={disabled || idx === 0}
+                                                aria-label="Move earlier"
+                                                title="Move earlier"
+                                            >
+                                                ▲
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="essay-flow-timeline-arrow"
+                                                onClick={() => handleMoveTimelineEvent(idx, 1)}
+                                                disabled={disabled || idx === timelineEvents.length - 1}
+                                                aria-label="Move later"
+                                                title="Move later"
+                                            >
+                                                ▼
+                                            </button>
+                                        </div>
+                                        <div className="essay-flow-timeline-body">
+                                            {evt.when && (
+                                                <div className="essay-flow-timeline-when">
+                                                    {evt.when}
+                                                </div>
+                                            )}
+                                            <div className="essay-flow-timeline-what">
+                                                {evt.what}
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="essay-flow-timeline-remove"
+                                            onClick={() => handleRemoveTimelineEvent(idx)}
+                                            disabled={disabled}
+                                            title="Remove this event"
+                                            aria-label="Remove"
+                                        >
+                                            ×
+                                        </button>
+                                    </li>
+                                ))}
+                            </ol>
+                        )}
+
+                        <div className="essay-flow-timeline-add">
+                            <input
+                                type="text"
+                                value={newTimelineWhen}
+                                onChange={(e) => setNewTimelineWhen(e.target.value)}
+                                placeholder="When (optional) — e.g. summer 2019, when I was 14"
+                                disabled={disabled}
+                                className="essay-flow-input essay-flow-timeline-when-input"
+                                maxLength={80}
+                            />
+                            <textarea
+                                value={newTimelineWhat}
+                                onChange={(e) => setNewTimelineWhat(e.target.value)}
+                                placeholder="What happened — one or two sentences."
+                                disabled={disabled}
+                                className="essay-flow-textarea"
+                                rows={2}
+                                style={{ minHeight: 60 }}
+                                maxLength={500}
+                                onKeyDown={(e) => {
+                                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleAddTimelineEvent();
+                                    }
+                                }}
+                            />
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'flex-end',
+                                    marginTop: '8px',
+                                }}
+                            >
+                                <button
+                                    type="button"
+                                    className="essay-flow-secondary"
+                                    onClick={handleAddTimelineEvent}
+                                    disabled={disabled || !newTimelineWhat.trim()}
+                                >
+                                    + Add event
+                                </button>
+                            </div>
+                        </div>
+
+                        {error && <div className="essay-flow-error">{error}</div>}
+
+                        <div className="essay-flow-actions">
+                            <button
+                                type="button"
+                                className="essay-flow-link"
+                                onClick={handleSkipTimeline}
+                                disabled={disabled}
+                            >
+                                Skip — let the council infer the order
+                            </button>
+                            <button
+                                type="button"
+                                className="essay-flow-primary"
+                                onClick={handleSubmitTimeline}
+                                disabled={disabled}
+                            >
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {step === 'voice' && (
                     <div className="essay-flow-step">
                         <h2 className="essay-flow-question">Voice & length</h2>
@@ -1441,7 +1641,7 @@ export default function EssayFlow({
                             <button
                                 type="button"
                                 className="essay-flow-link"
-                                onClick={() => setStep('core_idea')}
+                                onClick={() => setStep('timeline')}
                                 disabled={disabled}
                             >
                                 ← Back
