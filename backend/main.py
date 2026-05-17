@@ -179,6 +179,94 @@ async def _generate_intake_questions(topic: str, audience: str, essay_type: str)
     ]
 
 
+async def _brainstorm_topics(reflections: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Given 2-3 freeform reflections from a student who doesn't know what to
+    write about yet, return 3-4 candidate topics. Each topic is short and
+    specific — something they could turn into an essay tomorrow, not a
+    generic theme.
+
+    `reflections` is a list of `{prompt, answer}` dicts. We pass both so the
+    model sees what was asked AND how the student responded — context matters
+    when picking topics that hold up.
+
+    On any failure, returns an empty list so the UI falls back to a "try
+    again" affordance instead of crashing.
+    """
+    if not reflections:
+        return []
+    bullet_lines = []
+    for r in reflections:
+        prompt = (r.get("prompt") or "").strip()
+        answer = (r.get("answer") or "").strip()
+        if not answer:
+            continue
+        bullet_lines.append(f"Q: {prompt}\nA: {answer}")
+    if not bullet_lines:
+        return []
+    block = "\n\n".join(bullet_lines)
+
+    sys_prompt = (
+        "You are an essay coach. A student doesn't have a topic yet and just "
+        "answered a few open reflection prompts. Your job is to surface 3-4 "
+        "specific essay topics buried in what they said — concrete, lived "
+        "topics they could actually write about, not generic themes.\n\n"
+        "EACH TOPIC MUST:\n"
+        "  - Be one sentence, 8-16 words.\n"
+        "  - Name a specific moment, person, place, decision, or "
+        "contradiction (NOT a theme like 'identity' or 'resilience').\n"
+        "  - Be answerable only by THIS student — no one else could write it.\n"
+        "  - Sound like the start of an essay, not a writing-prompt title.\n\n"
+        "Each topic also gets ONE short reason explaining why it stood out — "
+        "what about the student's answers made you pick it. Keep the reason "
+        "under 18 words.\n\n"
+        "Return STRICT JSON, no markdown fences:\n"
+        '{"topics": [{"topic": "...", "reason": "..."}, ...]}'
+    )
+    user_prompt = (
+        "Here are the student's reflections:\n\n"
+        f"{block}\n\n"
+        "Surface 3-4 candidate essay topics from what they said."
+    )
+
+    from .council import query_model
+
+    try:
+        res = await query_model(
+            _INTAKE_MODEL,
+            [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            timeout=45.0,
+            temperature=0.7,
+        )
+    except Exception as e:
+        print(f"WARN: brainstorm-topics LLM call failed: {e}")
+        return []
+
+    parsed = _safe_json_loads((res or {}).get("content", "")) if res else None
+    if not isinstance(parsed, dict):
+        return []
+    items = parsed.get("topics")
+    if not isinstance(items, list):
+        return []
+
+    out: List[Dict[str, str]] = []
+    for it in items[:6]:
+        if not isinstance(it, dict):
+            continue
+        topic = str(it.get("topic") or "").strip().strip('"').strip("'").strip()
+        reason = str(it.get("reason") or "").strip().strip('"').strip("'").strip()
+        if not topic or len(topic) > 280:
+            continue
+        if len(reason) > 200:
+            reason = reason[:197].rstrip() + "..."
+        out.append({"topic": topic, "reason": reason})
+        if len(out) >= 4:
+            break
+    return out
+
+
 async def _regenerate_intake_question(
     topic: str,
     audience: str,
@@ -1980,6 +2068,51 @@ async def api_intake_questions(
         },
     )
     return {"questions": questions}
+
+
+class BrainstormReflection(BaseModel):
+    prompt: str = Field(..., max_length=400)
+    answer: str = Field("", max_length=4000)
+
+
+class IntakeBrainstormTopicsRequest(BaseModel):
+    """Request body for /api/intake/brainstorm-topics — the "I don't have a
+    topic yet" lane in EssayFlow. Reflections are the student's freeform
+    answers to a small set of open prompts the UI asked first."""
+    reflections: List[BrainstormReflection] = Field(default_factory=list)
+
+
+@app.post("/api/intake/brainstorm-topics")
+async def api_intake_brainstorm_topics(
+    body: IntakeBrainstormTopicsRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Surface 3-4 candidate essay topics from a student's freeform
+    reflections. Powers the "Help me find a topic" path on the topic step.
+    Returns `{topics: [{topic, reason}, ...]}` — the reason field shows
+    what about the student's answers made the topic stand out, so users
+    can pick the suggestion that resonates rather than just the first one.
+    """
+    reflections = [
+        {"prompt": r.prompt, "answer": r.answer}
+        for r in (body.reflections or [])
+        if (r.answer or "").strip()
+    ]
+    if not reflections:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one reflection answer is required.",
+        )
+    topics = await _brainstorm_topics(reflections)
+    posthog.capture(
+        "intake_topics_brainstormed",
+        distinct_id=user.id,
+        properties={
+            "reflection_count": len(reflections),
+            "topics_returned": len(topics),
+        },
+    )
+    return {"topics": topics}
 
 
 class IntakeRegenerateQuestionRequest(BaseModel):
