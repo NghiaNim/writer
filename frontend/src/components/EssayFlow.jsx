@@ -1260,15 +1260,26 @@ export default function EssayFlow({
 
                 {step === 'core_idea' && (
                     <div className="essay-flow-step">
-                        <h2 className="essay-flow-question">Your core idea</h2>
+                        <h2 className="essay-flow-question">
+                            {coreIdeaBullets ? 'The shape of it' : 'Your core idea'}
+                        </h2>
                         <p className="essay-flow-hint">
-                            This is the spine the council will write to — synthesized from your
-                            topic and answers. Edit anything that doesn't sound like you yet.
+                            {coreIdeaBullets
+                                ? "The spine the council will write to — pulled apart so you can see the moves. Edit, reorder, or drop any beat that doesn't sound like you yet."
+                                : "This is the spine the council will write to — synthesized from your topic and answers. Edit anything that doesn't sound like you yet."}
                         </p>
                         {coreIdeaLoading ? (
                             <div className="essay-flow-hint" style={{ opacity: 0.8 }}>
-                                Drafting your core idea…
+                                {coreIdeaBullets
+                                    ? 'Pulling the shape of your idea apart into beats…'
+                                    : 'Drafting your core idea…'}
                             </div>
+                        ) : coreIdeaBullets ? (
+                            <CoreIdeaBullets
+                                value={coreIdea}
+                                onChange={setCoreIdea}
+                                disabled={disabled}
+                            />
                         ) : (
                             <div className="essay-flow-textarea-with-mic">
                                 <textarea

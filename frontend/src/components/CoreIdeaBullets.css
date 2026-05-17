@@ -1,0 +1,253 @@
+/*
+ * CoreIdeaBullets — receipt-paper card, coffee-bean bullets, warm crema palette.
+ *
+ * Color anchor:
+ *   #d97706  amber-600          tag dot / accent
+ *   #f5b462  crema highlight    rim glow
+ *   #b07a48  light roast bean   bean top-light
+ *   #6f4e2c  medium roast bean  bean mid
+ *   #3d2817  dark roast bean    bean shadow
+ *   #f5e9d8  receipt cream      foreground text
+ *   #22160e  espresso paper     card background
+ */
+
+.coreidea-card {
+    position: relative;
+    background:
+        linear-gradient(180deg, rgba(245, 233, 216, 0.04) 0%, rgba(245, 233, 216, 0) 60%),
+        rgba(34, 22, 14, 0.72);
+    border: 1px solid rgba(217, 119, 6, 0.30);
+    border-radius: 14px 14px 4px 4px;
+    padding: 16px 18px 12px;
+    color: #f5e9d8;
+    box-shadow:
+        0 1px 0 rgba(245, 180, 98, 0.08) inset,
+        0 12px 32px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+}
+
+/* A faint warm glow behind the card so it lifts off the page like a
+   receipt under a cafe lamp. */
+.coreidea-card::before {
+    content: '';
+    position: absolute;
+    inset: -40% -10% auto -10%;
+    height: 160px;
+    background:
+        radial-gradient(ellipse at 50% 0%, rgba(245, 180, 98, 0.12), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Receipt tear line — small "punched holes" along the bottom edge.
+   Built with a repeating radial-gradient masking out little half-circles. */
+.coreidea-card::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: -1px;
+    height: 8px;
+    background-image:
+        radial-gradient(circle at 4px 0px, transparent 4px, rgba(217, 119, 6, 0.18) 4.5px, transparent 6px);
+    background-size: 12px 8px;
+    background-repeat: repeat-x;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.coreidea-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    position: relative;
+    z-index: 1;
+}
+
+/* Chalkboard-tag for "Today's pour". Compact pill with a small dot,
+   slight letterspacing — looks like a cafe menu chip. */
+.coreidea-card-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #f5b462;
+    padding: 4px 10px 4px 8px;
+    border: 1px solid rgba(217, 119, 6, 0.40);
+    border-radius: 999px;
+    background: rgba(217, 119, 6, 0.07);
+    font-family: var(--font-ui, system-ui), sans-serif;
+}
+
+.coreidea-card-tag-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #f5b462 0%, #b45309 80%);
+    box-shadow: 0 0 6px rgba(217, 119, 6, 0.6);
+}
+
+/* Mic toolbar — clearly separated from the editor area so nothing
+   covers it. Slight outline so it reads as an action, not decoration. */
+.coreidea-card-mic {
+    position: relative;
+    z-index: 2;
+}
+
+/* ---------- Bullets ------------------------------------------------- */
+
+.coreidea-bullets {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    z-index: 1;
+}
+
+.coreidea-bullet {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px dashed rgba(245, 180, 98, 0.14);
+}
+
+.coreidea-bullet:last-child {
+    border-bottom: none;
+}
+
+/* Coffee bean glyph. Tilted oval with a faux center crease via a
+   layered linear-gradient. Hand-shaped — no two readers see exactly
+   the same bean because the rotation breaks perfect symmetry. */
+.coreidea-bullet-bean {
+    flex-shrink: 0;
+    margin-top: 6px;
+    width: 13px;
+    height: 17px;
+    border-radius: 50% / 60%;
+    transform: rotate(-12deg);
+    background:
+        linear-gradient(
+            92deg,
+            transparent 44%,
+            rgba(0, 0, 0, 0.55) 47%,
+            rgba(0, 0, 0, 0.55) 53%,
+            transparent 56%
+        ),
+        radial-gradient(
+            ellipse at 35% 25%,
+            #c6915a 0%,
+            #8d5e34 30%,
+            #5a3a1f 70%,
+            #2c1a0c 100%
+        );
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.25),
+        0 1px 1px rgba(245, 180, 98, 0.15) inset;
+}
+
+.coreidea-bullet-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    color: #f5e9d8;
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-size: 16px;
+    line-height: 1.55;
+    padding: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+.coreidea-bullet-input:focus {
+    outline: none;
+}
+
+.coreidea-bullet-input::placeholder {
+    color: rgba(245, 233, 216, 0.35);
+    font-style: italic;
+}
+
+.coreidea-bullet-input:disabled {
+    color: rgba(245, 233, 216, 0.5);
+}
+
+.coreidea-bullet-remove {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    margin-top: 2px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: rgba(245, 233, 216, 0.35);
+    font-size: 18px;
+    line-height: 1;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.coreidea-bullet:hover .coreidea-bullet-remove,
+.coreidea-bullet:focus-within .coreidea-bullet-remove {
+    opacity: 1;
+}
+
+.coreidea-bullet-remove:hover {
+    color: #fef3c7;
+    border-color: rgba(217, 119, 6, 0.45);
+    background: rgba(217, 119, 6, 0.10);
+}
+
+/* ---------- Footer -------------------------------------------------- */
+
+.coreidea-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 10px;
+    margin-top: 4px;
+    position: relative;
+    z-index: 1;
+}
+
+.coreidea-add {
+    background: transparent;
+    border: 1px dashed rgba(245, 180, 98, 0.35);
+    color: #f5b462;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.coreidea-add:hover {
+    background: rgba(217, 119, 6, 0.10);
+    border-color: rgba(245, 180, 98, 0.6);
+    color: #fef3c7;
+}
+
+.coreidea-add:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.coreidea-card-count {
+    font-family: var(--font-code, ui-monospace, monospace);
+    font-size: 11px;
+    color: rgba(245, 233, 216, 0.45);
+    letter-spacing: 0.04em;
+}

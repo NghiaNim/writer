@@ -48,6 +48,15 @@ export const TUNABLES = [
     // expanding cap of fine bubbles. The CSS pulse here is the closest
     // single-element approximation.
   },
+  {
+    key: 'coreIdeaBullets',
+    type: 'bool',
+    default: false,
+    description:
+      'Show the "Your core idea" brief as an editable bulleted list with coffee-bean glyphs and a receipt-paper card, instead of one dense paragraph. Lifts the Dictate button out of the editor into a clearly-visible header tool.',
+    addedOn: '2026-05-17',
+    owner: 'sraval',
+  },
 ];
 
 /**
