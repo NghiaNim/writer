@@ -783,6 +783,17 @@ export const api = {
       }
       return response.json();
     },
+    async brainstormTopics({ reflections }) {
+      const response = await authedFetch(`${API_BASE}/api/intake/brainstorm-topics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reflections }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to brainstorm topics'));
+      }
+      return response.json();
+    },
     async regenerateQuestion({ topic, audience = '', essayType = 'general', alreadyAsked = [], rejectedQuestion = null }) {
       const response = await authedFetch(`${API_BASE}/api/intake/regenerate-question`, {
         method: 'POST',

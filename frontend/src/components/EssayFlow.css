@@ -646,6 +646,101 @@
     cursor: not-allowed;
 }
 
+/* "I don't have a topic yet" link beneath the topic input — softer than
+   the primary Continue, but visible enough that students who genuinely
+   don't know what to write notice it. */
+.essay-flow-link--soft {
+    align-self: flex-start;
+    margin-top: 8px;
+    padding: 4px 0;
+    font-size: 13px;
+    color: #93c5fd;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: color 120ms ease;
+}
+
+.essay-flow-link--soft:hover:not(:disabled) {
+    color: #bfdbfe;
+    text-decoration: underline;
+}
+
+.essay-flow-link--soft:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Brainstorm-lane topic candidates rendered as clickable cards. Each card
+   shows the topic in serif (so it reads as essay material, not UI text)
+   plus a smaller reason in italic explaining why the model surfaced it. */
+.essay-flow-brainstorm-results {
+    margin-top: 8px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.essay-flow-brainstorm-results-label {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #93c5fd;
+    margin-bottom: 6px;
+}
+
+.essay-flow-brainstorm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.essay-flow-brainstorm-card {
+    text-align: left;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(59, 130, 246, 0.28);
+    color: var(--text-primary);
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: background-color 120ms ease, border-color 120ms ease,
+        transform 120ms ease, box-shadow 120ms ease;
+    font-family: inherit;
+}
+
+.essay-flow-brainstorm-card:hover:not(:disabled) {
+    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.55);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.12);
+}
+
+.essay-flow-brainstorm-card:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.essay-flow-brainstorm-topic {
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-size: 16px;
+    line-height: 1.4;
+    color: #f1f5f9;
+    font-weight: 500;
+}
+
+.essay-flow-brainstorm-reason {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.45;
+}
+
 /* Interview-style "one question at a time" container. Replaces the old
    "all questions stacked on a page" layout. The dots row shows progress
    AND lets the user jump around — typing "1 of 5" without dots feels

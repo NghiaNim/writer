@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
+import { useTunable } from '../tunables';
 import CouncilConfig from './CouncilConfig';
 import MicButton from './common/MicButton';
+import CoreIdeaBullets from './CoreIdeaBullets';
 import './EssayFlow.css';
 
 // Word-target presets for the Step 4 picker. Tuned for college admissions /
@@ -33,6 +35,18 @@ const DEFAULT_WORD_TARGET = 650;
  * The session row is persisted at every transition so the user can refresh
  * and resume.
  */
+
+// Reflection prompts shown on the brainstorm lane (the "I don't have a
+// topic yet" path). Each one is deliberately open and conversational —
+// students answer with whatever's actually on their mind, and the
+// Flash brainstorm endpoint pulls 3-4 specific topic candidates out
+// of those answers. The prompts themselves shouldn't telegraph an
+// expected answer shape, so they read like a real conversation.
+const BRAINSTORM_PROMPTS = [
+    "What's something you keep arguing about with yourself? (Or with someone else.)",
+    "Tell me about a moment from the last year where something quietly shifted — a small thing you've thought about since.",
+    "What's a story your friends would say you tell too often? And what would surprise them about why you keep telling it?",
+];
 
 // Common audiences as quick-pick chips on the topic step. The free-text
 // input stays available alongside — these are starting points, not the
@@ -120,6 +134,10 @@ export default function EssayFlow({
     //                  | 'draft' (alternate path from Step 1)
     const [step, setStep] = useState('topic');
 
+    // Tunable: render the core idea as an editable bulleted list (cafe
+    // receipt look + mic in a header toolbar) instead of one paragraph.
+    const coreIdeaBullets = useTunable('coreIdeaBullets');
+
     // Persisted session row (created on Step 1 submit)
     const [session, setSession] = useState(null);
 
@@ -128,6 +146,13 @@ export default function EssayFlow({
     const [audience, setAudience] = useState('');
 
     // Step 2 state
+    // Brainstorm lane state — only used when the user took the "I don't
+    // have a topic yet" path. brainstormReflections is keyed by prompt
+    // index so the user's answers persist if they navigate around.
+    const [brainstormReflections, setBrainstormReflections] = useState({});
+    const [topicCandidates, setTopicCandidates] = useState([]);
+    const [brainstormLoading, setBrainstormLoading] = useState(false);
+
     const [questions, setQuestions] = useState([]);
     const [questionsLoading, setQuestionsLoading] = useState(false);
     // Which question the user is currently looking at — replaces the
@@ -294,6 +319,58 @@ export default function EssayFlow({
         } finally {
             setSubmitting(false);
         }
+    };
+
+    // ── Brainstorm lane ─────────────────────────────────────────────────
+    // Used when a student doesn't have a topic yet. They answer 2-3 open
+    // reflection prompts, we surface candidate topics via Flash, they pick
+    // one and the flow re-enters the normal topic step with the topic
+    // prefilled. The brainstorm step is OFF the main 4-step path — the
+    // stepper hides on it intentionally since this is a side-lane.
+
+    const handleStartBrainstorm = () => {
+        setError(null);
+        setStep('brainstorm');
+        setTopicCandidates([]);
+    };
+
+    const handleBrainstormReflectionChange = (idx, value) => {
+        setBrainstormReflections((prev) => ({ ...prev, [idx]: value }));
+    };
+
+    const handleBrainstormGenerate = async () => {
+        setError(null);
+        const reflections = BRAINSTORM_PROMPTS.map((prompt, i) => ({
+            prompt,
+            answer: (brainstormReflections[i] || '').trim(),
+        })).filter((r) => r.answer);
+        if (reflections.length === 0) {
+            setError('Answer at least one prompt — even a sentence or two gives me something to work with.');
+            return;
+        }
+        setBrainstormLoading(true);
+        try {
+            const res = await api.intake.brainstormTopics({ reflections });
+            const list = Array.isArray(res?.topics) ? res.topics : [];
+            if (list.length === 0) {
+                setError("Couldn't pull out topics from those answers — try adding more concrete detail.");
+                return;
+            }
+            setTopicCandidates(list);
+        } catch (e) {
+            setError(e.message || 'Failed to brainstorm topics.');
+        } finally {
+            setBrainstormLoading(false);
+        }
+    };
+
+    const handlePickBrainstormTopic = (candidateTopic) => {
+        setTopic(candidateTopic);
+        setStep('topic');
+        // Drop the candidates so going back to brainstorm starts fresh
+        // visually, but keep the reflection answers in case the user
+        // wants a different topic from the same answers later.
+        setTopicCandidates([]);
     };
 
     const handleJumpToDraft = async () => {
@@ -715,6 +792,14 @@ export default function EssayFlow({
                                 className="essay-flow-input"
                                 maxLength={500}
                             />
+                            <button
+                                type="button"
+                                className="essay-flow-link essay-flow-link--soft"
+                                onClick={handleStartBrainstorm}
+                                disabled={disabled}
+                            >
+                                I don't have a topic yet — help me find one →
+                            </button>
                         </div>
 
                         <div className="essay-flow-field">
@@ -780,6 +865,105 @@ export default function EssayFlow({
                             </button>
                         </div>
                     </form>
+                )}
+
+                {step === 'brainstorm' && (
+                    <div className="essay-flow-step">
+                        <h1 className="essay-flow-question">Let's find your topic together</h1>
+                        <p className="essay-flow-hint">
+                            Answer a couple of these honestly. They aren't the essay — they're
+                            how we figure out what the essay actually wants to be about.
+                        </p>
+
+                        <div className="essay-flow-history">
+                            {BRAINSTORM_PROMPTS.map((prompt, i) => (
+                                <div key={i} className="essay-flow-exchange">
+                                    <div className="essay-flow-exchange-q-row">
+                                        <div className="essay-flow-exchange-q">{prompt}</div>
+                                        <div className="essay-flow-exchange-q-tools">
+                                            <MicButton
+                                                value={brainstormReflections[i] || ''}
+                                                onChange={(next) =>
+                                                    handleBrainstormReflectionChange(i, next)
+                                                }
+                                                disabled={disabled || brainstormLoading}
+                                                size="sm"
+                                                title="Talk through this — it's faster than typing"
+                                            />
+                                        </div>
+                                    </div>
+                                    <textarea
+                                        value={brainstormReflections[i] || ''}
+                                        onChange={(e) =>
+                                            handleBrainstormReflectionChange(i, e.target.value)
+                                        }
+                                        placeholder="A few sentences. Be specific. No one else will read this."
+                                        rows={3}
+                                        disabled={disabled || brainstormLoading}
+                                        className="essay-flow-textarea"
+                                        style={{ minHeight: 90 }}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+
+                        {topicCandidates.length > 0 && (
+                            <div className="essay-flow-brainstorm-results">
+                                <div className="essay-flow-brainstorm-results-label">
+                                    Candidate topics
+                                </div>
+                                <p className="essay-flow-hint" style={{ marginTop: 0 }}>
+                                    These all came out of what you said. Pick the one that makes
+                                    you uncomfortable in the right way.
+                                </p>
+                                <div className="essay-flow-brainstorm-list">
+                                    {topicCandidates.map((c, i) => (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            className="essay-flow-brainstorm-card"
+                                            onClick={() => handlePickBrainstormTopic(c.topic)}
+                                            disabled={disabled || brainstormLoading}
+                                        >
+                                            <span className="essay-flow-brainstorm-topic">
+                                                {c.topic}
+                                            </span>
+                                            {c.reason && (
+                                                <span className="essay-flow-brainstorm-reason">
+                                                    {c.reason}
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {error && <div className="essay-flow-error">{error}</div>}
+
+                        <div className="essay-flow-actions">
+                            <button
+                                type="button"
+                                className="essay-flow-link"
+                                onClick={() => setStep('topic')}
+                                disabled={disabled || brainstormLoading}
+                            >
+                                ← Back to typing my own
+                            </button>
+                            <button
+                                type="button"
+                                className="essay-flow-primary"
+                                onClick={handleBrainstormGenerate}
+                                disabled={disabled || brainstormLoading}
+                            >
+                                {brainstormLoading
+                                    ? 'Thinking…'
+                                    : topicCandidates.length > 0
+                                        ? 'Try again with these answers'
+                                        : 'Show me topics'}
+                            </button>
+                        </div>
+                    </div>
                 )}
 
                 {step === 'questions' && (
