@@ -1,11 +1,23 @@
 """Default system prompts for the LLM Council Plus."""
 
+# Shared directive injected into every essay-writing prompt (Stage 1
+# drafts + Stage 3 revision). Stops the council from jumbling the
+# user's timeline arbitrarily — a real failure mode where the model
+# narrates events in a different order than the user described them,
+# which feels disorienting and breaks the personal-essay illusion that
+# this is a real account.
+CHRONOLOGY_BLOCK = """CHRONOLOGY:
+If the user's brief or facts contain time markers (years, ages, "when I was X", "two years ago", "before/after", "later"), respect the chronological order of events in the essay by default. You may invert the sequence only when a clear structural purpose justifies it — a deliberate flashback frame, or a present-day scene that reveals a past one. Do not jumble timelines arbitrarily."""
+
+
 STAGE1_PROMPT_DEFAULT = """You are a member of an essay-writing council.
 {search_context_block}
 {voice_profile_block}
 {student_profile_block}
 {library_voice_block}
 {word_target_block}
+
+""" + CHRONOLOGY_BLOCK + """
 
 You will receive either a topic the user wants an essay on, or a rough draft they want improved. In either case, produce a single complete essay. Take creative risks; prefer the surprising sentence over the safe one. Do not preface, hedge, or apologize. Do not announce what you are about to do. Just write the essay.
 
@@ -105,6 +117,8 @@ In draft mode: produce a structurally improved version. You may reorganize, merg
 {voice_profile_block}
 {student_profile_block}
 {library_voice_block}
+""" + CHRONOLOGY_BLOCK + """
+
 Do not preface, hedge, apologize, or describe your process. Output only the essay itself.
 
 {search_context_block}
@@ -130,6 +144,8 @@ In draft mode: produce a tightened version. Cut without losing meaning. Preserve
 {voice_profile_block}
 {student_profile_block}
 {library_voice_block}
+""" + CHRONOLOGY_BLOCK + """
+
 Do not preface, hedge, apologize, or describe your process. Output only the essay itself.
 
 {search_context_block}
@@ -155,6 +171,8 @@ In draft mode: produce an improved version that strengthens the user's argument 
 {voice_profile_block}
 {student_profile_block}
 {library_voice_block}
+""" + CHRONOLOGY_BLOCK + """
+
 Do not preface, hedge, apologize, or describe your process. Output only the essay itself.
 
 {search_context_block}
@@ -184,6 +202,8 @@ The voice inspiration above is a tonal anchor only — borrow rhythm, sentence v
 
 In topic mode: write the version that sounds like a thinking person, not a brand. If the prose could appear under a corporate byline, you have failed.
 In draft mode: preserve the user's voice while removing generic or robotic phrasing. Do not flatten their idiosyncrasies into smooth AI prose. The quirks they wrote are the parts to keep.
+
+""" + CHRONOLOGY_BLOCK + """
 
 Do not preface, hedge, apologize, or describe your process. Output only the essay itself.
 
@@ -339,6 +359,8 @@ COUNCIL CRITIQUES:
 {voice_profile_block}
 {student_profile_block}
 {library_voice_block}
+
+""" + CHRONOLOGY_BLOCK + """
 
 YOUR JOB — REVISE, DO NOT REWRITE.
 
