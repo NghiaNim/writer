@@ -5,6 +5,7 @@ import EssayFlow from './components/EssayFlow';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { TunablesProvider } from './contexts/TunablesContext.jsx';
 import { api, warmUpBackend } from './api';
 import './App.css';
 import './components/StageCopyButtons.css';
@@ -1370,7 +1371,9 @@ function App() {
 
   return (
     <AuthProvider>
-      <AuthGate />
+      <TunablesProvider>
+        <AuthGate />
+      </TunablesProvider>
     </AuthProvider>
   );
 }

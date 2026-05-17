@@ -601,6 +601,35 @@ export const api = {
    *   { rules?, reference_paragraphs?, inferred_style?, preferred_authors? }
    * The pending_suggestions queue is owned by suggestRules / accept / reject.
    */
+  // Tunables (feature flags). The set of valid keys lives in
+  // frontend/src/tunables.js. The backend stores opaque JSON.
+  tunables: {
+    async get() {
+      const response = await authedFetch(`${API_BASE}/api/tunables`);
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to load tunables'));
+      }
+      return response.json();
+    },
+    /**
+     * Merge a patch into the user's tunables blob. Pass `null` as a value
+     * to clear that key (so it falls back to the registry default).
+     *   api.tunables.update({ sidebarV2: true })
+     *   api.tunables.update({ sidebarV2: null })  // clear override
+     */
+    async update(patch, { replace = false } = {}) {
+      const response = await authedFetch(`${API_BASE}/api/tunables`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch, replace }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to update tunables'));
+      }
+      return response.json();
+    },
+  },
+
   voice: {
     async get(essayType = 'general') {
       const url = `${API_BASE}/api/voice-profile?essay_type=${encodeURIComponent(essayType)}`;

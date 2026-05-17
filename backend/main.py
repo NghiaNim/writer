@@ -1317,6 +1317,39 @@ async def get_app_settings(user: AuthUser = Depends(get_current_user)):
 
 
 
+# ---------------------------------------------------------------------------
+# Tunables (feature flags) — per-user overrides on user_settings.tunables.
+# The valid-key set lives in frontend/src/tunables.js; backend stores opaque
+# JSON so we can ship a new tunable without a backend deploy.
+# ---------------------------------------------------------------------------
+
+
+class TunablesUpdateBody(BaseModel):
+    patch: Dict[str, Any] = {}
+    replace: bool = False
+
+
+@app.get("/api/tunables")
+async def api_get_tunables(user: AuthUser = Depends(get_current_user)):
+    """Return the caller's tunable overrides (may be empty)."""
+    from .user_settings import load_user_tunables
+    return {"tunables": load_user_tunables(user.id)}
+
+
+@app.put("/api/tunables")
+async def api_update_tunables(
+    body: TunablesUpdateBody,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Upsert one or more tunable overrides. Pass None as a value to clear.
+
+    Merge by default; pass `replace=true` to overwrite the whole blob.
+    """
+    from .user_settings import update_user_tunables
+    blob = update_user_tunables(user.id, body.patch or {}, replace=body.replace)
+    return {"tunables": blob}
+
+
 @app.get("/api/settings/defaults")
 async def get_default_settings(user: AuthUser = Depends(get_current_user)):
     """Get default model settings."""

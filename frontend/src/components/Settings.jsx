@@ -13,9 +13,10 @@ const PromptSettings = lazy(() => import('./settings/PromptSettings'));
 const SearchSettings = lazy(() => import('./settings/SearchSettings'));
 const BackupSettings = lazy(() => import('./settings/BackupSettings'));
 const ProviderSettings = lazy(() => import('./settings/ProviderSettings'));
+const LabSettings = lazy(() => import('./settings/LabSettings'));
 import './Settings.css';
 
-const ADVANCED_SECTIONS = new Set(['prompts', 'search', 'import_export']);
+const ADVANCED_SECTIONS = new Set(['prompts', 'search', 'import_export', 'lab']);
 
 /**
  * Collapsible "Advanced" group in the Settings sidebar — System Prompts,
@@ -61,6 +62,12 @@ function SettingsAdvancedGroup({ activeSection, setActiveSection }) {
                         onClick={() => setActiveSection('import_export')}
                     >
                         Backup & Reset
+                    </button>
+                    <button
+                        className={`sidebar-nav-item ${activeSection === 'lab' ? 'active' : ''}`}
+                        onClick={() => setActiveSection('lab')}
+                    >
+                        Lab
                     </button>
                 </div>
             )}
@@ -1731,6 +1738,9 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               />
             )}
 
+            {/* LAB (tunables / feature flags) */}
+            {activeSection === 'lab' && <LabSettings />}
+
             </Suspense>
           </div>
         </div>
@@ -1749,12 +1759,10 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
             <button className="cancel-button" onClick={onClose}>
               Close
             </button>
-            {/* The Voice and Council tabs are self-saving (they have their
-                own Save button inside the section). Showing the global
-                footer Save here just renders a permanently-disabled
-                duplicate, which the user cannot tell from the live
-                in-section button. */}
-            {activeSection !== 'voice' && activeSection !== 'council' && (
+            {/* The Voice, Council, and Lab tabs are self-saving (each
+                section commits its own writes). Showing the global footer
+                Save here just renders a permanently-disabled duplicate. */}
+            {activeSection !== 'voice' && activeSection !== 'council' && activeSection !== 'lab' && (
               <button
                 className="save-button"
                 onClick={handleSave}

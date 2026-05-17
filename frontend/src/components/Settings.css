@@ -1686,3 +1686,131 @@ input:checked+.slider:before {
 .model-select-wrapper .validation-error-message {
   margin-top: 6px;
 }
+
+/* ----- Lab (tunables) ------------------------------------------------- */
+.lab-tunable-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.lab-tunable-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.lab-tunable-row.is-url-locked {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.04);
+}
+
+.lab-tunable-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lab-tunable-key-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lab-tunable-key {
+  font-family: var(--font-code, ui-monospace, monospace);
+  font-size: 0.92em;
+  color: #93c5fd;
+}
+
+.lab-tunable-source {
+  font-size: 0.75em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.lab-tunable-added {
+  font-size: 0.75em;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.lab-tunable-description {
+  margin-top: 4px;
+  font-size: 0.9em;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+}
+
+.lab-tunable-error {
+  margin-top: 6px;
+  font-size: 0.85em;
+  color: #f87171;
+}
+
+.lab-tunable-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.lab-tunable-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.lab-tunable-switch input {
+  cursor: pointer;
+}
+
+.lab-tunable-text {
+  width: 140px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  font: inherit;
+}
+
+.lab-tunable-reset {
+  font-size: 0.8em;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.lab-tunable-reset:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.lab-empty {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.9em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.lab-empty code {
+  font-family: var(--font-code, ui-monospace, monospace);
+  color: #93c5fd;
+}

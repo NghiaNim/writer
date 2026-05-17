@@ -298,6 +298,44 @@ complete | error                                     (terminal)
 
 **Always FK to `auth.users(id)`**, never a local `users` table. If you see SQL referencing `users(id)` you have a foreign migration that doesn't fit this codebase — drop it before applying.
 
+## Tunables (UI feature flags)
+
+**Default rule**: any non-trivial UI change goes behind a tunable. Small visual fixes, copy edits, and bug fixes don't need one. Anything that swaps a component, changes a flow, restyles a surface visibly, or is plausibly worth A/B-testing across customers — wrap it in a tunable.
+
+**Files:**
+- `frontend/src/tunables.js` — registry. Single source of truth. Add new flags here.
+- `frontend/src/contexts/TunablesContext.jsx` — `useTunable(key)` hook + provider (mounted in `App.jsx` inside `AuthProvider`).
+- `frontend/src/components/settings/LabSettings.jsx` — auto-generated UI under Settings → Advanced → Lab. New entries appear without code changes.
+- `backend/user_settings.py` — `load_user_tunables` / `update_user_tunables` against the `user_settings.tunables` JSONB column (migration `009_user_settings_tunables.sql`).
+- `/api/tunables` GET/PUT — endpoints the frontend hits.
+
+**Resolution priority** (highest wins): URL param `?tunables.<key>=on|off|<value>` → per-user row in Supabase → registry default.
+
+**Pattern for adding a tunable:**
+```js
+// frontend/src/tunables.js
+export const TUNABLES = [
+  {
+    key: 'sidebarV2',
+    type: 'bool',                  // 'bool' (default) | 'string' | 'number'
+    default: false,                // safe value — usually OFF for new UI
+    description: 'New sidebar with sticky nav + 2-line conversation titles.',
+    addedOn: '2026-05-17',
+    owner: 'sraval',
+  },
+];
+```
+```jsx
+// In any component:
+import { useTunable } from '../tunables';
+const sidebarV2 = useTunable('sidebarV2');
+return sidebarV2 ? <NewSidebar /> : <OldSidebar />;
+```
+
+**Retiring a tunable**: pick the surviving branch, inline it, delete the conditional, then remove the registry entry. Stale user-row values for the removed key are ignored automatically.
+
+**Don't**: leave a tunable on/off for everyone for more than ~2 weeks. Long-lived flags rot into dead code paths. Pick a winner and inline it.
+
 ## Common Gotchas
 
 1. **Port Conflicts**: Backend uses 8001 (not 8000). Update `backend/main.py` and `frontend/src/api.js` together.
