@@ -954,6 +954,40 @@ function AppShell() {
               });
               break;
 
+            case 'fact_check_start':
+              // Mark the message as fact-checking so the UI can show a
+              // small "running fact check…" affordance instead of
+              // surfacing the panel with nothing in it.
+              safeSetConv((prev) => {
+                if (!prev) return prev;
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                if (!lastMsg || lastMsg.role !== 'assistant') return prev;
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  factCheckRunning: true,
+                };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'fact_check_complete':
+              safeSetConv((prev) => {
+                if (!prev) return prev;
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                if (!lastMsg || lastMsg.role !== 'assistant') return prev;
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  factCheckRunning: false,
+                  factCheckFlags: Array.isArray(event?.data?.flags)
+                    ? event.data.flags
+                    : [],
+                };
+                return { ...prev, messages };
+              });
+              break;
+
             case 'interim_question':
             case 'clarification_question':
               // The backend asks the user one more question while the

@@ -1209,6 +1209,10 @@ function AssistantMessageBody({
                     onRegenerate={onRegenerate}
                     canRegenerate={Boolean(onRegenerate) && !isLoading && isLastMessage}
                     versionLabel={essayVersionLabel}
+                    factCheckFlags={
+                        msg.factCheckFlags || msg.metadata?.fact_check_flags || null
+                    }
+                    factCheckRunning={Boolean(msg.factCheckRunning)}
                 />
             )}
 

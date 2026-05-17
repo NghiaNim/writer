@@ -1,0 +1,168 @@
+/* FactCheckPanel — surfaces post-Stage-3 fact-check flags. Sits between
+   the FinalEssay body and its actions row. Color tuned amber so it reads
+   as "needs your attention" without alarming red. */
+
+.fact-check-panel {
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(245, 158, 11, 0.28);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin: 12px 0 20px;
+    color: #e2e8f0;
+    font-family: var(--font-ui, system-ui, sans-serif);
+    position: relative;
+    overflow: hidden;
+}
+
+.fact-check-panel::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.7), rgba(245, 158, 11, 0));
+}
+
+.fact-check-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.fact-check-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.fact-check-pulse {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(245, 158, 11, 0.7);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55);
+    animation: fact-check-pulse 1.6s infinite;
+}
+
+@keyframes fact-check-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55); }
+    70%  { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.fact-check-title {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #fcd34d;
+    font-weight: 700;
+}
+
+.fact-check-panel--running .fact-check-title {
+    color: #94a3b8;
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 500;
+    font-style: italic;
+}
+
+.fact-check-intro {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #cbd5e1;
+}
+
+.fact-check-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.fact-check-flag {
+    background: rgba(2, 6, 23, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.fact-check-flag-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.fact-check-tag {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.fact-check-tag--contradicts {
+    background: rgba(239, 68, 68, 0.18);
+    color: #fecaca;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.fact-check-tag--unsupported {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fde68a;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.fact-check-dismiss {
+    background: transparent;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    color: #94a3b8;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.fact-check-dismiss:hover {
+    background: rgba(148, 163, 184, 0.12);
+    color: #cbd5e1;
+    border-color: rgba(148, 163, 184, 0.55);
+}
+
+.fact-check-quote {
+    margin: 0 0 6px 0;
+    padding: 6px 10px;
+    background: rgba(15, 23, 42, 0.7);
+    border-left: 2px solid rgba(148, 163, 184, 0.4);
+    color: #e2e8f0;
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-size: 13.5px;
+    line-height: 1.5;
+    font-style: italic;
+}
+
+.fact-check-note {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #cbd5e1;
+}

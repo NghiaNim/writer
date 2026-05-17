@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ThinkBlockRenderer from './ThinkBlockRenderer';
+import FactCheckPanel from './FactCheckPanel';
 import { getModelVisuals, getShortModelName } from '../utils/modelHelpers';
 import StageTimer from './StageTimer';
 import './FinalEssay.css';
@@ -9,6 +10,11 @@ import './FinalEssay.css';
  * full-width, with copy / regenerate actions and a collapsed-by-default
  * "Show council notes" toggle that reveals Stages 1 & 2 (passed in as
  * `councilNotes`).
+ *
+ * `factCheckFlags` is the post-Stage-3 fact-check pass output — when
+ * populated, a FactCheckPanel renders between the essay body and the
+ * actions row. `factCheckRunning` controls a brief "checking…" state
+ * shown for the ~2s the pass takes.
  */
 export default function FinalEssay({
     finalResponse,
@@ -18,6 +24,8 @@ export default function FinalEssay({
     onRegenerate,
     canRegenerate = false,
     versionLabel = null,
+    factCheckFlags = null,
+    factCheckRunning = false,
 }) {
     const [isCopied, setIsCopied] = useState(false);
     const [showNotes, setShowNotes] = useState(false);
@@ -66,6 +74,11 @@ export default function FinalEssay({
             <article className="final-essay-body markdown-content">
                 <ThinkBlockRenderer content={essayText || 'No response'} />
             </article>
+
+            <FactCheckPanel
+                flags={factCheckFlags}
+                running={factCheckRunning}
+            />
 
             <div className="final-essay-actions">
                 <button
