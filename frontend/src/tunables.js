@@ -33,17 +33,21 @@
  */
 
 export const TUNABLES = [
-  // No tunables yet. The first feature toggle you add lives here.
-  // Example shape:
-  //
-  //   {
-  //     key: 'sidebarV2',
-  //     type: 'bool',
-  //     default: false,
-  //     description: 'New sidebar with sticky nav + 2-line conversation titles.',
-  //     addedOn: '2026-05-17',
-  //     owner: 'sraval',
-  //   },
+  {
+    key: 'brewMode',
+    type: 'bool',
+    default: false,
+    description:
+      'Re-skin the essay loading panel with espresso-brewing language and a CSS "bloom" indicator (the 30s pre-infusion CO2 release in pour-over coffee). Less generic-AI, more cafe.',
+    addedOn: '2026-05-17',
+    owner: 'sraval',
+    // Random-walk reference: James Hoffmann's pour-over bloom explainer
+    // and the r/Coffee specialty-prep vocabulary (sourcing → grinding →
+    // pulling → tasting → pour). The bloom is a real phenomenon: fresh-
+    // ground coffee releases CO2 when first wet, producing a slowly-
+    // expanding cap of fine bubbles. The CSS pulse here is the closest
+    // single-element approximation.
+  },
 ];
 
 /**

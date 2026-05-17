@@ -259,3 +259,66 @@
     font-size: 14px;
   }
 }
+
+/* ----- Brew mode (tunable: brewMode) ---------------------------------- */
+/*
+ * Warm-toned reskin. Bloom is a CSS-only stand-in for the 30-second
+ * pre-infusion in pour-over coffee — fresh-ground beans release CO2 when
+ * first wet, producing a slowly-expanding crema-colored cap. We mimic that
+ * with a radial gradient that breathes on a 4s cycle (close to the real
+ * bloom's tempo) and a faint crema ring underneath.
+ *
+ * Random-walk reference: James Hoffmann's "World Atlas of Coffee" + the
+ * r/Coffee specialty-prep vocabulary.
+ */
+.essay-loading-status--brew {
+  background: rgba(34, 22, 14, 0.62);
+  border-color: rgba(217, 119, 6, 0.30);
+  color: #f5e9d8;
+}
+
+.essay-loading-status--brew::before {
+  background: linear-gradient(180deg, rgba(217, 119, 6, 0.75), rgba(217, 119, 6, 0));
+}
+
+.essay-loading-status--brew .essay-loading-bar {
+  color: #f5b462;
+}
+
+.essay-loading-status--brew .essay-loading-prompt {
+  color: #d97706;
+}
+
+.essay-loading-status--brew .essay-loading-cursor {
+  color: #f5b462;
+}
+
+/* The bloom: replace the plain blue pulse with a warmer crema halo and a
+   slower, organic cycle. Two layered animations — `essay-bloom` is the
+   slow radial breathe, `essay-bloom-spin` rotates the highlight so it
+   doesn't look like a polished UI dot. */
+.essay-loading-status--brew .essay-loading-dot {
+  width: 12px;
+  height: 12px;
+  background: radial-gradient(
+    circle at 35% 30%,
+    #f5b462 0%,
+    #b45309 55%,
+    #4a2c14 100%
+  );
+  box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55);
+  animation:
+    essay-bloom 4s ease-in-out infinite,
+    essay-bloom-spin 9s linear infinite;
+}
+
+@keyframes essay-bloom {
+  0%   { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55), inset 0 0 0 0 rgba(245, 180, 98, 0); transform: scale(1); }
+  50%  { box-shadow: 0 0 0 14px rgba(217, 119, 6, 0),  inset 0 0 4px 1px rgba(245, 180, 98, 0.35); transform: scale(1.12); }
+  100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0),    inset 0 0 0 0 rgba(245, 180, 98, 0); transform: scale(1); }
+}
+
+@keyframes essay-bloom-spin {
+  from { background-position: 0% 0%; }
+  to   { background-position: 100% 100%; }
+}
