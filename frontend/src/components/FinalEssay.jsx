@@ -126,9 +126,7 @@ export default function FinalEssay({
             {showNotes && councilNotes && (
                 <div className="final-essay-council-notes">
                     <div className="council-notes-intro">
-                        How the council got here — the pitches considered, the draft
-                        picked as the spine, every member's draft, and the critiques the
-                        chairman applied during revision.
+                        How the council got here — pitches, spine pick, drafts, critiques.
                     </div>
                     {councilNotes}
                 </div>

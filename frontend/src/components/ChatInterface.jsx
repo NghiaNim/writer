@@ -712,9 +712,6 @@ export default function ChatInterface({
                     >
                         {isLoading ? (
                             <div className="composer-minimize-bar">
-                                <span className="composer-minimize-hint">
-                                    Hide this panel to read earlier drafts above.
-                                </span>
                                 <button
                                     type="button"
                                     className="composer-minimize-btn"
@@ -967,14 +964,11 @@ export default function ChatInterface({
                     >
                         {isLoading ? (
                             <div className="composer-minimize-bar">
-                                <span className="composer-minimize-hint">
-                                    Hide this panel to see council status above.
-                                </span>
                                 <button
                                     type="button"
                                     className="composer-minimize-btn"
                                     onClick={() => setComposerCollapsed(true)}
-                                    title="Collapse the composer while the council runs"
+                                    title="Hide composer"
                                 >
                                     Hide composer
                                 </button>
@@ -1008,8 +1002,8 @@ export default function ChatInterface({
                             </button>
                             <span className="essay-mode-hint">
                                 {essayMode === 'topic'
-                                    ? 'The council will write from scratch.'
-                                    : 'The council will refine your draft and preserve your voice.'}
+                                    ? 'Writes from scratch.'
+                                    : 'Refines your draft, keeps your voice.'}
                             </span>
                             <button
                                 type="button"
@@ -1040,7 +1034,7 @@ export default function ChatInterface({
                                     isLoading
                                         ? 'Council is deliberating...'
                                         : essayMode === 'draft'
-                                            ? 'Paste your draft here. The council will refine it while preserving your voice.'
+                                            ? 'Paste your draft here.'
                                             : 'What essay do you want to write? (e.g. "Why most productivity advice fails for creatives")'
                                 }
                                 value={input}

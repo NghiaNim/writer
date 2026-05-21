@@ -148,15 +148,7 @@ export default function InterimQuestions({
                     <span className="interim-questions__title">While we draft…</span>
                 </div>
                 <p className="interim-questions__placeholder-body">
-                    The council is just sitting down with your topic. In a few
-                    seconds, one or two quick questions will pop up here — your
-                    answers ground the final essay so it sounds like you, not
-                    like a model.
-                </p>
-                <p className="interim-questions__tip">
-                    Tip: you can change which questions you're asked by editing
-                    your council in Settings → Council, or your voice rules in
-                    Settings → Voice.
+                    A question or two will appear here in a few seconds.
                 </p>
             </aside>
         );
@@ -223,8 +215,7 @@ export default function InterimQuestions({
                 <>
                     {isChairmanAsk && !runFinished && (
                         <p className="interim-questions__chairman-note">
-                            About to write your final essay. Your answer here
-                            (or a quick skip) lands in the very next prompt.
+                            About to write the final essay. Your answer (or skip) lands in the next prompt.
                         </p>
                     )}
                     {runFinished && (
