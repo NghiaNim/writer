@@ -856,13 +856,15 @@ async def send_message_stream(
             generate_interim_questions,
             get_run_buffer,
             mark_question_emitted,
-            reset_run_buffer,
+            prune_pending_buffer,
         )
         from .user_facts import load_recent_user_facts
 
-        # Per-run state for interim Q&A. Reset at the start so a new run on
-        # the same conversation doesn't see stale answers.
-        reset_run_buffer(conversation_id)
+        # Per-run state for interim Q&A. On a retry against the same
+        # conversation, drop only the pending (never-answered) entries —
+        # answered/skipped entries from the prior run still represent
+        # durable user input and should reach this run's chairman.
+        prune_pending_buffer(conversation_id)
 
         def _emit_question_events(qs):
             """Yield SSE events for a batch of questions AND record each as

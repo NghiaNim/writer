@@ -24,6 +24,7 @@ import asyncio
 import json
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from .user_facts import (
@@ -204,22 +205,14 @@ async def extract_and_store(
     if not facts:
         return 0
 
-    # If this essay already has facts (re-run case), drop the old set first
-    # so the new extraction replaces rather than stacks.
-    if source_essay_id:
-        try:
-            removed = await asyncio.to_thread(
-                delete_facts_for_essay, user_id, source_essay_id
-            )
-            if removed:
-                logger.info(
-                    "memory: dropped %d stale facts for essay %s before re-extract",
-                    removed,
-                    source_essay_id,
-                )
-        except Exception as e:
-            logger.warning("memory: stale-fact cleanup failed: %s", e)
-
+    # Insert the new set FIRST, then sweep the previous extraction for this
+    # essay. The old order (delete-then-insert) lost user facts forever when
+    # the insert raised after the delete had already succeeded.
+    #
+    # The cutoff timestamp is captured *before* insert so the post-insert
+    # sweep targets only pre-existing rows — the freshly inserted facts
+    # share the same source_essay_id but have created_at >= cutoff.
+    cutoff_iso = datetime.now(timezone.utc).isoformat()
     try:
         inserted = await asyncio.to_thread(
             bulk_insert_user_facts,
@@ -227,6 +220,7 @@ async def extract_and_store(
             facts,
             source=source,
             source_essay_id=source_essay_id,
+            dedupe_exclude_essay_id=source_essay_id,
         )
         logger.info(
             "memory: extracted %d facts, inserted %d for user=%s essay=%s",
@@ -238,6 +232,23 @@ async def extract_and_store(
     except Exception as e:
         logger.warning("memory: bulk insert failed: %s", e)
         return 0
+
+    if source_essay_id and inserted:
+        try:
+            removed = await asyncio.to_thread(
+                delete_facts_for_essay,
+                user_id,
+                source_essay_id,
+                before=cutoff_iso,
+            )
+            if removed:
+                logger.info(
+                    "memory: dropped %d stale facts for essay %s after re-extract",
+                    removed,
+                    source_essay_id,
+                )
+        except Exception as e:
+            logger.warning("memory: stale-fact cleanup failed: %s", e)
 
     # If we just pushed the corpus past the prompt budget, fold the oldest
     # half into a single summary fact. The originals stay in the table

@@ -334,9 +334,15 @@ async def refresh(body: RefreshRequest):
             detail="Refresh token is invalid or expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    # If Supabase didn't rotate the refresh token on this call (it usually
+    # does, but some edge cases — e.g. a brand-new token still inside its
+    # reuse window — return access-only), fall back to the token the
+    # client sent. Returning None would clobber the frontend's stored
+    # refresh token and lock the user out on the next refresh attempt.
+    new_refresh = getattr(session, "refresh_token", None) or body.refresh_token
     return AuthResponse(
         access_token=session.access_token,
-        refresh_token=getattr(session, "refresh_token", None),
+        refresh_token=new_refresh,
         user=_user_to_dict(user),
         needs_email_confirmation=False,
     )

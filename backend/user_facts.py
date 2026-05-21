@@ -185,24 +185,37 @@ def delete_user_fact(user_id: str, fact_id: str) -> bool:
         return False
 
 
-def delete_facts_for_essay(user_id: str, essay_id: str) -> int:
-    """Remove all facts that were extracted from a given essay row.
+def delete_facts_for_essay(
+    user_id: str,
+    essay_id: str,
+    *,
+    before: Optional[str] = None,
+) -> int:
+    """Remove facts that were extracted from a given essay row.
 
     Used when an essay is re-run so the new extraction replaces the old
     one instead of stacking near-duplicates. Returns count deleted, or 0
     on any failure.
+
+    When `before` is set (ISO-8601 string), only rows with
+    `created_at < before` are removed. The caller passes the timestamp it
+    captured just before inserting the fresh extraction, so freshly
+    inserted rows are never caught by the sweep — making "insert new,
+    then delete old" safe even when both runs share the same essay_id.
     """
     if not essay_id:
         return 0
     sb = get_supabase()
     try:
-        res = (
+        q = (
             sb.table("user_fact")
             .delete()
             .eq("user_id", user_id)
             .eq("source_essay_id", essay_id)
-            .execute()
         )
+        if before:
+            q = q.lt("created_at", before)
+        res = q.execute()
         return len(res.data or [])
     except Exception as e:
         logger.warning("user_fact delete-by-essay failed for %s: %s", user_id, e)
@@ -215,6 +228,7 @@ def bulk_insert_user_facts(
     *,
     source: str = "essay",
     source_essay_id: Optional[str] = None,
+    dedupe_exclude_essay_id: Optional[str] = None,
 ) -> int:
     """Insert many facts in one round-trip, deduped against existing rows.
 
@@ -251,20 +265,39 @@ def bulk_insert_user_facts(
     # Dedupe against existing facts. We pull a generous window of recent
     # facts rather than all rows — for a user with thousands of facts the
     # window stays bounded, and near-duplicates would mostly be recent.
+    # When `dedupe_exclude_essay_id` is set, skip facts that came from the
+    # same essay row — the caller is doing a re-extract and is about to
+    # sweep those old rows after this insert lands, so deduping against
+    # them would just produce zero inserts and an empty essay.
     sb = get_supabase()
     try:
+        select_cols = (
+            "fact_text, source_essay_id"
+            if dedupe_exclude_essay_id
+            else "fact_text"
+        )
         existing = (
             sb.table("user_fact")
-            .select("fact_text")
+            .select(select_cols)
             .eq("user_id", user_id)
             .is_("archived_at", "null")
             .order("created_at", desc=True)
             .limit(200)
             .execute()
         )
+        rows = existing.data or []
+        if dedupe_exclude_essay_id:
+            # PostgREST `neq` on a nullable column also drops NULL rows
+            # (NULL != X is NULL → false), so the exclusion lives in
+            # Python to keep facts from other essays / intake / chat in
+            # the dedupe window.
+            rows = [
+                r for r in rows
+                if r.get("source_essay_id") != dedupe_exclude_essay_id
+            ]
         existing_norms = {
             _normalize_for_dedupe(r.get("fact_text") or "")
-            for r in (existing.data or [])
+            for r in rows
         }
     except Exception as e:
         logger.warning("user_fact dedupe lookup failed for %s: %s", user_id, e)

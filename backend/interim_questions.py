@@ -48,12 +48,39 @@ _DRAFT_EXCERPT_CHARS = 1200
 # Keyed by conversation_id. Each value is a list of {question_id, question,
 # answer, ts} dicts. event_generator clears the entry at the start of a run
 # and reads it before stage 3.
+#
+# ⚠️ SINGLE-PROCESS ONLY. This dict lives in the worker's RAM, so it does
+# not survive a restart and is not shared across processes. If the backend
+# is ever launched with `uvicorn --workers N` or behind a multi-process
+# load balancer, an interim-question POST may land on a worker that
+# doesn't hold the buffer for that conversation_id — the in-flight Q&A
+# block will then miss those answers (durable user_fact persistence still
+# happens correctly, since that path doesn't depend on the buffer). Move
+# to Redis (or a Supabase JSONB column) before scaling out.
 
 _run_buffers: Dict[str, List[Dict[str, Any]]] = {}
 
 
 def reset_run_buffer(conversation_id: str) -> None:
     _run_buffers[conversation_id] = []
+
+
+def prune_pending_buffer(conversation_id: str) -> None:
+    """Drop pending (never-answered) entries but keep answered/skipped ones.
+
+    Called at the start of a new run on a conversation that already has a
+    buffer. Pending entries from the prior run are stale — their
+    question_ids are gone from the frontend's view — but answered and
+    skipped entries represent durable user input that the chairman should
+    still see this run.
+    """
+    existing = _run_buffers.get(conversation_id)
+    if not existing:
+        _run_buffers[conversation_id] = []
+        return
+    _run_buffers[conversation_id] = [
+        e for e in existing if e.get("status") in ("answered", "skipped")
+    ]
 
 
 def get_run_buffer(conversation_id: str) -> List[Dict[str, Any]]:
