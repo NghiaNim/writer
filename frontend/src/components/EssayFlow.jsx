@@ -433,7 +433,7 @@ export default function EssayFlow({
             }
             await api.sessions.update(s.id, {
                 path: 'draft',
-                ...(audience.trim() ? { /* audience persisted on intake/core-idea below */ } : {}),
+                ...(audience.trim() ? { audience: audience.trim() } : {}),
             });
             setStep('draft');
         } catch (err) {
@@ -634,6 +634,7 @@ export default function EssayFlow({
             const qa = buildAnsweredQa();
             await api.sessions.update(session.id, {
                 conversation: qa,
+                ...(audience.trim() ? { audience: audience.trim() } : {}),
             });
             setStep('core_idea');
             setCoreIdeaLoading(true);
@@ -709,14 +710,38 @@ export default function EssayFlow({
         });
     };
 
+    // Persist the timeline alongside the Q&A so a refresh between
+    // step 3 (timeline) and step 4 (voice) doesn't drop everything the
+    // student just typed. We keep the Q&A entries Q&A-shaped and append
+    // a single sentinel entry the council message builder ignores.
+    const persistTimelineToSession = async (events) => {
+        if (!session?.id) return;
+        const qa = questions
+            .map((q, i) => ({ question: q, answer: (answers[i] || '').trim() }))
+            .filter((item) => item.answer);
+        const conversation = events.length
+            ? [...qa, { kind: 'timeline', events }]
+            : qa;
+        try {
+            await api.sessions.update(session.id, { conversation });
+        } catch (e) {
+            // Non-blocking — the timeline still lives in component state
+            // and will be sent to the council. We only lose it if the
+            // user refreshes before clicking Start.
+            console.warn('Failed to persist timeline to session:', e);
+        }
+    };
+
     const handleSubmitTimeline = async () => {
         setError(null);
+        await persistTimelineToSession(timelineEvents);
         setStep('voice');
     };
 
-    const handleSkipTimeline = () => {
+    const handleSkipTimeline = async () => {
         setError(null);
         setTimelineEvents([]);
+        await persistTimelineToSession([]);
         setStep('voice');
     };
 

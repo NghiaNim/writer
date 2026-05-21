@@ -19,6 +19,7 @@ policies are belt-and-suspenders against direct anon-key access.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -58,6 +59,7 @@ class UpdateSessionRequest(BaseModel):
     topic: Optional[str] = None
     so_what_answer: Optional[str] = None
     essay_type: Optional[str] = None
+    audience: Optional[str] = None
     path: Optional[Literal["interactive", "draft"]] = None
     conversation: Optional[List[Dict[str, Any]]] = None
     draft: Optional[str] = None
@@ -73,6 +75,7 @@ class SessionRow(BaseModel):
     topic: Optional[str] = None
     so_what_answer: Optional[str] = None
     essay_type: Optional[str] = None
+    audience: Optional[str] = None
     path: Optional[str] = None
     conversation: List[Dict[str, Any]] = []
     draft: Optional[str] = None
@@ -110,6 +113,7 @@ def _coerce_session(row: Dict[str, Any]) -> SessionRow:
         topic=row.get("topic"),
         so_what_answer=row.get("so_what_answer"),
         essay_type=row.get("essay_type"),
+        audience=row.get("audience"),
         path=row.get("path"),
         conversation=row.get("conversation") or [],
         draft=row.get("draft"),
@@ -194,6 +198,19 @@ async def memory_check(
         # Fall back to the whole topic string.
         tokens = [needle]
 
+    # PostgREST's or_ filter is a comma-separated string of conditions,
+    # with parentheses grouping. If a raw token contains any of those
+    # metacharacters (or ilike wildcards), the clause silently breaks
+    # apart and the query returns 0 rows — so memory_check stops
+    # warning the user about prior essays on the same topic. Strip them.
+    def _safe_token(t: str) -> str:
+        cleaned = re.sub(r"[,()*%_:\\]", " ", t).strip()
+        return cleaned[:80]
+
+    safe_tokens = [s for s in (_safe_token(t) for t in tokens) if len(s) >= 4]
+    if not safe_tokens:
+        return MemoryCheckResponse(found=False, matches=[])
+
     query = (
         supabase.table("essay_memory")
         .select("id, conversation_id, topic, summary, created_at")
@@ -202,8 +219,7 @@ async def memory_check(
         .limit(5)
     )
 
-    # PostgREST .or_() takes a comma-separated string of conditions.
-    or_clause = ",".join(f"topic.ilike.%{t}%" for t in tokens)
+    or_clause = ",".join(f"topic.ilike.%{t}%" for t in safe_tokens)
     try:
         result = query.or_(or_clause).execute()
     except Exception as e:
@@ -253,6 +269,8 @@ async def update_session(
 
     if "topic" in payload and isinstance(payload["topic"], str):
         payload["topic"] = payload["topic"].strip()
+    if "audience" in payload and isinstance(payload["audience"], str):
+        payload["audience"] = payload["audience"].strip() or None
 
     supabase = get_supabase()
     try:
