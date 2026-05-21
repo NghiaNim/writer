@@ -52,10 +52,7 @@ export default function PromptSettings({
                     <div className="prompt-content">
                         <label>Stage 1: Council Personas</label>
                         <p className="section-description" style={{ marginBottom: '10px' }}>
-                            Each council member has a distinct role. Member <strong>1</strong> uses the
-                            first persona below, member <strong>2</strong> the second, and so on.
-                            Council members beyond the persona list fall back to the generic Stage 1
-                            prompt at the bottom of this page.
+                            Member <strong>1</strong> uses persona 1, member <strong>2</strong> uses persona 2, and so on. Extras fall back to the generic prompt below.
                         </p>
 
                         {councilPersonas.length > 0 ? (
@@ -194,8 +191,7 @@ export default function PromptSettings({
                                 className="section-description"
                                 style={{ marginBottom: '10px' }}
                             >
-                                Used for council members at indices beyond the persona list (e.g. a
-                                5th member when only 4 personas are defined).
+                                Used for council members beyond the persona list.
                             </p>
                             <p className="prompt-help">
                                 Variables: <code>{'{user_query}'}</code>,{' '}
@@ -226,7 +222,7 @@ export default function PromptSettings({
                                 <span className="heat-value">{stage2Temperature.toFixed(1)}</span>
                             </div>
                             <p className="section-description" style={{ fontSize: '12px', margin: '8px 0' }}>
-                                Lower temperature recommended for consistent, parseable ranking output.
+                                Keep this low — Stage 2 needs to parse.
                             </p>
                             <div className="heat-slider-container">
                                 <span className="heat-icon cold">❄️</span>

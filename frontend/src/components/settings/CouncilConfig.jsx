@@ -85,8 +85,8 @@ export default function CouncilConfig({
             <section className="settings-section">
                 <h3>Available Model Sources</h3>
                 <p className="section-description">
-                    Toggle which providers are available for the search generator, council members, and chairman.
-                    <br /><em style={{ opacity: 0.7, fontSize: '12px' }}>Note: Non-chat models (embeddings, image generation, speech, OCR, etc.) are automatically filtered out.</em>
+                    Toggle which providers are available for council members and the chairman.
+                    <br /><em style={{ opacity: 0.7, fontSize: '12px' }}>Non-chat models (embeddings, image, speech, OCR) are filtered out.</em>
                 </p>
 
                 <div className="hybrid-settings-card">
