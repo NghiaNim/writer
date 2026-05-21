@@ -98,85 +98,404 @@ def _safe_json_loads(s: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-async def _generate_intake_questions(topic: str, audience: str, essay_type: str) -> List[str]:
-    """Generate 3-5 probing questions tailored to topic+audience.
+_INTAKE_SECTIONS = [
+    {
+        "id": "positioning",
+        "label": "How you want them to see you",
+        "blurb": (
+            "Who is the person on the page? What 3 words, what role, what "
+            "one sentence in the reader's head after they finish."
+        ),
+    },
+    {
+        "id": "direction",
+        "label": "Where you're pointed",
+        "blurb": (
+            "Dream, major, the kind of problem that lights you up. Skip "
+            "entirely for journal or personal-essay audiences; lean in for "
+            "admissions or statement-of-purpose."
+        ),
+    },
+    {
+        "id": "story",
+        "label": "A specific moment, object, or place",
+        "blurb": (
+            "One concrete artifact from the writer's actual life — an "
+            "object on their desk, a place they go to think, a moment that "
+            "went wrong. Surfaces the lived detail an outside reader "
+            "couldn't invent."
+        ),
+    },
+    {
+        "id": "tactics",
+        "label": "Why this story, this way",
+        "blurb": (
+            "What quality does this prove? What's the writer NOT being "
+            "given credit for? What would another student write the same "
+            "essay about? Pressure-tests the angle."
+        ),
+    },
+]
 
-    Returns a list of strings. On any failure, falls back to a small set of
-    safe, generic prompts so the UI keeps moving.
 
-    The system prompt is written so questions land like a real coach across
-    the kitchen table — concrete, slightly uncomfortable, hard to answer in
-    a generic way. Students using the app should NOT be able to feed these
-    into ChatGPT and get a useful response, because the right answer for
-    each one is grounded in something only they know.
+_INTAKE_QUESTION_KINDS = {"text", "examples_text", "choice", "multi"}
+
+
+_INTAKE_SYSTEM_PROMPT = """You are an essay coach sitting across the table from a writer (typically a high-school or college student) preparing a personal essay. You are the coach who actually knows them. Your job is to design a SHORT INTAKE that pulls out the kind of specific, lived detail an outside reader couldn't invent.
+
+You will use a four-part framework to choose what to ask. Cover at least three of the four parts:
+
+  1. POSITIONING — how the writer wants to be seen.
+     · "What 3 words do you want the reader to remember about you?"
+     · "Which role do you play in your own life?" (1-2 of: solves problems / takes care of others / asks unusual questions / connects people / keeps going quietly / creates things / notices small details / challenges old ideas / brings humor or warmth / learns from mistakes / takes responsibility early / turns curiosity into action)
+     · "What do you NOT want them to misunderstand about you?"
+     · "What's the one sentence you hope the reader says after they finish?"
+
+  2. DIRECTION (admissions / statement-of-purpose only — skip for journal/magazine audiences) — what they're pointed at.
+     · "What problem do you hope to solve one day?"
+     · "When did you first become interested in this field?"
+     · "What kind of people do you want to help, work with, or learn from?"
+
+  3. PERSONAL STORY — the lived material.
+     · OBJECT prompts: "What object on your desk has a story?" / "What object reminds you of a mistake?" / "What object would you take to college?"
+     · PLACE prompts: "Where do you go when you need to think?" / "Where did you fail at something?" / "What place at home has the most memories?"
+     · MOMENT prompts: "Tell me about one time you stayed quiet but thought deeply." / "Tell me about one time you changed your mind." / "Tell me about one time you realized you were growing up."
+     · DAILY-LIFE prompts: "What do your friends always ask you for help with?" / "What part of your life would surprise the reader?"
+
+  4. TACTICS — why this story, this way.
+     · "What quality does this story prove?"
+     · "Could another student write the same essay, or is it clearly yours?"
+     · "What does this story show that's NOT already obvious?"
+
+DESIGN RULES — non-negotiable:
+  - Mix question KINDS. Don't return 5 textareas in a row. Include at least one multi-select ("Pick 1-2 that feel true") and at least one example-laden free-text ("here are 3 sample answers — yours can sound nothing like these").
+  - Personalize using KNOWN FACTS. If we already know the writer plays violin, don't ask "what's an activity you do?" — ask about their relationship to the instrument, the practice room, the teacher, the time they broke a string mid-recital.
+  - Be CONCRETE. "What was the first thing you smelled when you walked in?" beats "Set the scene." Specific objects, specific people, specific moments.
+  - Be ANSWERABLE. 1-3 sentences max. Multi-select rows should be tappable, not paragraphs.
+  - NEVER use the words "journey", "impact", "meaningful", "learning", "growth". They invite generic-AI answers.
+  - NEVER ask a question whose answer is already in the KNOWN FACTS block. If you must touch a known area, ask a follow-up that adds resolution.
+
+OUTPUT — strict JSON, no markdown fences, no commentary. Return 5-7 questions total, ordered by section (positioning → direction → story → tactics; omit direction if the audience doesn't warrant it):
+
+{
+  "sections": [
+    {"id": "positioning", "label": "How you want them to see you"},
+    {"id": "story", "label": "A specific moment, object, or place"}
+  ],
+  "questions": [
+    {
+      "kind": "examples_text",
+      "section": "positioning",
+      "question": "What 3 words do you want the admission officer to remember about you?",
+      "subtext": "After reading your whole application — what should they walk away with?",
+      "placeholder": "curious, responsible, creative",
+      "examples": ["curious, responsible, creative", "brave, kind, independent", "analytical, persistent, community-minded"]
+    },
+    {
+      "kind": "multi",
+      "section": "positioning",
+      "question": "Which role do you play in your own life? Pick 1-2 that feel true.",
+      "max_select": 2,
+      "min_select": 1,
+      "options": ["I am the person who solves problems.", "I am the person who takes care of others.", "I am the person who notices small details.", "I am the person who challenges old ideas.", "I am the person who turns curiosity into action."]
+    },
+    {
+      "kind": "text",
+      "section": "story",
+      "question": "Tell me about one time you stayed quiet but thought deeply.",
+      "subtext": "One small moment is enough. Where were you, who was there, what were you not saying out loud?"
+    }
+  ]
+}
+
+Field reference:
+  - kind: "text" | "examples_text" | "choice" | "multi"  (always lowercase)
+  - section: matches one id from your `sections` array (lowercase)
+  - subtext: optional one-line nudge under the question, written like a coach's aside
+  - placeholder: optional textarea placeholder (only for text/examples_text)
+  - examples: 2-4 sample answers (only for examples_text) — used as clickable inspiration chips
+  - options: 4-10 option strings (only for choice/multi)
+  - max_select: integer 1-3 (only for multi). min_select defaults to 1.
+
+If the audience is "yourself (a journal entry)" or similar, skip Part 2 (direction) entirely and lean heavily on Part 3 (story). For admissions/statement-of-purpose audiences, include at least one positioning question AND at least one direction question."""
+
+
+def _normalize_intake_question(
+    q: Dict[str, Any],
+    valid_section_ids: set,
+) -> Optional[Dict[str, Any]]:
+    """Validate + sanitise one question dict from the model. Returns None
+    for anything that can't be salvaged — the caller drops it."""
+    if not isinstance(q, dict):
+        return None
+    kind = str(q.get("kind") or "").strip().lower()
+    if kind not in _INTAKE_QUESTION_KINDS:
+        return None
+    text = str(q.get("question") or "").strip().strip('"').strip("'").strip()
+    if not text or len(text) > 320:
+        return None
+    section = str(q.get("section") or "").strip().lower()
+    if section not in valid_section_ids:
+        # Fall back to a generic story bucket so it still renders somewhere.
+        section = "story" if "story" in valid_section_ids else next(iter(valid_section_ids), "")
+    out: Dict[str, Any] = {
+        "question_id": str(uuid.uuid4()),
+        "kind": kind,
+        "section": section,
+        "question": text,
+    }
+    subtext = str(q.get("subtext") or "").strip()
+    if subtext and len(subtext) <= 240:
+        out["subtext"] = subtext
+    if kind in ("text", "examples_text"):
+        ph = str(q.get("placeholder") or "").strip()
+        if ph and len(ph) <= 160:
+            out["placeholder"] = ph
+    if kind == "examples_text":
+        examples = q.get("examples") or []
+        if isinstance(examples, list):
+            cleaned_examples = []
+            for ex in examples:
+                ex_text = str(ex or "").strip().strip('"').strip("'").strip()
+                if ex_text and len(ex_text) <= 200:
+                    cleaned_examples.append(ex_text)
+                if len(cleaned_examples) >= 4:
+                    break
+            if cleaned_examples:
+                out["examples"] = cleaned_examples
+    if kind in ("choice", "multi"):
+        opts = q.get("options") or []
+        if not isinstance(opts, list):
+            return None
+        cleaned_opts = []
+        for opt in opts:
+            opt_text = str(opt or "").strip().strip('"').strip("'").strip()
+            if opt_text and len(opt_text) <= 160 and opt_text not in cleaned_opts:
+                cleaned_opts.append(opt_text)
+            if len(cleaned_opts) >= 12:
+                break
+        if len(cleaned_opts) < 2:
+            return None
+        out["options"] = cleaned_opts
+        if kind == "multi":
+            try:
+                max_select = int(q.get("max_select") or 1)
+            except (TypeError, ValueError):
+                max_select = 1
+            out["max_select"] = max(1, min(max_select, len(cleaned_opts)))
+            try:
+                min_select = int(q.get("min_select") or 1)
+            except (TypeError, ValueError):
+                min_select = 1
+            out["min_select"] = max(1, min(min_select, out["max_select"]))
+    return out
+
+
+def _fallback_intake_payload() -> Dict[str, Any]:
+    """Used when the model fails entirely. Mirrors the new typed shape so
+    the frontend's per-kind renderers still have something to draw."""
+    return {
+        "sections": [
+            {"id": "positioning", "label": "How you want them to see you"},
+            {"id": "story", "label": "A specific moment"},
+        ],
+        "questions": [
+            {
+                "question_id": str(uuid.uuid4()),
+                "kind": "examples_text",
+                "section": "positioning",
+                "question": "What 3 words do you want the reader to remember about you after they finish?",
+                "subtext": "Not adjectives off a list — words that point at something specific you've actually done.",
+                "placeholder": "curious, responsible, creative",
+                "examples": [
+                    "curious, responsible, creative",
+                    "brave, kind, independent",
+                    "analytical, persistent, community-minded",
+                ],
+            },
+            {
+                "question_id": str(uuid.uuid4()),
+                "kind": "multi",
+                "section": "positioning",
+                "question": "Which role do you play in your own life? Pick 1-2 that feel true.",
+                "max_select": 2,
+                "min_select": 1,
+                "options": [
+                    "I am the person who solves problems.",
+                    "I am the person who takes care of others.",
+                    "I am the person who notices small details.",
+                    "I am the person who challenges old ideas.",
+                    "I am the person who keeps going quietly.",
+                    "I am the person who connects people.",
+                    "I am the person who turns curiosity into action.",
+                ],
+            },
+            {
+                "question_id": str(uuid.uuid4()),
+                "kind": "text",
+                "section": "story",
+                "question": "Tell me about one time you stayed quiet but thought deeply.",
+                "subtext": "Where were you, who else was there, what were you not saying out loud?",
+            },
+            {
+                "question_id": str(uuid.uuid4()),
+                "kind": "text",
+                "section": "story",
+                "question": "What object on your desk or in your bag has a story most people don't know?",
+                "subtext": "An object you'd take to college; an object that reminds you of a mistake.",
+            },
+            {
+                "question_id": str(uuid.uuid4()),
+                "kind": "text",
+                "section": "tactics",
+                "question": "Could another student write this same essay? What makes it clearly yours?",
+            },
+        ],
+    }
+
+
+def _format_facts_for_intake(facts: List[Dict[str, Any]]) -> str:
+    if not facts:
+        return "(no facts on file yet — this is a fresh writer)"
+    lines: List[str] = []
+    for f in facts[:30]:
+        text = (f.get("fact_text") or "").strip()
+        if not text:
+            continue
+        cat = (f.get("category") or "general").strip()
+        lines.append(f"  - [{cat}] {text}")
+    return "\n".join(lines) if lines else "(no facts on file yet — this is a fresh writer)"
+
+
+async def _generate_intake_questions(
+    *,
+    topic: str,
+    audience: str,
+    essay_type: str,
+    user_id: Optional[str] = None,
+    already_asked: Optional[List[str]] = None,
+    rejected_question: Optional[str] = None,
+    n_questions: int = 6,
+) -> Dict[str, Any]:
+    """Generate a typed-question intake payload tailored to topic + audience
+    + known facts about the writer. Same generator powers both initial
+    generation and Swap (with already_asked + rejected_question filled in
+    and n_questions=1).
+
+    Returns `{sections: [...], questions: [...]}` with each question carrying
+    a server-issued question_id. Falls back to `_fallback_intake_payload()`
+    on any failure so the UI keeps moving.
     """
-    audience_part = f" The intended audience is: {audience}." if audience else ""
-    sys_prompt = (
-        "You are sitting across from a high-school or college student who is "
-        "trying to write a personal essay. You are the coach who actually "
-        "knows them. Your job is to ask 3-5 questions that pull out the kind "
-        "of specific, lived detail an outside reader couldn't invent.\n\n"
-        "GOOD QUESTIONS:\n"
-        "  - Ask for a specific moment, sentence, or image. \"What's the "
-        "first thing you smelled when you walked in?\" not \"Set the scene.\"\n"
-        "  - Probe a contradiction the student probably hasn't admitted to "
-        "themselves yet. \"What did you almost not put in this essay?\"\n"
-        "  - Ask about the person who would disagree most. \"Who in your life "
-        "would roll their eyes at this — and why are they almost right?\"\n"
-        "  - Get at price/cost. \"What did this cost you that you've never "
-        "told anyone?\"\n"
-        "  - Force them to pick. \"If you had to cut everything but one "
-        "moment, which one survives?\"\n\n"
-        "BAD QUESTIONS (do NOT generate these):\n"
-        "  - \"Why is this important to you?\" / \"What did you learn?\"\n"
-        "  - Anything a generic writing teacher would ask.\n"
-        "  - Anything ChatGPT could answer plausibly without knowing the "
-        "student.\n"
-        "  - Open-ended philosophical questions (\"How do you see growth?\").\n"
-        "  - Questions with the word \"journey\", \"impact\", \"meaningful\".\n\n"
-        "Each question is ONE sentence, in the second person, written like "
-        "you're actually talking. Contractions are fine. Casual is fine. "
-        "Cutting is fine."
+    facts: List[Dict[str, Any]] = []
+    if user_id:
+        try:
+            from .user_facts import load_recent_user_facts as _load_facts
+
+            facts = await asyncio.to_thread(_load_facts, user_id)
+        except Exception as e:
+            print(f"WARN: intake fact load failed for {user_id}: {e}")
+            facts = []
+
+    audience_text = (audience or "").strip()
+    facts_block = _format_facts_for_intake(facts)
+    asked_block = ""
+    if already_asked:
+        ask_lines = [f"  - {q.strip()}" for q in already_asked if (q or "").strip()]
+        if ask_lines:
+            asked_block = (
+                "\n\nQUESTIONS ALREADY ASKED IN THIS SESSION (do NOT repeat or "
+                "rephrase any of these):\n" + "\n".join(ask_lines)
+            )
+    rejected_block = ""
+    if rejected_question and rejected_question.strip():
+        rejected_block = (
+            "\n\nThe writer pressed Swap on this specific question — do NOT "
+            "produce another in the same vein:\n  - "
+            + rejected_question.strip()
+        )
+    count_line = (
+        f"Return exactly ONE new question (do not include the sections array "
+        f"unless the new question belongs to a section not already present in "
+        f"asked-questions context)."
+        if n_questions == 1
+        else f"Return {n_questions} questions covering at least three of the four parts."
     )
+
     user_prompt = (
-        f"TOPIC: {topic}.{audience_part}\n"
-        f"ESSAY TYPE: {essay_type}.\n\n"
-        "Return STRICT JSON, no prose:\n"
-        '{"questions": ["...", "...", "..."]}'
+        f"TOPIC: {(topic or '').strip() or '(none given)'}\n"
+        f"AUDIENCE: {audience_text or '(general reader)'}\n"
+        f"ESSAY TYPE: {(essay_type or 'general').strip()}\n\n"
+        f"KNOWN FACTS ABOUT THE WRITER (use these to personalise — never re-ask):\n{facts_block}"
+        f"{asked_block}"
+        f"{rejected_block}\n\n"
+        f"{count_line}\n\nStrict JSON only."
     )
+
     from .council import query_model
 
     try:
         res = await query_model(
             _INTAKE_MODEL,
             [
-                {"role": "system", "content": sys_prompt},
+                {"role": "system", "content": _INTAKE_SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
             timeout=45.0,
-            temperature=0.7,
+            temperature=0.65,
         )
     except Exception as e:
         print(f"WARN: intake questions LLM call failed: {e}")
         res = None
 
     parsed = _safe_json_loads((res or {}).get("content", "")) if res else None
-    if isinstance(parsed, dict):
-        qs = parsed.get("questions")
-        if isinstance(qs, list):
-            cleaned = [str(q).strip() for q in qs if str(q).strip()]
-            if 3 <= len(cleaned) <= 7:
-                return cleaned[:5]
+    if not isinstance(parsed, dict):
+        return _fallback_intake_payload()
 
-    # Fallback prompts. Generic enough to never be wrong, weak enough that
-    # we'll see in logs when the LLM call regressed.
-    return [
-        "What's the strongest specific moment, scene, or example you'd build this around?",
-        "What's the non-obvious thing you want this audience to understand?",
-        "What would someone who already agrees with you still learn?",
-        "What contradiction or tension lives inside this topic for you?",
-        "What's one detail you'd be embarrassed to leave out?",
-    ]
+    raw_sections = parsed.get("sections")
+    sections: List[Dict[str, str]] = []
+    valid_ids: set = set()
+    if isinstance(raw_sections, list):
+        for s in raw_sections:
+            if not isinstance(s, dict):
+                continue
+            sid = str(s.get("id") or "").strip().lower()
+            label = str(s.get("label") or "").strip()
+            if not sid or not label or len(label) > 80:
+                continue
+            if sid in valid_ids:
+                continue
+            valid_ids.add(sid)
+            sections.append({"id": sid, "label": label})
+    if not sections:
+        # Use the framework defaults so question.section still resolves.
+        for s in _INTAKE_SECTIONS:
+            sections.append({"id": s["id"], "label": s["label"]})
+            valid_ids.add(s["id"])
+
+    raw_questions = parsed.get("questions")
+    if not isinstance(raw_questions, list):
+        return _fallback_intake_payload()
+
+    cleaned: List[Dict[str, Any]] = []
+    for q in raw_questions:
+        norm = _normalize_intake_question(q, valid_ids)
+        if norm is not None:
+            cleaned.append(norm)
+        if len(cleaned) >= 8:
+            break
+    if not cleaned:
+        return _fallback_intake_payload()
+
+    # Order questions by section in the order they appear in `sections`.
+    section_order = {s["id"]: i for i, s in enumerate(sections)}
+    cleaned.sort(key=lambda q: section_order.get(q["section"], 99))
+
+    # Trim sections to only those referenced by at least one question so we
+    # don't render empty headers.
+    referenced = {q["section"] for q in cleaned}
+    sections = [s for s in sections if s["id"] in referenced]
+
+    return {"sections": sections, "questions": cleaned}
 
 
 async def _brainstorm_topics(reflections: List[Dict[str, str]]) -> List[Dict[str, str]]:
@@ -268,79 +587,33 @@ async def _brainstorm_topics(reflections: List[Dict[str, str]]) -> List[Dict[str
 
 
 async def _regenerate_intake_question(
+    *,
     topic: str,
     audience: str,
     essay_type: str,
+    user_id: Optional[str],
     already_asked: List[str],
     rejected_question: Optional[str] = None,
-) -> str:
-    """Generate ONE replacement question that fills a gap the already-asked
-    set doesn't cover. Used by the "Swap" button on each intake question
-    when the student feels the question doesn't relate to their essay.
-
-    `rejected_question` is the specific question the user wanted to drop;
-    we tell the model not to produce another in the same vein. Falls back
-    to a single generic question on any failure so the UI keeps moving.
+) -> Optional[Dict[str, Any]]:
+    """Generate ONE replacement intake question (typed shape) that fills a
+    gap the already-asked set doesn't cover. Used by the "Swap" button on
+    each intake question. Returns a single question dict (same shape as
+    items in `/api/intake/questions` response) or None on failure — the UI
+    surfaces a "couldn't swap" message in that case.
     """
-    audience_part = f" The intended audience is: {audience}." if audience else ""
-    asked_lines = "\n".join(f"  - {q}" for q in (already_asked or []) if q.strip())
-    rejected_line = (
-        f"\n\nThe student found this question unhelpful — DO NOT produce another "
-        f"in the same vein:\n  - {rejected_question.strip()}"
-        if rejected_question and rejected_question.strip()
-        else ""
+    payload = await _generate_intake_questions(
+        topic=topic,
+        audience=audience,
+        essay_type=essay_type,
+        user_id=user_id,
+        already_asked=already_asked,
+        rejected_question=rejected_question,
+        n_questions=1,
     )
-    sys_prompt = (
-        "You are sitting across from a student who wants a replacement for one "
-        "of the questions you already asked. Generate exactly ONE new question "
-        "that pulls out lived, specific detail the student couldn't fake. The "
-        "new question must:\n"
-        "  - Probe a DIFFERENT angle from anything you've already asked.\n"
-        "  - Be one sentence, second person, conversational.\n"
-        "  - Be answerable only by someone with this exact lived experience.\n"
-        "  - NOT use the words 'journey', 'impact', 'meaningful', 'learned'.\n"
-        "  - NOT be a generic writing-class prompt.\n\n"
-        "Good replacement angles to consider when the student dropped a "
-        "question: a specific moment vs. a sweeping arc; a contradiction vs. "
-        "a cost; a person who'd disagree vs. a person who'd applaud; the "
-        "thing they almost left out; the smallest detail they remember.\n\n"
-        "Output the question only, as a single line of plain text. No quotes, "
-        "no numbering, no preamble."
-    )
-    user_prompt = (
-        f"TOPIC: {topic}.{audience_part}\n"
-        f"ESSAY TYPE: {essay_type}.\n\n"
-        f"Questions already asked:\n{asked_lines or '  (none yet)'}"
-        f"{rejected_line}\n\n"
-        "Produce one replacement question."
-    )
-    from .council import query_model
-
-    try:
-        res = await query_model(
-            _INTAKE_MODEL,
-            [
-                {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            timeout=30.0,
-            temperature=0.75,
-        )
-    except Exception as e:
-        print(f"WARN: intake question regen LLM call failed: {e}")
-        res = None
-
-    text = (res or {}).get("content", "")
-    cleaned = (text or "").strip().strip('"').strip("'").strip()
-    # Strip a leading list marker if the model snuck one in.
-    cleaned = _re.sub(r"^[-\d.)\s]+", "", cleaned).strip()
-    # First sentence only — anything past the first question mark is noise.
-    if "?" in cleaned:
-        cleaned = cleaned.split("?")[0].strip() + "?"
-    if cleaned and len(cleaned) <= 280:
-        return cleaned
-
-    return "What's one small concrete detail from this story you've never told anyone?"
+    questions = (payload or {}).get("questions") or []
+    if not questions:
+        return None
+    return questions[0]
 
 
 async def _generate_example_answer(topic: str, audience: str, question: str) -> str:
@@ -2163,10 +2436,11 @@ async def api_intake_questions(
 ):
     if not (body.topic or "").strip():
         raise HTTPException(status_code=400, detail="topic is required")
-    questions = await _generate_intake_questions(
+    payload = await _generate_intake_questions(
         topic=body.topic.strip(),
         audience=(body.audience or "").strip(),
         essay_type=(body.essay_type or "general").strip() or "general",
+        user_id=user.id,
     )
     posthog.capture(
         "intake_started",
@@ -2174,9 +2448,15 @@ async def api_intake_questions(
         properties={
             "essay_type": (body.essay_type or "general"),
             "has_audience": bool((body.audience or "").strip()),
+            "question_count": len((payload or {}).get("questions") or []),
         },
     )
-    return {"questions": questions}
+    # Preserve the legacy `questions` key so older frontends don't crash;
+    # they'll just render the question text as plain strings while ignoring
+    # the type metadata.
+    sections = (payload or {}).get("sections") or []
+    questions = (payload or {}).get("questions") or []
+    return {"sections": sections, "questions": questions}
 
 
 class BrainstormReflection(BaseModel):
@@ -2252,14 +2532,23 @@ async def api_intake_regenerate_question(
         topic=body.topic.strip(),
         audience=(body.audience or "").strip(),
         essay_type=(body.essay_type or "general").strip() or "general",
+        user_id=user.id,
         already_asked=[q for q in (body.already_asked or []) if q],
         rejected_question=body.rejected_question,
     )
     posthog.capture(
         "intake_question_swapped",
         distinct_id=user.id,
-        properties={"already_asked_count": len(body.already_asked or [])},
+        properties={
+            "already_asked_count": len(body.already_asked or []),
+            "found_replacement": bool(question),
+        },
     )
+    if not question:
+        raise HTTPException(
+            status_code=502,
+            detail="Couldn't find a different angle right now — try Skip instead.",
+        )
     return {"question": question}
 
 

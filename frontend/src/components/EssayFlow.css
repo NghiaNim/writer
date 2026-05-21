@@ -889,6 +889,152 @@
     margin-right: 2px;
 }
 
+/* Section group for typed intake questions — one header per group of
+   questions in the same framework section (positioning / story / etc.). */
+.essay-flow-question-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.essay-flow-question-section + .essay-flow-question-section {
+    margin-top: 18px;
+}
+
+.essay-flow-question-section-header {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #f5b462;
+    padding: 6px 0 2px;
+    border-bottom: 1px solid rgba(217, 119, 6, 0.18);
+    margin-bottom: 4px;
+}
+
+/* Coach-aside line below the question header — explains the "why" of the
+   question in a softer tone than the question itself. */
+.essay-flow-exchange-subtext {
+    margin: 2px 0 8px 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-style: italic;
+    line-height: 1.5;
+}
+
+/* Choice / multi options — tappable pill rows. The whole pill is the click
+   target so users on touch devices don't have to hit a tiny checkbox. */
+.essay-flow-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 4px 0 0 0;
+}
+
+.essay-flow-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.45;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease,
+        transform 80ms ease;
+}
+
+.essay-flow-option:hover:not(:disabled) {
+    background: rgba(217, 119, 6, 0.08);
+    border-color: rgba(217, 119, 6, 0.45);
+}
+
+.essay-flow-option--selected {
+    background: rgba(217, 119, 6, 0.16);
+    border-color: rgba(245, 180, 98, 0.65);
+    color: #fef3c7;
+}
+
+.essay-flow-option:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.essay-flow-option:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.essay-flow-option-tick {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(148, 163, 184, 0.15);
+    color: #f5b462;
+    font-size: 12px;
+    line-height: 18px;
+    text-align: center;
+    margin-top: 1px;
+}
+
+.essay-flow-option--selected .essay-flow-option-tick {
+    background: rgba(245, 180, 98, 0.32);
+    color: #fef3c7;
+}
+
+.essay-flow-option-label {
+    flex: 1;
+    min-width: 0;
+}
+
+.essay-flow-option-hint {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Example chips for examples_text questions — tap one to seed the textarea.
+   Different visual register from the option pills above so users
+   instinctively read them as "examples" not "choices". */
+.essay-flow-example-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 0 0;
+}
+
+.essay-flow-example-chip {
+    padding: 4px 10px;
+    background: transparent;
+    border: 1px dashed rgba(245, 180, 98, 0.35);
+    color: rgba(245, 180, 98, 0.85);
+    border-radius: 999px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    line-height: 1.3;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease,
+        color 120ms ease;
+}
+
+.essay-flow-example-chip:hover:not(:disabled) {
+    background: rgba(217, 119, 6, 0.10);
+    border-color: rgba(245, 180, 98, 0.65);
+    color: #fef3c7;
+}
+
+.essay-flow-example-chip:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* Skipped state — the question row dims and shows an inline banner
    with an Undo. Saves vertical space (no textarea) while keeping the
    question visible so the user remembers what they passed on. */

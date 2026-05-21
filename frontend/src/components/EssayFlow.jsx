@@ -167,12 +167,20 @@ export default function EssayFlow({
     const [topicCandidates, setTopicCandidates] = useState([]);
     const [brainstormLoading, setBrainstormLoading] = useState(false);
 
+    // questions: TypedQuestion[] from the backend.
+    //   { question_id, kind: 'text'|'examples_text'|'choice'|'multi',
+    //     section, question, subtext?, placeholder?, examples?,
+    //     options?, max_select?, min_select? }
+    // sections: [{ id, label }] — render order. Empty = flat list.
     const [questions, setQuestions] = useState([]);
+    const [sections, setSections] = useState([]);
     const [questionsLoading, setQuestionsLoading] = useState(false);
     // Question index currently being swapped via the regenerate endpoint
     // — used for the spinner state on the Swap button.
     const [swappingIdx, setSwappingIdx] = useState(null);
-    const [answers, setAnswers] = useState({}); // { [questionIdx]: 'answer text' }
+    // answers[idx] is a string for text/examples_text/choice questions OR
+    // an array of option strings for multi questions.
+    const [answers, setAnswers] = useState({});
     // Questions the user has intentionally chosen to skip. Continue is
     // gated on every question being either answered OR explicitly
     // skipped, so users move forward without being forced to answer
@@ -320,12 +328,32 @@ export default function EssayFlow({
                     audience: audience.trim(),
                 });
                 setQuestions(Array.isArray(res?.questions) ? res.questions : []);
+                setSections(Array.isArray(res?.sections) ? res.sections : []);
             } catch (err) {
                 console.warn('intake/questions failed:', err);
+                setSections([
+                    { id: 'positioning', label: 'How you want them to see you' },
+                    { id: 'story', label: 'A specific moment' },
+                ]);
                 setQuestions([
-                    "What's the first thing you remember about this — a sound, a face, a sentence someone said?",
-                    "What's the part of this you almost didn't put in the essay?",
-                    "Who in your life would roll their eyes at this — and why are they almost right?",
+                    {
+                        question_id: 'fallback-1',
+                        kind: 'text',
+                        section: 'positioning',
+                        question: "What's the first thing you remember about this — a sound, a face, a sentence someone said?",
+                    },
+                    {
+                        question_id: 'fallback-2',
+                        kind: 'text',
+                        section: 'positioning',
+                        question: "What's the part of this you almost didn't put in the essay?",
+                    },
+                    {
+                        question_id: 'fallback-3',
+                        kind: 'text',
+                        section: 'story',
+                        question: "Who in your life would roll their eyes at this — and why are they almost right?",
+                    },
                 ]);
             } finally {
                 setQuestionsLoading(false);
@@ -422,10 +450,20 @@ export default function EssayFlow({
     // explicitly skipped via its per-question Skip button. This lets users
     // bypass individual questions they have nothing for without having to
     // figure out an unrelated "Skip the rest" link.
+    // True when a typed answer "counts" as handled — strings need real
+    // content, multi-select arrays need at least one chosen option.
+    const isAnswerFilled = (q, value) => {
+        if (q?.kind === 'multi') {
+            return Array.isArray(value) && value.length > 0;
+        }
+        if (typeof value === 'string') return value.trim().length > 0;
+        return false;
+    };
+
     const allQuestionsHandled = useMemo(() => {
         if (!questions.length) return false;
         return questions.every(
-            (_, i) => (answers[i] || '').trim().length > 0 || skippedQuestions.has(i)
+            (q, i) => isAnswerFilled(q, answers[i]) || skippedQuestions.has(i)
         );
     }, [questions, answers, skippedQuestions]);
 
@@ -433,13 +471,49 @@ export default function EssayFlow({
         setAnswers((prev) => ({ ...prev, [idx]: value }));
         // Typing into a previously-skipped question un-skips it
         // automatically — the user clearly has something to say.
-        if (skippedQuestions.has(idx) && value.trim().length > 0) {
+        const q = questions[idx];
+        if (skippedQuestions.has(idx) && isAnswerFilled(q, value)) {
             setSkippedQuestions((prev) => {
                 const next = new Set(prev);
                 next.delete(idx);
                 return next;
             });
         }
+    };
+
+    // Toggle one option on a multi-select question. Enforces max_select by
+    // dropping the oldest pick when the user crosses the cap so they don't
+    // have to manually deselect first — feels more like a coach saying
+    // "OK pick a different one" than a form yelling at them.
+    const handleToggleMulti = (idx, option) => {
+        const q = questions[idx];
+        if (!q || q.kind !== 'multi') return;
+        const max = Math.max(1, q.max_select || 1);
+        setAnswers((prev) => {
+            const current = Array.isArray(prev[idx]) ? prev[idx] : [];
+            let next;
+            if (current.includes(option)) {
+                next = current.filter((o) => o !== option);
+            } else {
+                next = [...current, option];
+                while (next.length > max) next.shift();
+            }
+            return { ...prev, [idx]: next };
+        });
+        if (skippedQuestions.has(idx)) {
+            setSkippedQuestions((prev) => {
+                const nextSet = new Set(prev);
+                nextSet.delete(idx);
+                return nextSet;
+            });
+        }
+    };
+
+    // Tap an example chip on an examples_text question to seed the
+    // textarea. Replaces any existing draft so the chip behaves like
+    // "show me an example to start from" — the user edits from there.
+    const handlePickExample = (idx, text) => {
+        handleAnswerChange(idx, text);
     };
 
     const handleSkipQuestion = (idx) => {
@@ -474,17 +548,20 @@ export default function EssayFlow({
     const handleSwapQuestion = async (idx) => {
         if (swappingIdx !== null) return;
         const rejected = questions[idx];
+        const rejectedText = rejected?.question || '';
         setSwappingIdx(idx);
         setError(null);
         try {
             const res = await api.intake.regenerateQuestion({
                 topic: topic.trim(),
                 audience: audience.trim(),
-                alreadyAsked: questions.filter((q, i) => i !== idx && q && q.trim()),
-                rejectedQuestion: rejected,
+                alreadyAsked: questions
+                    .filter((q, i) => i !== idx && q?.question)
+                    .map((q) => q.question),
+                rejectedQuestion: rejectedText,
             });
-            const fresh = (res?.question || '').trim();
-            if (!fresh) {
+            const fresh = res?.question;
+            if (!fresh || !fresh.question_id || !fresh.question) {
                 setError("Couldn't find a different angle — try the Skip button instead.");
                 return;
             }
@@ -519,9 +596,31 @@ export default function EssayFlow({
         }
     };
 
+    // Turn one typed answer into the plain "Q: ... A: ..." string the
+    // council prompt expects. Multi-select picks are joined with semicolons
+    // so they read as a clear list ("solves problems; notices small
+    // details") rather than as one comma-separated blob the model might
+    // mis-parse as a single phrase.
+    const serializeAnswer = (q, value) => {
+        if (q?.kind === 'multi') {
+            if (!Array.isArray(value) || value.length === 0) return '';
+            return value.map((o) => (o || '').trim()).filter(Boolean).join('; ');
+        }
+        if (typeof value === 'string') return value.trim();
+        return '';
+    };
+
+    const buildAnsweredQa = () =>
+        questions
+            .map((q, i) => ({
+                question: q?.question || '',
+                answer: serializeAnswer(q, answers[i]),
+            }))
+            .filter((item) => item.question && item.answer);
+
     const handleSubmitAnswers = async () => {
         setError(null);
-        const answeredCount = questions.filter((_, i) => (answers[i] || '').trim()).length;
+        const answeredCount = buildAnsweredQa().length;
         if (answeredCount < 1) {
             setError("Answer at least one question — even one short reply gives the council something concrete to work with.");
             return;
@@ -532,9 +631,7 @@ export default function EssayFlow({
     const advanceToCoreIdea = async () => {
         setSubmitting(true);
         try {
-            const qa = questions
-                .map((q, i) => ({ question: q, answer: (answers[i] || '').trim() }))
-                .filter((item) => item.answer);
+            const qa = buildAnsweredQa();
             await api.sessions.update(session.id, {
                 conversation: qa,
             });
@@ -693,9 +790,7 @@ export default function EssayFlow({
                 }
             }
 
-            const qa = questions
-                .map((q, i) => ({ question: q, answer: (answers[i] || '').trim() }))
-                .filter((item) => item.answer);
+            const qa = buildAnsweredQa();
             const message = buildInteractiveMessage({
                 topic: topic.trim(),
                 audience: audience.trim(),
@@ -1107,129 +1202,252 @@ export default function EssayFlow({
                                 )}
                             </div>
                         )}
-                        {questions.length > 0 && (
-                            <div className="essay-flow-history">
-                                {questions.map((q, i) => {
-                                    const ex = examples[i];
-                                    const exVisible = ex && ex.text && !ex.hidden;
-                                    const isSkipped = skippedQuestions.has(i);
-                                    const isSwappingThis = swappingIdx === i;
-                                    return (
-                                        <div
-                                            key={i}
-                                            className={
-                                                'essay-flow-exchange ' +
-                                                (isSkipped ? 'essay-flow-exchange--skipped' : '')
-                                            }
-                                        >
-                                            <div className="essay-flow-exchange-q-row">
-                                                <div className="essay-flow-exchange-q">
-                                                    <span className="essay-flow-exchange-q-number">
-                                                        {i + 1}.
-                                                    </span>{' '}
-                                                    {q}
-                                                </div>
-                                                {!isSkipped && (
-                                                    <div className="essay-flow-exchange-q-tools">
+                        {questions.length > 0 && (() => {
+                            // Group questions by section so each section's
+                            // header renders once above its questions. If no
+                            // sections came back, render a single flat group.
+                            const groups = sections.length
+                                ? sections.map((section) => ({
+                                      section,
+                                      items: questions
+                                          .map((q, i) => ({ q, i }))
+                                          .filter(({ q }) => q?.section === section.id),
+                                  }))
+                                : [{ section: null, items: questions.map((q, i) => ({ q, i })) }];
+
+                            const renderQuestion = ({ q, i }) => {
+                                if (!q) return null;
+                                const ex = examples[i];
+                                const exVisible = ex && ex.text && !ex.hidden;
+                                const isSkipped = skippedQuestions.has(i);
+                                const isSwappingThis = swappingIdx === i;
+                                const kind = q.kind || 'text';
+                                const value = answers[i];
+                                const textValue = typeof value === 'string' ? value : '';
+                                const multiValue = Array.isArray(value) ? value : [];
+                                const canMic = kind === 'text' || kind === 'examples_text';
+                                const canShowExample = kind === 'text';
+                                const showExampleChips =
+                                    kind === 'examples_text' && Array.isArray(q.examples) && q.examples.length > 0;
+
+                                return (
+                                    <div
+                                        key={q.question_id || i}
+                                        className={
+                                            'essay-flow-exchange ' +
+                                            (isSkipped ? 'essay-flow-exchange--skipped' : '')
+                                        }
+                                    >
+                                        <div className="essay-flow-exchange-q-row">
+                                            <div className="essay-flow-exchange-q">
+                                                <span className="essay-flow-exchange-q-number">
+                                                    {i + 1}.
+                                                </span>{' '}
+                                                {q.question}
+                                            </div>
+                                            {!isSkipped && (
+                                                <div className="essay-flow-exchange-q-tools">
+                                                    {canMic && (
                                                         <MicButton
-                                                            value={answers[i] || ''}
+                                                            value={textValue}
                                                             onChange={(next) => handleAnswerChange(i, next)}
                                                             disabled={disabled || isSwappingThis}
                                                             size="sm"
                                                             title="Talk through your answer"
                                                         />
-                                                        <button
-                                                            type="button"
-                                                            className="essay-flow-skip-question"
-                                                            onClick={() => handleSwapQuestion(i)}
-                                                            disabled={disabled || isSwappingThis}
-                                                            title="This question doesn't fit — give me a different one"
-                                                        >
-                                                            {isSwappingThis ? 'Swapping…' : 'Swap'}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="essay-flow-skip-question"
-                                                            onClick={() => handleSkipQuestion(i)}
-                                                            disabled={disabled || isSwappingThis}
-                                                            title="Skip this one — you don't have to answer every question"
-                                                        >
-                                                            Skip
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {isSkipped ? (
-                                                <div className="essay-flow-skipped-banner">
-                                                    <span>Skipped — the council won't ask about this.</span>
+                                                    )}
                                                     <button
                                                         type="button"
-                                                        className="essay-flow-link essay-flow-link--inline"
-                                                        onClick={() => handleUnskipQuestion(i)}
-                                                        disabled={disabled}
+                                                        className="essay-flow-skip-question"
+                                                        onClick={() => handleSwapQuestion(i)}
+                                                        disabled={disabled || isSwappingThis}
+                                                        title="This question doesn't fit — give me a different one"
                                                     >
-                                                        Undo
+                                                        {isSwappingThis ? 'Swapping…' : 'Swap'}
                                                     </button>
-                                                </div>
-                                            ) : (
-                                                <textarea
-                                                    value={answers[i] || ''}
-                                                    onChange={(e) => handleAnswerChange(i, e.target.value)}
-                                                    placeholder="One or two sentences is plenty. Tap the mic to talk it through."
-                                                    rows={3}
-                                                    disabled={disabled || isSwappingThis}
-                                                    className="essay-flow-textarea"
-                                                    style={{ minHeight: 90 }}
-                                                />
-                                            )}
-                                            {!isSkipped && (
-                                                <div className="essay-flow-example-row">
                                                     <button
                                                         type="button"
-                                                        className="essay-flow-example-toggle"
-                                                        onClick={() => handleShowExample(i, q)}
-                                                        disabled={disabled || isSwappingThis || (ex && ex.loading)}
+                                                        className="essay-flow-skip-question"
+                                                        onClick={() => handleSkipQuestion(i)}
+                                                        disabled={disabled || isSwappingThis}
+                                                        title="Skip this one — you don't have to answer every question"
                                                     >
-                                                        {ex && ex.loading
-                                                            ? 'Thinking…'
-                                                            : ex && ex.text
-                                                              ? exVisible
-                                                                  ? 'Hide example'
-                                                                  : 'Show example'
-                                                              : 'Stuck? Show me an example'}
+                                                        Skip
                                                     </button>
-                                                </div>
-                                            )}
-                                            {!isSkipped && ex && ex.error && (
-                                                <div className="essay-flow-example-error">
-                                                    {ex.error}
-                                                </div>
-                                            )}
-                                            {!isSkipped && exVisible && (
-                                                <div className="essay-flow-example">
-                                                    <div className="essay-flow-example-label">
-                                                        Example — not your answer, just a nudge
-                                                    </div>
-                                                    <div className="essay-flow-example-text">
-                                                        {ex.text}
-                                                    </div>
-                                                    <div className="essay-flow-example-actions">
-                                                        <button
-                                                            type="button"
-                                                            className="essay-flow-example-link"
-                                                            onClick={() => handleRegenerateExample(i, q)}
-                                                            disabled={disabled}
-                                                        >
-                                                            Try a different angle
-                                                        </button>
-                                                    </div>
                                                 </div>
                                             )}
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+
+                                        {q.subtext && !isSkipped && (
+                                            <div className="essay-flow-exchange-subtext">
+                                                {q.subtext}
+                                            </div>
+                                        )}
+
+                                        {isSkipped ? (
+                                            <div className="essay-flow-skipped-banner">
+                                                <span>Skipped — the council won't ask about this.</span>
+                                                <button
+                                                    type="button"
+                                                    className="essay-flow-link essay-flow-link--inline"
+                                                    onClick={() => handleUnskipQuestion(i)}
+                                                    disabled={disabled}
+                                                >
+                                                    Undo
+                                                </button>
+                                            </div>
+                                        ) : kind === 'multi' ? (
+                                            <div className="essay-flow-options" role="group">
+                                                {(q.options || []).map((option) => {
+                                                    const selected = multiValue.includes(option);
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            key={option}
+                                                            className={
+                                                                'essay-flow-option ' +
+                                                                (selected ? 'essay-flow-option--selected' : '')
+                                                            }
+                                                            onClick={() => handleToggleMulti(i, option)}
+                                                            disabled={disabled || isSwappingThis}
+                                                            aria-pressed={selected}
+                                                        >
+                                                            <span className="essay-flow-option-tick" aria-hidden="true">
+                                                                {selected ? '✓' : ''}
+                                                            </span>
+                                                            <span className="essay-flow-option-label">{option}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                                <div className="essay-flow-option-hint">
+                                                    Pick up to {q.max_select || 1}.{' '}
+                                                    {multiValue.length > 0 &&
+                                                        `${multiValue.length} chosen.`}
+                                                </div>
+                                            </div>
+                                        ) : kind === 'choice' ? (
+                                            <div className="essay-flow-options" role="radiogroup">
+                                                {(q.options || []).map((option) => {
+                                                    const selected = textValue === option;
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            key={option}
+                                                            className={
+                                                                'essay-flow-option ' +
+                                                                (selected ? 'essay-flow-option--selected' : '')
+                                                            }
+                                                            onClick={() => handleAnswerChange(i, option)}
+                                                            disabled={disabled || isSwappingThis}
+                                                            aria-pressed={selected}
+                                                            role="radio"
+                                                            aria-checked={selected}
+                                                        >
+                                                            <span className="essay-flow-option-tick" aria-hidden="true">
+                                                                {selected ? '●' : ''}
+                                                            </span>
+                                                            <span className="essay-flow-option-label">{option}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <textarea
+                                                value={textValue}
+                                                onChange={(e) => handleAnswerChange(i, e.target.value)}
+                                                placeholder={
+                                                    q.placeholder ||
+                                                    'One or two sentences is plenty. Tap the mic to talk it through.'
+                                                }
+                                                rows={3}
+                                                disabled={disabled || isSwappingThis}
+                                                className="essay-flow-textarea"
+                                                style={{ minHeight: 90 }}
+                                            />
+                                        )}
+
+                                        {showExampleChips && !isSkipped && (
+                                            <div className="essay-flow-example-chips">
+                                                {q.examples.map((sample) => (
+                                                    <button
+                                                        type="button"
+                                                        key={sample}
+                                                        className="essay-flow-example-chip"
+                                                        onClick={() => handlePickExample(i, sample)}
+                                                        disabled={disabled || isSwappingThis}
+                                                        title="Use as a starting point — edit from here"
+                                                    >
+                                                        {sample}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {canShowExample && !isSkipped && (
+                                            <div className="essay-flow-example-row">
+                                                <button
+                                                    type="button"
+                                                    className="essay-flow-example-toggle"
+                                                    onClick={() => handleShowExample(i, q.question)}
+                                                    disabled={disabled || isSwappingThis || (ex && ex.loading)}
+                                                >
+                                                    {ex && ex.loading
+                                                        ? 'Thinking…'
+                                                        : ex && ex.text
+                                                          ? exVisible
+                                                              ? 'Hide example'
+                                                              : 'Show example'
+                                                          : 'Stuck? Show me an example'}
+                                                </button>
+                                            </div>
+                                        )}
+                                        {canShowExample && !isSkipped && ex && ex.error && (
+                                            <div className="essay-flow-example-error">
+                                                {ex.error}
+                                            </div>
+                                        )}
+                                        {canShowExample && !isSkipped && exVisible && (
+                                            <div className="essay-flow-example">
+                                                <div className="essay-flow-example-label">
+                                                    Example — not your answer, just a nudge
+                                                </div>
+                                                <div className="essay-flow-example-text">
+                                                    {ex.text}
+                                                </div>
+                                                <div className="essay-flow-example-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="essay-flow-example-link"
+                                                        onClick={() => handleRegenerateExample(i, q.question)}
+                                                        disabled={disabled}
+                                                    >
+                                                        Try a different angle
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            };
+
+                            return (
+                                <div className="essay-flow-history">
+                                    {groups.map(({ section, items }, gi) => {
+                                        if (items.length === 0) return null;
+                                        return (
+                                            <div key={section?.id || `group-${gi}`} className="essay-flow-question-section">
+                                                {section && (
+                                                    <div className="essay-flow-question-section-header">
+                                                        {section.label}
+                                                    </div>
+                                                )}
+                                                {items.map(renderQuestion)}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
 
                         {error && <div className="essay-flow-error">{error}</div>}
 
