@@ -460,3 +460,85 @@
     padding-right: 60px; /* Make room for close button */
   }
 }
+
+/* ============================================================
+ * Coffee variant — opted in via `coffeeGreetingV1`.
+ *
+ * Goal: extend the warm crema/amber language past the brand name
+ * so the whole nav reads as one room. Layout untouched.
+ * ============================================================ */
+
+.sidebar--coffee .sidebar-title {
+    color: var(--coffee-cream);
+}
+
+.sidebar--coffee .sidebar-title-bean {
+    --bean-size: 16px;
+    margin-right: 4px;
+}
+
+.sidebar--coffee .icon-button {
+    background: var(--coffee-amber-soft);
+    border-color: var(--coffee-amber-dim);
+    color: var(--coffee-crema);
+}
+
+.sidebar--coffee .icon-button:hover {
+    background: rgba(217, 119, 6, 0.16);
+    border-color: var(--coffee-amber);
+    color: var(--coffee-crema-bright);
+    box-shadow: 0 0 12px var(--coffee-amber-dim);
+}
+
+/* "Pour №N" greeting chip — small all-caps tracked label that orients
+   returning users without claiming a card slot. */
+.sidebar--coffee .sidebar-pour-strip {
+    padding: 4px 16px 12px;
+    font-family: var(--font-ui);
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--coffee-crema);
+}
+
+.sidebar--coffee .sidebar-pour-strip-number {
+    font-weight: 600;
+}
+
+/* New Discussion button — keep the label, warm the chrome. */
+.sidebar--coffee .new-council-btn {
+    background:
+        linear-gradient(135deg, rgba(217, 119, 6, 0.18) 0%, rgba(180, 83, 9, 0.10) 100%);
+    border: 1px dashed var(--coffee-amber-dim);
+    color: var(--coffee-crema-bright);
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.25),
+        0 0 24px var(--coffee-crema-glow);
+}
+
+.sidebar--coffee .new-council-btn:hover:not(:disabled) {
+    background:
+        linear-gradient(135deg, rgba(217, 119, 6, 0.28) 0%, rgba(180, 83, 9, 0.18) 100%);
+    border-color: var(--coffee-amber);
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.3),
+        0 0 32px rgba(245, 180, 98, 0.25);
+}
+
+/* Search input — warmer focus glow. Layout untouched. */
+.sidebar--coffee .search-input:focus {
+    border-color: var(--coffee-amber);
+    box-shadow: 0 0 0 2px var(--coffee-amber-dim);
+}
+
+/* Active conversation tint — replace cool indigo with warm amber. */
+.sidebar--coffee .conversation-item:hover {
+    border-color: rgba(217, 119, 6, 0.25);
+}
+
+.sidebar--coffee .conversation-item.active {
+    background: var(--coffee-amber-soft);
+    border-color: rgba(217, 119, 6, 0.45);
+    box-shadow: 0 0 24px var(--coffee-crema-glow);
+}
+
