@@ -929,7 +929,7 @@ async def root():
     return {"status": "ok", "service": "LLM Council API"}
 
 
-@app.get("/healthz")
+@app.api_route("/healthz", methods=["GET", "HEAD"])
 async def healthz():
     """Liveness probe used by Render's health check and the frontend warm-up
     ping. Intentionally cheap: no DB hit, no auth, no external calls. The
