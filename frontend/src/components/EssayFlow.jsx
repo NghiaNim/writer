@@ -930,8 +930,7 @@ export default function EssayFlow({
                     <div className="essay-flow-step">
                         <h1 className="essay-flow-question">Let's find your topic together</h1>
                         <p className="essay-flow-hint">
-                            Answer a couple of these honestly. They aren't the essay — they're
-                            how we figure out what the essay actually wants to be about.
+                            Answer a couple honestly. These aren't the essay — they help us find it.
                         </p>
 
                         <div className="essay-flow-history">
@@ -972,8 +971,7 @@ export default function EssayFlow({
                                     Candidate topics
                                 </div>
                                 <p className="essay-flow-hint" style={{ marginTop: 0 }}>
-                                    These all came out of what you said. Pick the one that makes
-                                    you uncomfortable in the right way.
+                                    Pick the one that makes you uncomfortable in the right way.
                                 </p>
                                 <div className="essay-flow-brainstorm-list">
                                     {topicCandidates.map((c, i) => (
@@ -1029,9 +1027,7 @@ export default function EssayFlow({
                     <div className="essay-flow-step">
                         <h2 className="essay-flow-question">A few questions to make this sound like you</h2>
                         <p className="essay-flow-hint">
-                            These help the council write something that actually sounds like
-                            you. One short answer per question is plenty. You can skip any
-                            question, or swap one that doesn't feel right.
+                            Short answers. Skip or swap any that don't feel right.
                         </p>
                         {questionsLoading && (
                             <div className="essay-flow-hint" style={{ opacity: 0.8 }}>
@@ -1257,9 +1253,7 @@ export default function EssayFlow({
                     <div className="essay-flow-step">
                         <h2 className="essay-flow-question">The shape of it</h2>
                         <p className="essay-flow-hint">
-                            The spine the council will write to — pulled apart so you can see
-                            the moves. Edit, reorder, or drop any beat that doesn't sound like
-                            you yet.
+                            The spine the council will write to. Edit, reorder, or drop any beat.
                         </p>
                         {coreIdeaLoading ? (
                             <div className="essay-flow-hint" style={{ opacity: 0.8 }}>
@@ -1298,11 +1292,7 @@ export default function EssayFlow({
                     <div className="essay-flow-step">
                         <h2 className="essay-flow-question">Story timeline</h2>
                         <p className="essay-flow-hint">
-                            Optional, but powerful. List the events you want the essay to mention,
-                            in the order they actually happened. The council will respect this
-                            sequence — no jumbled timelines. If a year or age helps, add it; if
-                            not, leave it blank. Skip this step entirely if you'd rather not
-                            plan the structure.
+                            Optional. List events in the order they happened — the council will respect the sequence.
                         </p>
 
                         {timelineEvents.length > 0 && (
@@ -1560,8 +1550,7 @@ export default function EssayFlow({
                     <div className="essay-flow-step">
                         <h2 className="essay-flow-question">Paste your draft</h2>
                         <p className="essay-flow-hint">
-                            Rough is fine — bullet points, half-sentences, anything you have. The
-                            council will refine it without flattening your voice.
+                            Rough is fine. The council won't flatten your voice.
                         </p>
                         <textarea
                             ref={draftRef}
