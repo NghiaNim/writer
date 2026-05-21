@@ -517,9 +517,7 @@ export default function VoiceProfileSettings() {
                         lineHeight: 1.5,
                     }}
                 >
-                    Rules here are <strong style={{ color: colors.text }}>actually applied</strong>{' '}
-                    to every essay the council writes for you. Start with a few — even three rules
-                    change the output noticeably.
+                    <strong style={{ color: colors.text }}>Applied to every essay</strong> the council writes. Even three rules change the output.
                 </p>
             </div>
 
@@ -562,7 +560,7 @@ export default function VoiceProfileSettings() {
                 title="Rules the council follows"
                 count={rules.length}
                 accent={rules.length > 0}
-                helper="Concrete, prescriptive, one rule per line. The Voice Guardian and Chairman are required to apply every rule below."
+                helper="One concrete rule per line. Applied to every essay."
                 action={
                     <button
                         type="button"
@@ -698,7 +696,7 @@ export default function VoiceProfileSettings() {
                 <Panel
                     title="Pending suggestions"
                     count={pendingSuggestions.length}
-                    helper="The AI extracted these from your reference samples. Accept what fits — nothing is applied to your essays until you approve it."
+                    helper="Pulled from your reference samples. Nothing applies until you accept."
                 >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {pendingSuggestions.map((s) => (
@@ -753,7 +751,7 @@ export default function VoiceProfileSettings() {
             <Panel
                 title="Reference samples"
                 count={referenceParagraphs.length}
-                helper="Paste paragraphs of your own writing. The council uses these as voice anchors. Tap “Suggest rules” to extract concrete style rules from them."
+                helper="Paste paragraphs of your writing. Tap “Suggest rules” to extract style rules from them."
                 action={
                     referenceParagraphs.length > 0 ? (
                         <button
@@ -923,7 +921,7 @@ export default function VoiceProfileSettings() {
             <Panel
                 title="Profile facts"
                 count={profileFacts.length}
-                helper="Concrete things the council should remember about you (achievements, background, constraints). Injected into every run alongside voice rules."
+                helper="Things the council should remember (achievements, background, constraints)."
             >
                 {factsLoading ? (
                     <div style={{ color: colors.textMuted, fontSize: '13px' }}>Loading facts…</div>
@@ -972,7 +970,7 @@ export default function VoiceProfileSettings() {
             {/* ---------- 5. Inferred style summary ---------- */}
             <Panel
                 title="Inferred style summary"
-                helper="A short sentence the council reads at the top of your profile. Auto-filled when you ask for rule suggestions; editable any time."
+                helper="A short sentence at the top of your profile. Auto-filled by Suggest rules."
             >
                 <textarea
                     value={inferredStyle}

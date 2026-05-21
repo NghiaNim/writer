@@ -95,10 +95,7 @@ export default function MemorySettings() {
         <section className="settings-section" style={{ maxWidth: '720px' }}>
             <h2 className="settings-section-title">What we know about you</h2>
             <p className="section-description">
-                These are the durable facts the council has remembered about you, pulled from
-                your essays and your answers to questions while we drafted. We inject these
-                into every essay prompt so the writing is grounded in your real life. Delete
-                anything that's wrong, outdated, or that you'd rather we forget.
+                Facts the council remembers, pulled from your essays and in-flight answers. Injected into every prompt. Delete anything wrong or outdated.
             </p>
 
             <div
@@ -114,8 +111,8 @@ export default function MemorySettings() {
                 }}
             >
                 {totalActive === 0
-                    ? 'No memory yet — start an essay and answer the questions we ask while drafting to begin building your profile.'
-                    : `${totalActive} active fact${totalActive === 1 ? '' : 's'} on file. Older facts may be folded into a compact summary when there are too many to fit in a prompt; the originals stay in this list.`}
+                    ? "No memory yet — answer the council's in-flight questions to start building this."
+                    : `${totalActive} active fact${totalActive === 1 ? '' : 's'}. Older facts may be folded into a summary when the prompt gets too long; the originals stay listed.`}
             </div>
 
             {error && (
