@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import MicButton from './common/MicButton';
 import './CoreIdeaBullets.css';
 
@@ -74,6 +74,20 @@ export default function CoreIdeaBullets({ value, onChange, disabled = false }) {
         initial.length ? initial : ['']
     );
     const lastValueSeenRef = useRef(value);
+    const inputRefs = useRef([]);
+
+    // Auto-grow every textarea to fit its content. The inline `onInput`
+    // handler only fires while a user is typing; without this effect,
+    // bullets seeded from `value` (LLM draft, mic dictation, parent
+    // refresh) mount at rows={1} and clip mid-sentence.
+    useLayoutEffect(() => {
+        inputRefs.current.length = bullets.length;
+        inputRefs.current.forEach((el) => {
+            if (!el) return;
+            el.style.height = 'auto';
+            el.style.height = `${el.scrollHeight}px`;
+        });
+    }, [bullets]);
 
     useEffect(() => {
         // If the parent's value is a totally different paragraph (LLM
@@ -157,6 +171,7 @@ export default function CoreIdeaBullets({ value, onChange, disabled = false }) {
                     <li className="coreidea-bullet" key={idx}>
                         <span className="coreidea-bullet-bean" aria-hidden="true" />
                         <textarea
+                            ref={(el) => { inputRefs.current[idx] = el; }}
                             className="coreidea-bullet-input"
                             value={b}
                             onChange={(e) => handleEdit(idx, e.target.value)}
@@ -167,12 +182,6 @@ export default function CoreIdeaBullets({ value, onChange, disabled = false }) {
                             }
                             disabled={disabled}
                             rows={1}
-                            onInput={(e) => {
-                                // Auto-grow without locking maxHeight — short
-                                // bullets stay short, long ones expand.
-                                e.target.style.height = 'auto';
-                                e.target.style.height = `${e.target.scrollHeight}px`;
-                            }}
                         />
                         {bullets.length > 1 && (
                             <button
