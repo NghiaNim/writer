@@ -175,7 +175,7 @@ export default function EssayLoadingStatus({ loading, progress, aborted, onAbort
                         className="essay-loading-minimize"
                         onClick={() => setMinimized(true)}
                         aria-expanded={true}
-                        title="Hide this panel to see persona progress above. The council is still running."
+                        title="Minimize"
                     >
                         Minimize
                     </button>
@@ -187,10 +187,7 @@ export default function EssayLoadingStatus({ loading, progress, aborted, onAbort
                 <span className="essay-loading-cursor" aria-hidden="true">_</span>
             </div>
             <div className="essay-loading-hint">
-                The bar is busy; four shots are pulling in parallel. Your finished cup is poured below when it lands. A full service takes about a minute and a half — feel free to minimize this bar and watch the chips above.
-            </div>
-            <div className="essay-loading-tip">
-                Want a different roast or a different bar staff? Tune your council members and voice rules in Settings — changes apply to the next pull.
+                Four shots pulling in parallel. ~90s.
             </div>
         </div>
     );
