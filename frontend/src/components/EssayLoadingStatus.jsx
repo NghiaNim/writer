@@ -1,43 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useTunable } from '../tunables';
 import './EssayLoadingStatus.css';
 
-const MESSAGES = {
-    search: [
-        'consulting the wider web...',
-        'pulling sources for context...',
-        'reading what the internet thinks...',
-    ],
-    pitch: [
-        'council members are pitching angles in parallel...',
-        'the architect is proposing a structural spine...',
-        'the devil\'s advocate is pitching an inversion...',
-        'the voice guardian is picking a concrete opening...',
-        'picking the strongest pitch...',
-    ],
-    stage1: [
-        'council members are drafting in parallel from the chosen angle...',
-        'the architect is writing in long, load-bearing paragraphs...',
-        'the editor is leaning into short paragraphs and white space...',
-        'the devil\'s advocate is opening with the strongest counter...',
-        'the voice guardian is grounding paragraph one in a real moment...',
-    ],
-    stage2: [
-        'critiquing the strongest draft...',
-        'flagging cuts, sharpens, and what to keep...',
-        'pulling sharper sentences from the runner-up drafts...',
-    ],
-    stage3: [
-        'chairman is revising the spine...',
-        'applying every cut the critics agreed on...',
-        'sharpening the flagged passages...',
-        'protecting the kept sentences...',
-        'applying voice rules before the final pass...',
-    ],
-    idle: ['standing by...'],
-};
-
-// Brewing-room reskin. The mapping mirrors a specialty-coffee prep flow:
+// Brewing-room copy for the loading panel. The mapping mirrors a specialty-
+// coffee prep flow:
 //
 //   search  →  sourcing (where the beans come from)
 //   pitch   →  grinding (preparing the angles, each persona dials a setting)
@@ -49,7 +14,7 @@ const MESSAGES = {
 // vocabulary. The bloom we render in CSS is the 30s CO2 pre-infusion in
 // pour-over technique — a real phenomenon when fresh-ground coffee meets
 // water for the first time.
-const BREW_MESSAGES = {
+const MESSAGES = {
     search: [
         'sourcing beans from the wider web...',
         'checking origin notes before we grind...',
@@ -101,36 +66,20 @@ function pickStage({ loading, msg }) {
     return 'idle';
 }
 
-function describeStage(stage, brew = false) {
-    if (brew) {
-        switch (stage) {
-            case 'search':
-                return 'Sourcing';
-            case 'pitch':
-                return 'Grinding';
-            case 'stage1':
-                return 'Pulling shots';
-            case 'stage2':
-                return 'Cupping';
-            case 'stage3':
-                return 'The pour';
-            default:
-                return 'At the bar';
-        }
-    }
+function describeStage(stage) {
     switch (stage) {
         case 'search':
-            return 'Web search';
+            return 'Sourcing';
         case 'pitch':
-            return 'Pitching angles';
+            return 'Grinding';
         case 'stage1':
-            return 'Council drafting';
+            return 'Pulling shots';
         case 'stage2':
-            return 'Critique';
+            return 'Cupping';
         case 'stage3':
-            return 'Final revision';
+            return 'The pour';
         default:
-            return 'Working';
+            return 'At the bar';
     }
 }
 
@@ -144,10 +93,8 @@ function describeStage(stage, brew = false) {
  * rarely lands on during the 60-90s wait.
  */
 export default function EssayLoadingStatus({ loading, progress, aborted, onAbort, msg }) {
-    const brew = useTunable('brewMode');
     const stage = pickStage({ loading, msg });
-    const pool = brew ? BREW_MESSAGES : MESSAGES;
-    const messages = useMemo(() => pool[stage] || pool.idle, [pool, stage]);
+    const messages = useMemo(() => MESSAGES[stage] || MESSAGES.idle, [stage]);
     const [messageIdx, setMessageIdx] = useState(0);
     const [minimized, setMinimized] = useState(false);
 
@@ -164,35 +111,24 @@ export default function EssayLoadingStatus({ loading, progress, aborted, onAbort
         return () => clearInterval(id);
     }, [messages]);
 
-    const stageLabel = describeStage(stage, brew);
+    const stageLabel = describeStage(stage);
     const pitchProgress = progress?.pitch;
     const stage1Progress = progress?.stage1;
     const stage2Progress = progress?.stage2;
 
     let progressLabel = null;
     if (stage === 'pitch' && pitchProgress?.total) {
-        progressLabel = brew
-            ? `${pitchProgress.count} of ${pitchProgress.total} dialed in`
-            : `${pitchProgress.count} of ${pitchProgress.total} pitches in`;
+        progressLabel = `${pitchProgress.count} of ${pitchProgress.total} dialed in`;
     } else if (stage === 'stage1' && stage1Progress?.total) {
-        progressLabel = brew
-            ? `${stage1Progress.count} of ${stage1Progress.total} shots pulled`
-            : `${stage1Progress.count} of ${stage1Progress.total} drafts complete`;
+        progressLabel = `${stage1Progress.count} of ${stage1Progress.total} shots pulled`;
     } else if (stage === 'stage2' && stage2Progress?.total) {
-        if (brew) {
-            const noun = stage2Progress.total === 1 ? 'cup tasted' : 'cups tasted';
-            progressLabel = `${stage2Progress.count} of ${stage2Progress.total} ${noun}`;
-        } else {
-            const noun = stage2Progress.total === 1 ? 'critique' : 'critiques';
-            progressLabel = `${stage2Progress.count} of ${stage2Progress.total} ${noun} in`;
-        }
+        const noun = stage2Progress.total === 1 ? 'cup tasted' : 'cups tasted';
+        progressLabel = `${stage2Progress.count} of ${stage2Progress.total} ${noun}`;
     }
-
-    const brewClass = brew ? ' essay-loading-status--brew' : '';
 
     if (minimized) {
         return (
-            <div className={`essay-loading-status essay-loading-status--compact${brewClass} ${aborted ? 'aborted' : ''}`}>
+            <div className={`essay-loading-status essay-loading-status--compact ${aborted ? 'aborted' : ''}`}>
                 <button
                     type="button"
                     className="essay-loading-compact-inner"
@@ -215,7 +151,7 @@ export default function EssayLoadingStatus({ loading, progress, aborted, onAbort
     }
 
     return (
-        <div className={`essay-loading-status${brewClass} ${aborted ? 'aborted' : ''}`}>
+        <div className={`essay-loading-status ${aborted ? 'aborted' : ''}`}>
             <div className="essay-loading-bar">
                 <span className="essay-loading-dot" />
                 <span className="essay-loading-stage">{stageLabel}</span>
@@ -251,14 +187,10 @@ export default function EssayLoadingStatus({ loading, progress, aborted, onAbort
                 <span className="essay-loading-cursor" aria-hidden="true">_</span>
             </div>
             <div className="essay-loading-hint">
-                {brew
-                    ? 'The bar is busy; four shots are pulling in parallel. Your finished cup is poured below when it lands. A full service takes about a minute and a half — feel free to minimize this bar and watch the chips above.'
-                    : 'Live status while members draft privately — final essay appears below when ready. A full run usually takes about a minute and a half. You can minimize this bar anytime.'}
+                The bar is busy; four shots are pulling in parallel. Your finished cup is poured below when it lands. A full service takes about a minute and a half — feel free to minimize this bar and watch the chips above.
             </div>
             <div className="essay-loading-tip">
-                {brew
-                    ? 'Want a different roast or a different bar staff? Tune your council members and voice rules in Settings — changes apply to the next pull.'
-                    : 'Want different questions or a different council? Tune your council members and voice rules anytime in Settings — changes apply on the next run.'}
+                Want a different roast or a different bar staff? Tune your council members and voice rules in Settings — changes apply to the next pull.
             </div>
         </div>
     );

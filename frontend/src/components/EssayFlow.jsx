@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
-import { useTunable } from '../tunables';
 import CouncilConfig from './CouncilConfig';
 import MicButton from './common/MicButton';
 import CoreIdeaBullets from './CoreIdeaBullets';
@@ -153,10 +152,6 @@ export default function EssayFlow({
     //                  | 'draft' (alternate path from Step 1)
     const [step, setStep] = useState('topic');
 
-    // Tunable: render the core idea as an editable bulleted list (cafe
-    // receipt look + mic in a header toolbar) instead of one paragraph.
-    const coreIdeaBullets = useTunable('coreIdeaBullets');
-
     // Persisted session row (created on Step 1 submit)
     const [session, setSession] = useState(null);
 
@@ -174,10 +169,6 @@ export default function EssayFlow({
 
     const [questions, setQuestions] = useState([]);
     const [questionsLoading, setQuestionsLoading] = useState(false);
-    // Which question the user is currently looking at — replaces the
-    // old "all questions on a page" layout with a one-at-a-time walk
-    // that feels more like a real coach than a form.
-    const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
     // Question index currently being swapped via the regenerate endpoint
     // — used for the spinner state on the Swap button.
     const [swappingIdx, setSwappingIdx] = useState(null);
@@ -289,12 +280,10 @@ export default function EssayFlow({
     // Refs for autofocus
     const topicRef = useRef(null);
     const draftRef = useRef(null);
-    const coreIdeaRef = useRef(null);
 
     useEffect(() => {
         if (step === 'topic') topicRef.current?.focus();
         if (step === 'draft') draftRef.current?.focus();
-        if (step === 'core_idea') coreIdeaRef.current?.focus();
     }, [step]);
 
     // -----------------------------------------------------------------------
@@ -325,7 +314,6 @@ export default function EssayFlow({
             // Kick off questions LLM call as we transition.
             setStep('questions');
             setQuestionsLoading(true);
-            setCurrentQuestionIdx(0);
             try {
                 const res = await api.intake.questions({
                     topic: trimmedTopic,
@@ -1039,11 +1027,11 @@ export default function EssayFlow({
 
                 {step === 'questions' && (
                     <div className="essay-flow-step">
-                        <h2 className="essay-flow-question">Let's get one detail at a time</h2>
+                        <h2 className="essay-flow-question">A few questions to make this sound like you</h2>
                         <p className="essay-flow-hint">
                             These help the council write something that actually sounds like
-                            you. One short answer is plenty. You can skip any question, or
-                            swap one that doesn't feel right.
+                            you. One short answer per question is plenty. You can skip any
+                            question, or swap one that doesn't feel right.
                         </p>
                         {questionsLoading && (
                             <div className="essay-flow-hint" style={{ opacity: 0.8 }}>
@@ -1119,260 +1107,170 @@ export default function EssayFlow({
                                 )}
                             </div>
                         )}
-                        {/* One-question-at-a-time interview. The user walks
-                            forward through the questions with Prev/Next, can
-                            skip or swap any question without losing the others,
-                            and the last "Next" becomes the Continue submit. */}
-                        {questions.length > 0 && (() => {
-                            const safeIdx = Math.max(0, Math.min(currentQuestionIdx, questions.length - 1));
-                            const q = questions[safeIdx];
-                            const i = safeIdx;
-                            const ex = examples[i];
-                            const exVisible = ex && ex.text && !ex.hidden;
-                            const isSkipped = skippedQuestions.has(i);
-                            const isFirst = i === 0;
-                            const isLast = i === questions.length - 1;
-                            const isSwappingThis = swappingIdx === i;
-                            const isHandled =
-                                isSkipped || (answers[i] || '').trim().length > 0;
-                            return (
-                                <div className="essay-flow-interview">
-                                    <div className="essay-flow-interview-progress">
-                                        <span className="essay-flow-interview-progress-label">
-                                            Question {i + 1} of {questions.length}
-                                        </span>
-                                        <div className="essay-flow-interview-dots">
-                                            {questions.map((_, qi) => {
-                                                const wasHandled =
-                                                    skippedQuestions.has(qi) ||
-                                                    (answers[qi] || '').trim().length > 0;
-                                                return (
+                        {questions.length > 0 && (
+                            <div className="essay-flow-history">
+                                {questions.map((q, i) => {
+                                    const ex = examples[i];
+                                    const exVisible = ex && ex.text && !ex.hidden;
+                                    const isSkipped = skippedQuestions.has(i);
+                                    const isSwappingThis = swappingIdx === i;
+                                    return (
+                                        <div
+                                            key={i}
+                                            className={
+                                                'essay-flow-exchange ' +
+                                                (isSkipped ? 'essay-flow-exchange--skipped' : '')
+                                            }
+                                        >
+                                            <div className="essay-flow-exchange-q-row">
+                                                <div className="essay-flow-exchange-q">
+                                                    <span className="essay-flow-exchange-q-number">
+                                                        {i + 1}.
+                                                    </span>{' '}
+                                                    {q}
+                                                </div>
+                                                {!isSkipped && (
+                                                    <div className="essay-flow-exchange-q-tools">
+                                                        <MicButton
+                                                            value={answers[i] || ''}
+                                                            onChange={(next) => handleAnswerChange(i, next)}
+                                                            disabled={disabled || isSwappingThis}
+                                                            size="sm"
+                                                            title="Talk through your answer"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            className="essay-flow-skip-question"
+                                                            onClick={() => handleSwapQuestion(i)}
+                                                            disabled={disabled || isSwappingThis}
+                                                            title="This question doesn't fit — give me a different one"
+                                                        >
+                                                            {isSwappingThis ? 'Swapping…' : 'Swap'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="essay-flow-skip-question"
+                                                            onClick={() => handleSkipQuestion(i)}
+                                                            disabled={disabled || isSwappingThis}
+                                                            title="Skip this one — you don't have to answer every question"
+                                                        >
+                                                            Skip
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {isSkipped ? (
+                                                <div className="essay-flow-skipped-banner">
+                                                    <span>Skipped — the council won't ask about this.</span>
                                                     <button
-                                                        key={qi}
                                                         type="button"
-                                                        className={
-                                                            'essay-flow-interview-dot ' +
-                                                            (qi === i
-                                                                ? 'essay-flow-interview-dot--active'
-                                                                : wasHandled
-                                                                    ? 'essay-flow-interview-dot--done'
-                                                                    : 'essay-flow-interview-dot--pending')
-                                                        }
-                                                        onClick={() => setCurrentQuestionIdx(qi)}
+                                                        className="essay-flow-link essay-flow-link--inline"
+                                                        onClick={() => handleUnskipQuestion(i)}
                                                         disabled={disabled}
-                                                        aria-label={`Jump to question ${qi + 1}`}
-                                                        title={`Jump to question ${qi + 1}`}
-                                                    />
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        className={
-                                            'essay-flow-exchange ' +
-                                            (isSkipped ? 'essay-flow-exchange--skipped' : '')
-                                        }
-                                    >
-                                        <div className="essay-flow-exchange-q-row">
-                                            <div className="essay-flow-exchange-q">{q}</div>
-                                            {!isSkipped && (
-                                                <div className="essay-flow-exchange-q-tools">
-                                                    <MicButton
-                                                        value={answers[i] || ''}
-                                                        onChange={(next) => handleAnswerChange(i, next)}
-                                                        disabled={disabled || isSwappingThis}
-                                                        size="sm"
-                                                        title="Talk through your answer"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        className="essay-flow-skip-question"
-                                                        onClick={() => handleSwapQuestion(i)}
-                                                        disabled={disabled || isSwappingThis}
-                                                        title="This question doesn't fit — give me a different one"
                                                     >
-                                                        {isSwappingThis ? 'Swapping…' : 'Swap'}
+                                                        Undo
                                                     </button>
+                                                </div>
+                                            ) : (
+                                                <textarea
+                                                    value={answers[i] || ''}
+                                                    onChange={(e) => handleAnswerChange(i, e.target.value)}
+                                                    placeholder="One or two sentences is plenty. Tap the mic to talk it through."
+                                                    rows={3}
+                                                    disabled={disabled || isSwappingThis}
+                                                    className="essay-flow-textarea"
+                                                    style={{ minHeight: 90 }}
+                                                />
+                                            )}
+                                            {!isSkipped && (
+                                                <div className="essay-flow-example-row">
                                                     <button
                                                         type="button"
-                                                        className="essay-flow-skip-question"
-                                                        onClick={() => handleSkipQuestion(i)}
-                                                        disabled={disabled || isSwappingThis}
-                                                        title="Skip this one — you don't have to answer every question"
+                                                        className="essay-flow-example-toggle"
+                                                        onClick={() => handleShowExample(i, q)}
+                                                        disabled={disabled || isSwappingThis || (ex && ex.loading)}
                                                     >
-                                                        Skip
+                                                        {ex && ex.loading
+                                                            ? 'Thinking…'
+                                                            : ex && ex.text
+                                                              ? exVisible
+                                                                  ? 'Hide example'
+                                                                  : 'Show example'
+                                                              : 'Stuck? Show me an example'}
                                                     </button>
                                                 </div>
                                             )}
+                                            {!isSkipped && ex && ex.error && (
+                                                <div className="essay-flow-example-error">
+                                                    {ex.error}
+                                                </div>
+                                            )}
+                                            {!isSkipped && exVisible && (
+                                                <div className="essay-flow-example">
+                                                    <div className="essay-flow-example-label">
+                                                        Example — not your answer, just a nudge
+                                                    </div>
+                                                    <div className="essay-flow-example-text">
+                                                        {ex.text}
+                                                    </div>
+                                                    <div className="essay-flow-example-actions">
+                                                        <button
+                                                            type="button"
+                                                            className="essay-flow-example-link"
+                                                            onClick={() => handleRegenerateExample(i, q)}
+                                                            disabled={disabled}
+                                                        >
+                                                            Try a different angle
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                        {isSkipped ? (
-                                            <div className="essay-flow-skipped-banner">
-                                                <span>Skipped — the council won't ask about this.</span>
-                                                <button
-                                                    type="button"
-                                                    className="essay-flow-link essay-flow-link--inline"
-                                                    onClick={() => handleUnskipQuestion(i)}
-                                                    disabled={disabled}
-                                                >
-                                                    Undo
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <textarea
-                                                value={answers[i] || ''}
-                                                onChange={(e) => handleAnswerChange(i, e.target.value)}
-                                                placeholder="One or two sentences is plenty. Tap the mic to talk it through."
-                                                rows={3}
-                                                disabled={disabled || isSwappingThis}
-                                                className="essay-flow-textarea"
-                                                style={{ minHeight: 90 }}
-                                            />
-                                        )}
-                                        {!isSkipped && (
-                                            <div className="essay-flow-example-row">
-                                                <button
-                                                    type="button"
-                                                    className="essay-flow-example-toggle"
-                                                    onClick={() => handleShowExample(i, q)}
-                                                    disabled={disabled || isSwappingThis || (ex && ex.loading)}
-                                                >
-                                                    {ex && ex.loading
-                                                        ? 'Thinking…'
-                                                        : ex && ex.text
-                                                          ? exVisible
-                                                              ? 'Hide example'
-                                                              : 'Show example'
-                                                          : 'Stuck? Show me an example'}
-                                                </button>
-                                            </div>
-                                        )}
-                                        {!isSkipped && ex && ex.error && (
-                                            <div className="essay-flow-example-error">
-                                                {ex.error}
-                                            </div>
-                                        )}
-                                        {!isSkipped && exVisible && (
-                                            <div className="essay-flow-example">
-                                                <div className="essay-flow-example-label">
-                                                    Example — not your answer, just a nudge
-                                                </div>
-                                                <div className="essay-flow-example-text">
-                                                    {ex.text}
-                                                </div>
-                                                <div className="essay-flow-example-actions">
-                                                    <button
-                                                        type="button"
-                                                        className="essay-flow-example-link"
-                                                        onClick={() =>
-                                                            handleRegenerateExample(i, q)
-                                                        }
-                                                        disabled={disabled}
-                                                    >
-                                                        Try a different angle
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+                                    );
+                                })}
+                            </div>
+                        )}
 
-                                    {error && <div className="essay-flow-error">{error}</div>}
+                        {error && <div className="essay-flow-error">{error}</div>}
 
-                                    <div className="essay-flow-interview-nav">
-                                        <button
-                                            type="button"
-                                            className="essay-flow-link"
-                                            onClick={() => setCurrentQuestionIdx((v) => Math.max(0, v - 1))}
-                                            disabled={disabled || isFirst}
-                                        >
-                                            ← Previous
-                                        </button>
-                                        {isLast ? (
-                                            <button
-                                                type="button"
-                                                className="essay-flow-primary"
-                                                onClick={handleSubmitAnswers}
-                                                disabled={
-                                                    disabled || questionsLoading || !allQuestionsHandled
-                                                }
-                                                title={
-                                                    allQuestionsHandled
-                                                        ? 'Continue to your core idea'
-                                                        : 'Answer or skip each question to continue'
-                                                }
-                                            >
-                                                {submitting ? 'Saving…' : 'Continue'}
-                                            </button>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                className="essay-flow-primary"
-                                                onClick={() =>
-                                                    setCurrentQuestionIdx((v) =>
-                                                        Math.min(questions.length - 1, v + 1)
-                                                    )
-                                                }
-                                                disabled={disabled || !isHandled}
-                                                title={
-                                                    isHandled
-                                                        ? 'Next question'
-                                                        : 'Answer or skip this question to continue'
-                                                }
-                                            >
-                                                Next →
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })()}
+                        <div className="essay-flow-actions">
+                            <button
+                                type="button"
+                                className="essay-flow-primary"
+                                onClick={handleSubmitAnswers}
+                                disabled={
+                                    disabled || questionsLoading || !allQuestionsHandled
+                                }
+                                title={
+                                    allQuestionsHandled
+                                        ? 'Continue to your core idea'
+                                        : 'Answer or skip each question to continue'
+                                }
+                            >
+                                {submitting ? 'Saving…' : 'Continue'}
+                            </button>
+                        </div>
                     </div>
                 )}
 
                 {step === 'core_idea' && (
                     <div className="essay-flow-step">
-                        <h2 className="essay-flow-question">
-                            {coreIdeaBullets ? 'The shape of it' : 'Your core idea'}
-                        </h2>
+                        <h2 className="essay-flow-question">The shape of it</h2>
                         <p className="essay-flow-hint">
-                            {coreIdeaBullets
-                                ? "The spine the council will write to — pulled apart so you can see the moves. Edit, reorder, or drop any beat that doesn't sound like you yet."
-                                : "This is the spine the council will write to — synthesized from your topic and answers. Edit anything that doesn't sound like you yet."}
+                            The spine the council will write to — pulled apart so you can see
+                            the moves. Edit, reorder, or drop any beat that doesn't sound like
+                            you yet.
                         </p>
                         {coreIdeaLoading ? (
                             <div className="essay-flow-hint" style={{ opacity: 0.8 }}>
-                                {coreIdeaBullets
-                                    ? 'Pulling the shape of your idea apart into beats…'
-                                    : 'Drafting your core idea…'}
+                                Pulling the shape of your idea apart into beats…
                             </div>
-                        ) : coreIdeaBullets ? (
+                        ) : (
                             <CoreIdeaBullets
                                 value={coreIdea}
                                 onChange={setCoreIdea}
                                 disabled={disabled}
                             />
-                        ) : (
-                            <div className="essay-flow-textarea-with-mic">
-                                <textarea
-                                    ref={coreIdeaRef}
-                                    value={coreIdea}
-                                    onChange={(e) => setCoreIdea(e.target.value)}
-                                    placeholder="Your core idea will appear here once drafted…"
-                                    rows={8}
-                                    disabled={disabled}
-                                    className="essay-flow-textarea"
-                                />
-                                <div className="essay-flow-textarea-mic">
-                                    <MicButton
-                                        value={coreIdea}
-                                        onChange={setCoreIdea}
-                                        disabled={disabled}
-                                        size="md"
-                                        showLabel
-                                        title="Talk through changes to your core idea"
-                                    />
-                                </div>
-                            </div>
                         )}
                         {error && <div className="essay-flow-error">{error}</div>}
                         <div className="essay-flow-actions">

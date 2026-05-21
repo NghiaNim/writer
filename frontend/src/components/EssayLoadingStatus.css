@@ -1,13 +1,24 @@
 /* Essay Loading Status - terminal-style cycling messages */
 
+/*
+ * Warm-toned brewing-room palette. The bloom on the status dot is a
+ * CSS-only stand-in for the 30-second pre-infusion in pour-over coffee —
+ * fresh-ground beans release CO2 when first wet, producing a slowly-
+ * expanding crema-colored cap. We mimic that with a radial gradient that
+ * breathes on a 4s cycle (close to the real bloom's tempo) and a faint
+ * crema ring underneath.
+ *
+ * Random-walk reference: James Hoffmann's "World Atlas of Coffee" + the
+ * r/Coffee specialty-prep vocabulary.
+ */
 .essay-loading-status {
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(34, 22, 14, 0.62);
+  border: 1px solid rgba(217, 119, 6, 0.30);
   border-radius: 12px;
   padding: 22px 26px;
   margin: 12px 0 24px;
   font-family: var(--font-code, 'JetBrains Mono', monospace);
-  color: #cbd5e1;
+  color: #f5e9d8;
   position: relative;
   overflow: hidden;
 }
@@ -19,7 +30,7 @@
   top: 0;
   bottom: 0;
   width: 3px;
-  background: linear-gradient(180deg, rgba(59, 130, 246, 0.7), rgba(59, 130, 246, 0));
+  background: linear-gradient(180deg, rgba(217, 119, 6, 0.75), rgba(217, 119, 6, 0));
 }
 
 .essay-loading-bar {
@@ -29,29 +40,35 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  color: #93c5fd;
+  color: #f5b462;
   margin-bottom: 14px;
 }
 
 .essay-loading-dot {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: #3b82f6;
-  box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
-  animation: essay-pulse 1.6s infinite;
+  background: radial-gradient(
+    circle at 35% 30%,
+    #f5b462 0%,
+    #b45309 55%,
+    #4a2c14 100%
+  );
+  box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55);
+  animation:
+    essay-bloom 4s ease-in-out infinite,
+    essay-bloom-spin 9s linear infinite;
 }
 
-@keyframes essay-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.55);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
-  }
+@keyframes essay-bloom {
+  0%   { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55), inset 0 0 0 0 rgba(245, 180, 98, 0); transform: scale(1); }
+  50%  { box-shadow: 0 0 0 14px rgba(217, 119, 6, 0),  inset 0 0 4px 1px rgba(245, 180, 98, 0.35); transform: scale(1.12); }
+  100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0),    inset 0 0 0 0 rgba(245, 180, 98, 0); transform: scale(1); }
+}
+
+@keyframes essay-bloom-spin {
+  from { background-position: 0% 0%; }
+  to   { background-position: 100% 100%; }
 }
 
 .essay-loading-stage {
@@ -186,7 +203,7 @@
 }
 
 .essay-loading-prompt {
-  color: #64748b;
+  color: #d97706;
   font-weight: 700;
 }
 
@@ -208,7 +225,7 @@
 }
 
 .essay-loading-cursor {
-  color: #3b82f6;
+  color: #f5b462;
   font-weight: 700;
   animation: essay-cursor-blink 1s steps(2, jump-none) infinite;
 }
@@ -260,65 +277,3 @@
   }
 }
 
-/* ----- Brew mode (tunable: brewMode) ---------------------------------- */
-/*
- * Warm-toned reskin. Bloom is a CSS-only stand-in for the 30-second
- * pre-infusion in pour-over coffee — fresh-ground beans release CO2 when
- * first wet, producing a slowly-expanding crema-colored cap. We mimic that
- * with a radial gradient that breathes on a 4s cycle (close to the real
- * bloom's tempo) and a faint crema ring underneath.
- *
- * Random-walk reference: James Hoffmann's "World Atlas of Coffee" + the
- * r/Coffee specialty-prep vocabulary.
- */
-.essay-loading-status--brew {
-  background: rgba(34, 22, 14, 0.62);
-  border-color: rgba(217, 119, 6, 0.30);
-  color: #f5e9d8;
-}
-
-.essay-loading-status--brew::before {
-  background: linear-gradient(180deg, rgba(217, 119, 6, 0.75), rgba(217, 119, 6, 0));
-}
-
-.essay-loading-status--brew .essay-loading-bar {
-  color: #f5b462;
-}
-
-.essay-loading-status--brew .essay-loading-prompt {
-  color: #d97706;
-}
-
-.essay-loading-status--brew .essay-loading-cursor {
-  color: #f5b462;
-}
-
-/* The bloom: replace the plain blue pulse with a warmer crema halo and a
-   slower, organic cycle. Two layered animations — `essay-bloom` is the
-   slow radial breathe, `essay-bloom-spin` rotates the highlight so it
-   doesn't look like a polished UI dot. */
-.essay-loading-status--brew .essay-loading-dot {
-  width: 12px;
-  height: 12px;
-  background: radial-gradient(
-    circle at 35% 30%,
-    #f5b462 0%,
-    #b45309 55%,
-    #4a2c14 100%
-  );
-  box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55);
-  animation:
-    essay-bloom 4s ease-in-out infinite,
-    essay-bloom-spin 9s linear infinite;
-}
-
-@keyframes essay-bloom {
-  0%   { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55), inset 0 0 0 0 rgba(245, 180, 98, 0); transform: scale(1); }
-  50%  { box-shadow: 0 0 0 14px rgba(217, 119, 6, 0),  inset 0 0 4px 1px rgba(245, 180, 98, 0.35); transform: scale(1.12); }
-  100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0),    inset 0 0 0 0 rgba(245, 180, 98, 0); transform: scale(1); }
-}
-
-@keyframes essay-bloom-spin {
-  from { background-position: 0% 0%; }
-  to   { background-position: 100% 100%; }
-}

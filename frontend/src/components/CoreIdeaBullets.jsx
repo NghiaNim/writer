@@ -16,9 +16,10 @@ import './CoreIdeaBullets.css';
  * `buildInteractiveMessage` in EssayFlow keeps working unmodified and the
  * council prompt simply receives the bullets as separate lines.
  *
- * Visual personality: warm crema palette to match brewMode, coffee-bean
- * bullet glyph (a tilted radial-gradient oval with a faux crease), and a
- * perforated bottom edge on the card mimicking a receipt tear line.
+ * Visual personality: warm crema palette to match the loading panel,
+ * coffee-bean bullet glyph (a tilted radial-gradient oval with a faux
+ * crease), and a perforated bottom edge on the card mimicking a receipt
+ * tear line.
  */
 
 const MIN_BULLET_LEN = 6;        // shorter than this → noise / artifact, drop

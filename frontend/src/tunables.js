@@ -32,32 +32,7 @@
  * weeks should be inlined and removed — long-lived flags rot into dead code.
  */
 
-export const TUNABLES = [
-  {
-    key: 'brewMode',
-    type: 'bool',
-    default: false,
-    description:
-      'Re-skin the essay loading panel with espresso-brewing language and a CSS "bloom" indicator (the 30s pre-infusion CO2 release in pour-over coffee). Less generic-AI, more cafe.',
-    addedOn: '2026-05-17',
-    owner: 'sraval',
-    // Random-walk reference: James Hoffmann's pour-over bloom explainer
-    // and the r/Coffee specialty-prep vocabulary (sourcing → grinding →
-    // pulling → tasting → pour). The bloom is a real phenomenon: fresh-
-    // ground coffee releases CO2 when first wet, producing a slowly-
-    // expanding cap of fine bubbles. The CSS pulse here is the closest
-    // single-element approximation.
-  },
-  {
-    key: 'coreIdeaBullets',
-    type: 'bool',
-    default: false,
-    description:
-      'Show the "Your core idea" brief as an editable bulleted list with coffee-bean glyphs and a receipt-paper card, instead of one dense paragraph. Lifts the Dictate button out of the editor into a clearly-visible header tool.',
-    addedOn: '2026-05-17',
-    owner: 'sraval',
-  },
-];
+export const TUNABLES = [];
 
 /**
  * Build a lookup map from the registry for fast resolution.
