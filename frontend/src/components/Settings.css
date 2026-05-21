@@ -1814,3 +1814,113 @@ input:checked+.slider:before {
   font-family: var(--font-code, ui-monospace, monospace);
   color: #93c5fd;
 }
+
+/* ============================================================
+ * Settings — Coffee variant.
+ * Scoped under `.app--coffee` so the override only applies in
+ * the coffee theme. Repaints the SaaS-blue accents that were
+ * the most visible "AI dashboard" tells: side-nav active state,
+ * provider/council selection, focus rings, primary buttons,
+ * tabs, heat readouts. Surface backgrounds inherit the existing
+ * dark frame — we only swap accent chromaticity, not the whole
+ * shell, to keep the diff small and the form controls readable.
+ * ============================================================ */
+
+.app--coffee .settings-modal,
+.app--coffee .settings-body,
+.app--coffee .settings-header,
+.app--coffee .settings-main-panel,
+.app--coffee .settings-footer {
+  background: var(--coffee-espresso);
+}
+
+.app--coffee .settings-sidebar {
+  background: rgba(34, 22, 14, 0.6);
+}
+
+.app--coffee .sidebar-nav-item.active {
+  background: var(--coffee-amber-soft);
+  color: var(--coffee-crema-bright);
+  border-left: 2px solid var(--coffee-amber);
+}
+
+.app--coffee .prompt-tab.active {
+  background-color: var(--coffee-amber-deep);
+  color: var(--coffee-crema-bright);
+}
+
+.app--coffee .provider-option-container.selected {
+  border-color: var(--coffee-amber);
+  background: var(--coffee-amber-soft);
+  box-shadow: 0 0 0 1px var(--coffee-amber);
+}
+
+.app--coffee .provider-config-nested {
+  background: var(--coffee-amber-soft);
+}
+
+.app--coffee .inline-api-key-section input:focus,
+.app--coffee .api-key-section input:focus {
+  border-color: var(--coffee-amber);
+  box-shadow: 0 0 0 2px var(--coffee-amber-dim);
+}
+
+.app--coffee .test-button {
+  border-color: var(--coffee-amber);
+  color: var(--coffee-crema);
+}
+
+.app--coffee .test-button:hover:not(:disabled) {
+  background: var(--coffee-amber-soft);
+  border-color: var(--coffee-crema);
+  color: var(--coffee-crema-bright);
+}
+
+.app--coffee .action-btn {
+  background: var(--coffee-amber-soft);
+  border-color: var(--coffee-amber-dim);
+  color: var(--coffee-crema);
+}
+
+.app--coffee .action-btn:hover {
+  background: rgba(217, 119, 6, 0.18);
+  border-color: var(--coffee-amber);
+  color: var(--coffee-crema-bright);
+}
+
+.app--coffee .type-btn.active {
+  background-color: var(--coffee-amber-deep);
+  color: var(--coffee-crema-bright);
+  box-shadow: 0 2px 4px var(--coffee-amber-dim);
+}
+
+.app--coffee .free-filter-label input[type="checkbox"] {
+  accent-color: var(--coffee-amber);
+}
+
+.app--coffee .add-member-button:hover:not(:disabled) {
+  background: var(--coffee-amber-soft);
+  border-color: var(--coffee-amber-dim);
+  color: var(--coffee-crema);
+}
+
+.app--coffee .prompt-help code {
+  background: var(--coffee-amber-soft);
+  border-color: var(--coffee-amber-dim);
+  color: var(--coffee-crema);
+}
+
+.app--coffee .prompt-content textarea:focus {
+  border-color: var(--coffee-amber);
+  box-shadow: 0 0 0 3px var(--coffee-amber-dim);
+}
+
+.app--coffee .heat-value {
+  color: var(--coffee-crema);
+  background: var(--coffee-amber-soft);
+}
+
+.app--coffee .heat-slider::-webkit-slider-thumb,
+.app--coffee .heat-slider::-moz-range-thumb {
+  border-color: var(--coffee-amber);
+}

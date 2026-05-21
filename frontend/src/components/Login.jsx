@@ -145,12 +145,18 @@ export default function Login() {
     const buttonLabel = mode === 'login' ? 'Sign in' : 'Create account';
 
     return (
-        <div className="login-screen">
+        <div className="login-screen login-screen--coffee">
             <div className="login-card">
                 <div className="login-header">
-                    <h1 className="login-title">MidnightCoffee</h1>
+                    <h1 className="login-title">
+                        <span
+                            className="coffee-bean login-title-bean"
+                            aria-hidden="true"
+                        />
+                        MidnightCoffee
+                    </h1>
                     <p className="login-subtitle">
-                        Your writing companion, in one place.
+                        Slow writing, with a small council. Pour something good.
                     </p>
                 </div>
 

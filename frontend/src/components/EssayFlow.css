@@ -79,6 +79,15 @@
     max-width: 540px;
 }
 
+/* Typographic separator between topic and audience. Reads as a
+   directional mark, not a UI element — quiet crema-dim. */
+.essay-flow-topic-chip-arrow {
+    margin: 0 8px;
+    color: rgba(245, 180, 98, 0.55);
+    font-weight: 400;
+    white-space: nowrap;
+}
+
 .essay-flow-question {
     margin: 0;
     font-family: var(--font-display);
@@ -1317,3 +1326,378 @@
 .essay-flow-council-wrapper {
     margin-top: 8px;
 }
+
+/* ============================================================
+ * Coffee theme — the default EssayFlow look. The `--coffee` modifier
+ * class is now applied unconditionally in JSX; `coffeeGreetingV1`
+ * tunable was retired after default-on.
+ *
+ * Originally scoped to Step 1 only, then progressively extended to
+ * cover the stepper, every step's chrome, and the timeline page.
+ * ============================================================ */
+
+/* Warm bloom behind the card. Same idea as login: cafe lamp glow. */
+.essay-flow--coffee .essay-flow-card {
+    border-color: rgba(217, 119, 6, 0.18);
+    box-shadow:
+        var(--shadow-glass),
+        0 0 60px var(--coffee-crema-glow);
+    position: relative;
+}
+
+/* Receipt tear edge stolen from .coreidea-card::after — subliminally
+   connects Step 1 to Step 3 without renaming or restyling anything. */
+.essay-flow--coffee .essay-flow-card::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: -1px;
+    height: 8px;
+    background-image:
+        radial-gradient(
+            circle at 6px 0px,
+            transparent 4px,
+            rgba(217, 119, 6, 0.18) 4.5px,
+            transparent 6px
+        );
+    background-size: 12px 8px;
+    background-repeat: repeat-x;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Step 1 H1 reads warmer and a touch smaller — less form-y. */
+.essay-flow--coffee .essay-flow-question {
+    color: var(--coffee-cream);
+}
+
+.essay-flow--coffee .essay-flow-warm-subline {
+    margin: -8px 0 4px 0;
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--coffee-crema);
+    font-style: italic;
+}
+
+/* Field labels — keep the all-caps tracked feel but in crema. */
+.essay-flow--coffee .essay-flow-label {
+    color: var(--coffee-crema);
+}
+
+/* Audience chips — warm tint on hover + active. Inactive untouched
+   so the chip row still reads as quiet options. */
+.essay-flow--coffee .essay-flow-chip:hover:not(:disabled) {
+    background: var(--coffee-amber-soft);
+    border-color: rgba(217, 119, 6, 0.45);
+    color: var(--coffee-crema-bright);
+}
+
+.essay-flow--coffee .essay-flow-chip--active {
+    background: var(--coffee-amber-dim);
+    border-color: var(--coffee-amber);
+    color: var(--coffee-crema-bright);
+}
+
+/* Word-target chips, compact mode.
+   With per-chip subtitles dropped, the column-layout chip read as
+   bloated whitespace. Switch to a centered single-line pill with
+   right-sized padding so the chip row feels confident, not airy. */
+.essay-flow--coffee .essay-flow-word-targets {
+    gap: 8px;
+    align-items: stretch;
+}
+
+.essay-flow--coffee .essay-flow-word-targets .essay-flow-chip {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 18px;
+    min-width: 72px;
+    gap: 0;
+}
+
+.essay-flow--coffee .essay-flow-word-targets .essay-flow-chip .chip-main {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+}
+
+/* Custom chip — the number input now sits centered, same height as
+   the preset chips. Removed the trailing "words" sub for consistency
+   with the presets (TARGET LENGTH label provides the unit context). */
+.essay-flow--coffee .essay-flow-word-targets .essay-flow-chip.custom {
+    padding: 6px 12px;
+}
+
+.essay-flow--coffee .essay-flow-chip-input {
+    width: 64px;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    padding: 4px 0;
+    color: var(--coffee-cream);
+}
+
+.essay-flow--coffee .essay-flow-chip-input:focus {
+    border-bottom-color: var(--coffee-amber);
+}
+
+/* Topic input + audience input — warm focus glow. */
+.essay-flow--coffee .essay-flow-input:focus,
+.essay-flow--coffee .essay-flow-textarea:focus {
+    border-color: var(--coffee-amber);
+    box-shadow: 0 0 0 3px var(--coffee-amber-dim);
+}
+
+/* "I don't have a topic yet" link — warm crema instead of cool blue. */
+.essay-flow--coffee .essay-flow-link--soft {
+    color: var(--coffee-crema);
+}
+
+.essay-flow--coffee .essay-flow-link--soft:hover:not(:disabled) {
+    color: var(--coffee-crema-bright);
+}
+
+/* Topic chip — warm pill, same shape. */
+.essay-flow--coffee .essay-flow-topic-chip {
+    background: var(--coffee-amber-soft);
+    border-color: var(--coffee-amber-dim);
+    color: var(--coffee-cream);
+}
+
+.essay-flow--coffee .essay-flow-topic-chip span {
+    color: var(--coffee-crema-bright);
+}
+
+/* Primary CTA — the single most-clicked button in the app. */
+.essay-flow--coffee .essay-flow-primary {
+    background: var(--coffee-amber);
+    box-shadow: 0 0 24px var(--coffee-amber-dim);
+}
+
+.essay-flow--coffee .essay-flow-primary:hover:not(:disabled) {
+    background: var(--coffee-amber-deep);
+    box-shadow: 0 0 32px rgba(217, 119, 6, 0.35);
+}
+
+/* Stepper label color sync. */
+.essay-flow--coffee .essay-flow-stepper-label {
+    color: var(--coffee-crema);
+}
+
+/* Stepper bottom divider — softer + warm-tinted. Minimalism move:
+   let the dots carry the rhythm, not a hard separator line. */
+.essay-flow--coffee .essay-flow-stepper {
+    border-bottom-color: rgba(217, 119, 6, 0.10);
+}
+
+/* Stepper dots — were cool blue, now warm crema/amber. */
+.essay-flow--coffee .essay-flow-stepper-dot--pending {
+    background: rgba(245, 233, 216, 0.18);
+}
+
+.essay-flow--coffee .essay-flow-stepper-dot--done {
+    background: rgba(217, 119, 6, 0.55);
+}
+
+.essay-flow--coffee .essay-flow-stepper-dot--active {
+    background: var(--coffee-crema);
+    box-shadow: 0 0 0 3px var(--coffee-amber-dim);
+}
+
+/* Step 2 question rows — warm the question text from gray to cream. */
+.essay-flow--coffee .essay-flow-exchange-q {
+    color: var(--coffee-cream);
+}
+
+.essay-flow--coffee .essay-flow-exchange-q-number {
+    color: var(--coffee-crema);
+}
+
+/* Swap / Skip chips — warmer outline, drop the cool gray cast. */
+.essay-flow--coffee .essay-flow-skip-question {
+    border-color: rgba(217, 119, 6, 0.25);
+    color: var(--coffee-crema);
+}
+
+.essay-flow--coffee .essay-flow-skip-question:hover:not(:disabled) {
+    background: var(--coffee-amber-soft);
+    border-color: var(--coffee-amber);
+    color: var(--coffee-crema-bright);
+}
+
+/* "Stuck? Show me an example" link — was inheriting blue chrome. */
+.essay-flow--coffee .essay-flow-example-toggle:hover:not(:disabled) {
+    color: var(--coffee-crema);
+}
+
+/* Example panel — was a blue tinted block. Warm it. */
+.essay-flow--coffee .essay-flow-example {
+    background: var(--coffee-amber-soft);
+    border-left-color: rgba(217, 119, 6, 0.55);
+}
+
+.essay-flow--coffee .essay-flow-example-label {
+    color: var(--coffee-crema);
+}
+
+/* Field hint italic copy — warm tinted secondary. */
+.essay-flow--coffee .essay-flow-field-hint {
+    color: rgba(245, 233, 216, 0.65);
+}
+
+/* Memory-recall banner area, skipped banner — warm gray. */
+.essay-flow--coffee .essay-flow-skipped-banner {
+    color: var(--coffee-crema);
+}
+
+/* "Back" link buttons inside coffee mode read warm. */
+.essay-flow--coffee .essay-flow-link {
+    color: var(--coffee-cream);
+}
+
+.essay-flow--coffee .essay-flow-link:hover:not(:disabled) {
+    color: var(--coffee-crema-bright);
+}
+
+/* ============================================================
+ * Typography bumps — bigger, calmer reading sizes.
+ * Scoped to coffee mode so the change rides with the rebrand
+ * and ships under the same tunable.
+ * ============================================================ */
+
+.essay-flow--coffee .essay-flow-question {
+    font-size: 32px;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+}
+
+.essay-flow--coffee .essay-flow-question-small {
+    font-size: 26px;
+}
+
+.essay-flow--coffee .essay-flow-hint {
+    font-size: 15.5px;
+    line-height: 1.55;
+}
+
+.essay-flow--coffee .essay-flow-field-hint {
+    font-size: 14px;
+}
+
+.essay-flow--coffee .essay-flow-label {
+    font-size: 12px;
+    letter-spacing: 0.16em;
+}
+
+.essay-flow--coffee .essay-flow-input,
+.essay-flow--coffee .essay-flow-textarea {
+    font-size: 16px;
+}
+
+.essay-flow--coffee .essay-flow-exchange-q {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.essay-flow--coffee .essay-flow-primary {
+    font-size: 15px;
+}
+
+.essay-flow--coffee .essay-flow-example-toggle {
+    font-size: 13px;
+}
+
+/* ============================================================
+ * Timeline step (Step 4) — minimalism pass.
+ *
+ * The original frame around the add-event area read like a
+ * form-builder zone (dashed box + dark inner fill + stacked
+ * inputs + secondary button). We strip the frame so the inputs
+ * themselves carry the structure, and restyle the Add button
+ * to match the quiet "+ add another bullet" pill on Step 3.
+ * ============================================================ */
+
+.essay-flow--coffee .essay-flow-timeline-add {
+    margin-top: 4px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    gap: 10px;
+}
+
+.essay-flow--coffee .essay-flow-timeline-add-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 2px;
+}
+
+/* The Add button — no CSS existed before, so it rendered as a
+   browser-default gray rectangle. Match the language of the
+   .coreidea-add pill: small warm dashed amber affordance. */
+.essay-flow--coffee .essay-flow-secondary {
+    background: transparent;
+    border: 1px dashed rgba(245, 180, 98, 0.35);
+    color: var(--coffee-crema);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.essay-flow--coffee .essay-flow-secondary:hover:not(:disabled) {
+    background: var(--coffee-amber-soft);
+    border-color: rgba(245, 180, 98, 0.6);
+    color: var(--coffee-crema-bright);
+}
+
+.essay-flow--coffee .essay-flow-secondary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Existing timeline rows had a blue counter chip + blue "when"
+   label. Swap to warm so the timeline reads as one continuous
+   coffee surface. */
+.essay-flow--coffee .essay-flow-timeline-row::before {
+    background: rgba(217, 119, 6, 0.55);
+    color: var(--coffee-cream);
+}
+
+.essay-flow--coffee .essay-flow-timeline-when {
+    color: var(--coffee-crema);
+}
+
+.essay-flow--coffee .essay-flow-timeline-what {
+    color: var(--coffee-cream);
+}
+
+.essay-flow--coffee .essay-flow-timeline-arrow:hover:not(:disabled) {
+    background: var(--coffee-amber-soft);
+    border-color: rgba(217, 119, 6, 0.45);
+    color: var(--coffee-crema-bright);
+}
+
+/* Skip / Back style links — drop the underline so they read as
+   quiet text buttons, not as anchors. Underline reappears on
+   hover only, which keeps the affordance discoverable. */
+.essay-flow--coffee .essay-flow-link {
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.essay-flow--coffee .essay-flow-link:hover:not(:disabled) {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+
+

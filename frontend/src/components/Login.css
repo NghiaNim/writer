@@ -271,3 +271,118 @@
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+/* ============================================================
+ * Coffee theme — the default Login look (was previously gated
+ * behind a `coffeeGreetingV1` tunable; that's been retired and
+ * the modifier class is now applied unconditionally in JSX).
+ *
+ * Same DOM, same layout. Warm crema/amber vocabulary anchored
+ * to the "Today's pour" card on EssayFlow Step 3. Goal: a
+ * logged-out user opening the app should feel like they walked
+ * into a cafe, not a dashboard.
+ * ============================================================ */
+
+.login-screen--coffee {
+    background:
+        radial-gradient(ellipse 110% 60% at 50% -10%, var(--coffee-crema-glow) 0%, transparent 60%);
+}
+
+.login-screen--coffee .login-card {
+    border-color: rgba(217, 119, 6, 0.18);
+    box-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.45),
+        0 0 60px var(--coffee-crema-glow);
+}
+
+.login-screen--coffee .login-title {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: linear-gradient(180deg, var(--coffee-crema-bright) 0%, var(--coffee-crema) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.login-screen--coffee .login-title-bean {
+    --bean-size: 18px;
+    margin-top: 2px;
+}
+
+.login-screen--coffee .login-subtitle {
+    color: var(--coffee-cream);
+    opacity: 0.75;
+}
+
+.login-screen--coffee .login-tab.is-active {
+    background: var(--coffee-amber);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset,
+        0 0 12px var(--coffee-amber-dim);
+}
+
+.login-screen--coffee .login-field input:focus {
+    border-color: var(--coffee-amber);
+    box-shadow: 0 0 0 3px var(--coffee-amber-dim);
+}
+
+.login-screen--coffee .login-submit {
+    background: var(--coffee-amber);
+}
+
+.login-screen--coffee .login-submit:hover:not(:disabled) {
+    background: var(--coffee-amber-deep);
+}
+
+.login-screen--coffee .login-google:hover:not(:disabled) {
+    border-color: rgba(217, 119, 6, 0.45);
+    background: var(--coffee-amber-soft);
+}
+
+.login-screen--coffee .login-link {
+    color: var(--coffee-crema);
+}
+
+.login-screen--coffee .login-link:hover:not(:disabled) {
+    color: var(--coffee-crema-bright);
+}
+
+/* Typography bumps inside coffee mode — bigger and calmer.
+   Brand moment on Login should feel like an arrival, not a form. */
+.login-screen--coffee .login-card {
+    max-width: 460px;
+    padding: 44px 36px 32px;
+}
+
+.login-screen--coffee .login-title {
+    font-size: 38px;
+    letter-spacing: -0.015em;
+}
+
+.login-screen--coffee .login-subtitle {
+    font-size: 16px;
+    line-height: 1.5;
+    max-width: 320px;
+    margin: 4px auto 0;
+}
+
+.login-screen--coffee .login-label {
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+}
+
+.login-screen--coffee .login-field input {
+    font-size: 15px;
+    padding: 12px 14px;
+}
+
+.login-screen--coffee .login-submit,
+.login-screen--coffee .login-google {
+    font-size: 15px;
+    padding: 13px 16px;
+}
+
+.login-screen--coffee .login-footer {
+    font-size: 14px;
+}

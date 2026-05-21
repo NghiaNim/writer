@@ -35,6 +35,23 @@
   --shadow-glass: 0 12px 40px rgba(0, 0, 0, 0.35);
   --shadow-glow-blue: 0 0 24px rgba(59, 130, 246, 0.2), 0 4px 12px rgba(0, 0, 0, 0.15);
   --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.2);
+
+  /* --- Coffee palette (third-wave / "Today's pour" aesthetic) ---
+     Opt-in via .login-screen--coffee, .sidebar--coffee, .essay-flow--coffee
+     modifier classes. Anchored to the values already used by
+     CoreIdeaBullets.css and EssayLoadingStatus.css so all coffee surfaces
+     share one chromatic vocabulary. */
+  --coffee-espresso: #22160e;
+  --coffee-roast: #3d2817;
+  --coffee-bean: #6f4e2c;
+  --coffee-amber: #d97706;
+  --coffee-amber-deep: #b45309;
+  --coffee-crema: #f5b462;
+  --coffee-crema-bright: #fef3c7;
+  --coffee-cream: #f5e9d8;
+  --coffee-amber-dim: rgba(217, 119, 6, 0.20);
+  --coffee-amber-soft: rgba(217, 119, 6, 0.08);
+  --coffee-crema-glow: rgba(245, 180, 98, 0.12);
 }
 
 body {
@@ -42,11 +59,14 @@ body {
   font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg-darker);
+  background-color: #0a0805;
+  /* Warm cafe-lamp wash — single top radial in crema, no cool radials.
+     Replaces the prior blue+cyan wash that was leaking SaaS-indigo
+     through every surface even after component-level coffee styling. */
   background-image:
-    radial-gradient(ellipse 120% 80% at 50% -20%, rgba(59, 130, 246, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse 80% 50% at 100% 50%, rgba(34, 211, 238, 0.06) 0%, transparent 45%),
-    linear-gradient(180deg, #0c1222 0%, #0f172a 40%, #0a0f1a 100%);
+    radial-gradient(ellipse 110% 65% at 50% -10%, rgba(245, 180, 98, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 45% at 90% 60%, rgba(217, 119, 6, 0.05) 0%, transparent 50%),
+    linear-gradient(180deg, #0e0a08 0%, #14100c 45%, #0a0805 100%);
   background-attachment: fixed;
   color: var(--text-primary);
   height: 100vh;
@@ -165,4 +185,37 @@ body::after {
 /* Global Button Reset */
 button {
   font-family: var(--font-ui);
+}
+
+/* --- Coffee bean glyph (shared utility) ---
+   Pure-CSS coffee bean: tilted oval with a faux center crease via a
+   layered linear-gradient. Originally lived inline in CoreIdeaBullets.css
+   as `.coreidea-bullet-bean`; lifted here so login, sidebar, and any other
+   coffee surface can reuse the same shape without copy-paste drift.
+   `--bean-size` lets callers scale it. */
+.coffee-bean {
+  display: inline-block;
+  flex-shrink: 0;
+  width: calc(var(--bean-size, 14px) * 0.82);
+  height: var(--bean-size, 14px);
+  border-radius: 50% / 60%;
+  transform: rotate(-12deg);
+  background:
+    linear-gradient(
+      92deg,
+      transparent 44%,
+      rgba(0, 0, 0, 0.55) 47%,
+      rgba(0, 0, 0, 0.55) 53%,
+      transparent 56%
+    ),
+    radial-gradient(
+      ellipse at 35% 25%,
+      #c6915a 0%,
+      #8d5e34 30%,
+      #5a3a1f 70%,
+      #2c1a0c 100%
+    );
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.25),
+    0 1px 1px rgba(245, 180, 98, 0.15) inset;
 }

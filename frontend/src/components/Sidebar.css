@@ -462,7 +462,9 @@
 }
 
 /* ============================================================
- * Coffee variant — opted in via `coffeeGreetingV1`.
+ * Coffee theme — the default Sidebar look. The `--coffee` modifier
+ * class is now applied unconditionally in JSX; the `coffeeGreetingV1`
+ * tunable that originally gated this was retired after default-on.
  *
  * Goal: extend the warm crema/amber language past the brand name
  * so the whole nav reads as one room. Layout untouched.
@@ -540,5 +542,37 @@
     background: var(--coffee-amber-soft);
     border-color: rgba(217, 119, 6, 0.45);
     box-shadow: 0 0 24px var(--coffee-crema-glow);
+}
+
+/* Empty-state strong text — match the coffee CTA tint. */
+.sidebar--coffee .sidebar-empty-state-hint strong {
+    color: var(--coffee-crema);
+}
+
+/* Typography bumps inside the sidebar coffee mode. */
+.sidebar--coffee .sidebar-title {
+    font-size: 22px;
+}
+
+.sidebar--coffee .new-council-btn {
+    font-size: 15.5px;
+}
+
+.sidebar--coffee .search-input {
+    font-size: 14px;
+}
+
+.sidebar--coffee .conversation-title {
+    font-size: 14.5px;
+    line-height: 1.4;
+}
+
+.sidebar--coffee .sidebar-empty-state-title {
+    font-size: 15px;
+}
+
+.sidebar--coffee .sidebar-empty-state-hint {
+    font-size: 13px;
+    line-height: 1.6;
 }
 

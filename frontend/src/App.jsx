@@ -1299,7 +1299,7 @@ function AppShell() {
   };
 
   return (
-    <div className="app">
+    <div className="app app--coffee">
       {/* Mobile hamburger menu button */}
       <button 
         className="mobile-menu-btn" 

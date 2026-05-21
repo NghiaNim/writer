@@ -6,12 +6,15 @@ import CoreIdeaBullets from './CoreIdeaBullets';
 import './EssayFlow.css';
 
 // Word-target presets for the Step 4 picker. Tuned for college admissions /
-// statement-of-purpose use cases.
+// statement-of-purpose use cases. The label is the number; the per-chip
+// subtitle was dropped in favor of a single explanatory hint underneath
+// the row — four subtitles competing for attention read SaaS-y, one quiet
+// hint reads minimal.
 const WORD_TARGET_PRESETS = [
-    { value: 250, label: '250', sub: 'short supplement' },
-    { value: 500, label: '500', sub: 'standard supplement' },
-    { value: 650, label: '650', sub: 'Common App' },
-    { value: 1000, label: '1000', sub: 'long SoP' },
+    { value: 250, label: '250' },
+    { value: 500, label: '500' },
+    { value: 650, label: '650' },
+    { value: 1000, label: '1000' },
 ];
 const DEFAULT_WORD_TARGET = 650;
 
@@ -896,7 +899,7 @@ export default function EssayFlow({
     const showStepper = stepIndex >= 0;
 
     return (
-        <div className="essay-flow">
+        <div className="essay-flow essay-flow--coffee">
             <div className="essay-flow-card">
                 {handoffError && (
                     <div className="essay-flow-handoff-error" role="alert">
@@ -915,11 +918,16 @@ export default function EssayFlow({
                 )}
                 {showTopicChip && (
                     <div className="essay-flow-topic-chip" title={topic}>
-                        Topic: <span>{topic}</span>
+                        <span>{topic}</span>
                         {audience && (
                             <>
-                                <span style={{ opacity: 0.5, margin: '0 4px' }}>·</span>
-                                <span>for {audience}</span>
+                                <span
+                                    className="essay-flow-topic-chip-arrow"
+                                    aria-hidden="true"
+                                >
+                                    →
+                                </span>
+                                <span>{audience}</span>
                             </>
                         )}
                     </div>
@@ -951,7 +959,12 @@ export default function EssayFlow({
 
                 {step === 'topic' && (
                     <form onSubmit={handleSubmitTopic} className="essay-flow-step">
-                        <h1 className="essay-flow-question">What is your essay about?</h1>
+                        <h1 className="essay-flow-question">
+                            Let's start with what you're after.
+                        </h1>
+                        <p className="essay-flow-warm-subline">
+                            One short sentence. The first pour is always rough — that's fine.
+                        </p>
 
                         <div className="essay-flow-field">
                             <label htmlFor="essay-flow-topic" className="essay-flow-label">
@@ -1594,7 +1607,7 @@ export default function EssayFlow({
                                 type="text"
                                 value={newTimelineWhen}
                                 onChange={(e) => setNewTimelineWhen(e.target.value)}
-                                placeholder="When (optional) — e.g. summer 2019, when I was 14"
+                                placeholder="When (optional)"
                                 disabled={disabled}
                                 className="essay-flow-input essay-flow-timeline-when-input"
                                 maxLength={80}
@@ -1602,7 +1615,7 @@ export default function EssayFlow({
                             <textarea
                                 value={newTimelineWhat}
                                 onChange={(e) => setNewTimelineWhat(e.target.value)}
-                                placeholder="What happened — one or two sentences."
+                                placeholder="What happened?"
                                 disabled={disabled}
                                 className="essay-flow-textarea"
                                 rows={2}
@@ -1615,20 +1628,14 @@ export default function EssayFlow({
                                     }
                                 }}
                             />
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    justifyContent: 'flex-end',
-                                    marginTop: '8px',
-                                }}
-                            >
+                            <div className="essay-flow-timeline-add-actions">
                                 <button
                                     type="button"
                                     className="essay-flow-secondary"
                                     onClick={handleAddTimelineEvent}
                                     disabled={disabled || !newTimelineWhat.trim()}
                                 >
-                                    + Add event
+                                    + Add
                                 </button>
                             </div>
                         </div>
@@ -1642,7 +1649,7 @@ export default function EssayFlow({
                                 onClick={handleSkipTimeline}
                                 disabled={disabled}
                             >
-                                Skip — let the council infer the order
+                                Skip this step
                             </button>
                             <button
                                 type="button"
@@ -1659,22 +1666,15 @@ export default function EssayFlow({
                 {step === 'voice' && (
                     <div className="essay-flow-step">
                         <h2 className="essay-flow-question">Voice & length</h2>
-                        <p className="essay-flow-hint">
-                            Last step. The council will lean into the voice you describe here.
-                        </p>
                         {onOpenVoiceSettings ? (
-                            <p className="essay-flow-hint essay-flow-voice-settings-callout">
+                            <p className="essay-flow-voice-rules-link">
                                 <button
                                     type="button"
                                     className="essay-flow-link"
                                     onClick={onOpenVoiceSettings}
                                 >
-                                    Open saved voice rules
-                                </button>{' '}
-                                <span className="essay-flow-word-target-summary">
-                                    — persistent rules and reference paragraphs (Settings → My Voice)
-                                    apply to every essay, including this one.
-                                </span>
+                                    Open saved voice rules →
+                                </button>
                             </p>
                         ) : null}
 
@@ -1689,8 +1689,7 @@ export default function EssayFlow({
                                 className="essay-flow-input"
                             />
                             <div className="essay-flow-word-target-summary">
-                                Up to 5. Comma-separated. Used as a stylistic anchor — the council
-                                won't quote or name them in your essay.
+                                Up to 5 — stylistic anchors, never named in the essay.
                             </div>
                         </div>
 
@@ -1708,7 +1707,6 @@ export default function EssayFlow({
                                         disabled={disabled}
                                     >
                                         <span className="chip-main">{p.label}</span>
-                                        <span className="chip-sub">{p.sub}</span>
                                     </button>
                                 ))}
                                 <div
@@ -1727,11 +1725,7 @@ export default function EssayFlow({
                                         disabled={disabled}
                                         className="essay-flow-chip-input"
                                     />
-                                    <span className="chip-sub">words</span>
                                 </div>
-                            </div>
-                            <div className="essay-flow-word-target-summary">
-                                Final essay aims for ~{wordTarget} words.
                             </div>
                         </div>
 
@@ -1748,11 +1742,8 @@ export default function EssayFlow({
                                 </span>
                                 <span>
                                     {councilOpen
-                                        ? 'Hide council settings'
-                                        : 'Customize the council for this essay'}
-                                </span>
-                                <span className="essay-flow-disclosure-hint">
-                                    {councilOpen ? '' : '(uses your default if untouched)'}
+                                        ? 'Hide council'
+                                        : 'Customize council'}
                                 </span>
                             </button>
                             {councilOpen && (
@@ -1819,7 +1810,6 @@ export default function EssayFlow({
                                         disabled={disabled}
                                     >
                                         <span className="chip-main">{p.label}</span>
-                                        <span className="chip-sub">{p.sub}</span>
                                     </button>
                                 ))}
                                 <div
@@ -1838,7 +1828,6 @@ export default function EssayFlow({
                                         disabled={disabled}
                                         className="essay-flow-chip-input"
                                     />
-                                    <span className="chip-sub">words</span>
                                 </div>
                             </div>
                         </div>

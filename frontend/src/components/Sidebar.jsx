@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { useTunable } from '../tunables';
 import './Sidebar.css';
 
 /**
@@ -43,7 +42,6 @@ export default function Sidebar({
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const coffee = useTunable('coffeeGreetingV1');
 
   const isConversationStreaming = (convId) => {
     if (streamingIds && typeof streamingIds.has === 'function') {
@@ -86,7 +84,7 @@ export default function Sidebar({
       {/* Mobile backdrop */}
       {isOpen && <div className="sidebar-backdrop" onClick={onClose} />}
       
-      <div className={`sidebar ${isOpen ? 'open' : ''} ${coffee ? 'sidebar--coffee' : ''}`}>
+      <div className={`sidebar sidebar--coffee ${isOpen ? 'open' : ''}`}>
         {/* Mobile close button */}
         <button className="sidebar-close-btn" onClick={onClose} aria-label="Close menu">
           ×
@@ -95,11 +93,7 @@ export default function Sidebar({
         <div className="sidebar-header">
         <div className="sidebar-title-wrapper">
           <div className="sidebar-title">
-            {coffee ? (
-              <span className="coffee-bean sidebar-title-bean" aria-hidden="true" />
-            ) : (
-              <span className="title-icon" aria-hidden="true">☕</span>
-            )}
+            <span className="coffee-bean sidebar-title-bean" aria-hidden="true" />
             {' '}MidnightCoffee
           </div>
         </div>
@@ -130,11 +124,10 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Coffee-themed greeting strip — small "Pour №N" chip that
-          orients returning users without taking up real estate. Shown
-          only when the coffee variant is on; quietly hides while the
-          user is actively searching to avoid noise. */}
-      {coffee && !searchQuery && (
+      {/* Coffee greeting strip — small "Pour №N" chip that orients
+          returning users without taking up real estate. Hidden while
+          the user is actively searching to avoid noise. */}
+      {!searchQuery && (
         <div className="sidebar-pour-strip" aria-hidden="true">
           <span className="sidebar-pour-strip-number">
             Pour №{(conversations?.length || 0) + 1}
@@ -147,7 +140,7 @@ export default function Sidebar({
         <input
           type="text"
           className="search-input"
-          placeholder={coffee ? 'Find a past pour…' : 'Search conversations...'}
+          placeholder="Find a past pour…"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -173,9 +166,9 @@ export default function Sidebar({
                 </div>
               </>
             ) : (
-              <div className="sidebar-empty-state-title">
-                {coffee ? 'Nothing brewing yet.' : 'No essays yet'}
-              </div>
+                <div className="sidebar-empty-state-title">
+                  Nothing brewing yet.
+                </div>
             )}
           </div>
         ) : (
