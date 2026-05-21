@@ -55,9 +55,7 @@ export default function FactCheckPanel({ flags, running }) {
                 </span>
             </div>
             <p className="fact-check-intro">
-                The fact-checker found {visibleFlags.length === 1 ? 'a claim' : 'claims'} in the essay
-                that either contradict something you told us or look unsupported.
-                Skim them — fix what's wrong, dismiss what's fine.
+                Fix what's wrong, dismiss what's fine.
             </p>
             <ul className="fact-check-list">
                 {(flags || []).map((flag, idx) => {
