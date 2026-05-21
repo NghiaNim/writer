@@ -850,10 +850,12 @@ async def send_message_stream(
         # Pull interim-question helpers up-front so we can clear the run buffer
         # at the start and read it again before stage 3.
         from .interim_questions import (
+            MAX_QUESTIONS_PER_BATCH,
             MAX_QUESTIONS_PER_RUN,
             clear_run_buffer,
             generate_interim_questions,
             get_run_buffer,
+            mark_question_emitted,
             reset_run_buffer,
         )
         from .user_facts import load_recent_user_facts
@@ -861,6 +863,20 @@ async def send_message_stream(
         # Per-run state for interim Q&A. Reset at the start so a new run on
         # the same conversation doesn't see stale answers.
         reset_run_buffer(conversation_id)
+
+        def _emit_question_events(qs):
+            """Yield SSE events for a batch of questions AND record each as
+            pending in the run buffer. Marking on emit means subsequent
+            batches won't repeat, the per-run cap counts pending too (so we
+            never overshoot), and `format_in_flight_qa_block` still filters
+            them out by empty answer if the user never responds."""
+            for q in qs:
+                mark_question_emitted(
+                    conversation_id,
+                    question_id=q.get("question_id") or "",
+                    question=q.get("question") or "",
+                )
+                yield f"data: {json.dumps({'type': 'interim_question', 'data': q})}\n\n"
 
         async def _emit_interim_questions(stage1_for_context):
             """Generate interim questions and yield SSE events. Caller is
@@ -888,8 +904,8 @@ async def send_message_stream(
             except Exception as ex:
                 print(f"WARN: interim question generation failed: {ex}")
                 qs = []
-            for q in qs:
-                yield f"data: {json.dumps({'type': 'interim_question', 'data': q})}\n\n"
+            for event in _emit_question_events(qs):
+                yield event
 
         try:
             # Initialize variables for metadata
@@ -1065,6 +1081,30 @@ async def send_message_stream(
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
             await asyncio.sleep(0.05)
 
+            # Kick off an EARLY batch of interim questions in parallel with
+            # stage 1. The generator runs without draft excerpts (drafts
+            # don't exist yet) and instead leans on topic + known facts. By
+            # the time stage 1 finishes ~30-45s later, this typically
+            # returned in ~3-5s and was emitted mid-loop — giving the user
+            # a much longer answering window than the post-stage-1 batch
+            # alone (which leaves only ~20-30s before the chairman starts).
+            try:
+                early_known_facts = await asyncio.to_thread(
+                    load_recent_user_facts, user.id
+                )
+            except Exception:
+                early_known_facts = []
+            early_questions_task = asyncio.create_task(
+                generate_interim_questions(
+                    topic=session_topic or "",
+                    user_query=body.content,
+                    known_facts=early_known_facts,
+                    asked_this_run=[],
+                    stage1_drafts=None,
+                    n_remaining=MAX_QUESTIONS_PER_BATCH,
+                )
+            )
+
             total_models = 0
 
             async for item in stage1_collect_responses(
@@ -1089,12 +1129,41 @@ async def send_message_stream(
                 yield f"data: {json.dumps({'type': 'stage1_progress', 'data': item, 'count': len(stage1_results), 'total': total_models})}\n\n"
                 await asyncio.sleep(0.01)
 
+                # Drain the early-question task the moment it finishes —
+                # ideally while the first or second persona is still
+                # writing, so the user sees questions ~5s in.
+                if early_questions_task is not None and early_questions_task.done():
+                    try:
+                        early_qs = early_questions_task.result()
+                    except Exception as ex:
+                        print(f"WARN: early question generation failed: {ex}")
+                        early_qs = []
+                    early_questions_task = None
+                    for event in _emit_question_events(early_qs):
+                        yield event
+
+            # Stage 1 finished. Drain any still-pending early-question task
+            # with a short timeout — it should already be done.
+            if early_questions_task is not None:
+                try:
+                    early_qs = await asyncio.wait_for(
+                        early_questions_task, timeout=3.0
+                    )
+                except (Exception, asyncio.TimeoutError) as ex:
+                    print(f"WARN: early question gen still pending after stage 1: {ex}")
+                    early_qs = []
+                early_questions_task = None
+                for event in _emit_question_events(early_qs):
+                    yield event
+
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
             await asyncio.sleep(0.05)
 
             # Interim questions: stage 1 just finished; stage 2 is about to
             # start. Use the council's drafts to pick questions whose answers
-            # would ground vague claims in the final essay.
+            # would ground vague claims in the final essay. The per-run cap
+            # already accounts for whatever the early task emitted, since
+            # those are recorded as pending in the run buffer.
             async for event in _emit_interim_questions(stage1_results):
                 yield event
                 await asyncio.sleep(0.01)

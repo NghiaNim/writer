@@ -371,6 +371,21 @@
     font-style: italic;
 }
 
+/* Placeholder variant — shown for the few seconds between "Run the council"
+   and the first interim_question SSE event. Same chrome as the normal
+   panel, just no input/actions. The body line explains what this panel
+   is for so the user doesn't dismiss it as decoration. */
+.interim-questions--placeholder {
+    opacity: 0.85;
+}
+
+.interim-questions__placeholder-body {
+    margin: 10px 0 0;
+    font-size: 13.5px;
+    color: #cbd5e1;
+    line-height: 1.55;
+}
+
 /* Chairman variant — the FINAL clarification before stage 3. More emphatic
    border + a gold inner glow so the user notices this is the last
    shape-the-essay moment. */

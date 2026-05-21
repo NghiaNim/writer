@@ -132,7 +132,35 @@ export default function InterimQuestions({
         }
     }, [activeIdx, list]);
 
-    if (total === 0) return null;
+    // No questions yet but the run is still streaming — render a placeholder
+    // so the user knows this panel exists and that questions will appear
+    // here. Without this, the panel only materialises ~30s into the run
+    // (after stage 1) and answers compete with the chairman's start.
+    if (total === 0) {
+        if (runFinished) return null;
+        return (
+            <aside
+                className="interim-questions interim-questions--placeholder"
+                aria-label="Questions from the council"
+            >
+                <div className="interim-questions__head">
+                    <span className="interim-questions__pulse" aria-hidden="true" />
+                    <span className="interim-questions__title">While we draft…</span>
+                </div>
+                <p className="interim-questions__placeholder-body">
+                    The council is just sitting down with your topic. In a few
+                    seconds, one or two quick questions will pop up here — your
+                    answers ground the final essay so it sounds like you, not
+                    like a model.
+                </p>
+                <p className="interim-questions__tip">
+                    Tip: you can change which questions you're asked by editing
+                    your council in Settings → Council, or your voice rules in
+                    Settings → Voice.
+                </p>
+            </aside>
+        );
+    }
 
     const activeQ = activeIdx >= 0 ? list[activeIdx] : null;
     const heard = list.filter((q) => q.status === 'submitted' && q.answer);

@@ -60,6 +60,38 @@ def get_run_buffer(conversation_id: str) -> List[Dict[str, Any]]:
     return list(_run_buffers.get(conversation_id) or [])
 
 
+def mark_question_emitted(
+    conversation_id: str,
+    *,
+    question_id: str,
+    question: str,
+) -> None:
+    """Record that a question was emitted to the user but not yet answered.
+
+    Pending entries count toward the per-run budget (so we don't over-ask)
+    and feed `asked_this_run` dedup in subsequent batches (so the model
+    won't repeat). They have `status="pending"` and an empty answer; they
+    flip to "answered" or "skipped" when the user responds.
+
+    Silently no-ops if the run buffer has already been cleared, or if the
+    question_id is already present (so re-emits are idempotent).
+    """
+    if conversation_id not in _run_buffers:
+        return
+    for entry in _run_buffers[conversation_id]:
+        if entry.get("question_id") == question_id:
+            return
+    _run_buffers[conversation_id].append(
+        {
+            "question_id": question_id,
+            "question": (question or "").strip(),
+            "answer": "",
+            "skipped": False,
+            "status": "pending",
+        }
+    )
+
+
 def append_run_answer(
     conversation_id: str,
     *,
@@ -68,7 +100,10 @@ def append_run_answer(
     answer: str,
     skipped: bool = False,
 ) -> None:
-    """Append a Q&A to the current run buffer. Silently no-ops if the run has
+    """Record a user response to an interim question. If a pending entry for
+    this question_id already exists (because the backend called
+    `mark_question_emitted` when the SSE event went out), update that entry
+    in place; otherwise append a fresh row. Silently no-ops if the run has
     already finished (buffer cleared).
 
     Skipped answers ARE recorded (with empty `answer` and `skipped=True`) so
@@ -81,12 +116,21 @@ def append_run_answer(
         # stage 3 purposes; the caller is expected to also persist to
         # user_fact, which we never want to lose.
         return
+    status = "skipped" if skipped else "answered"
+    for entry in _run_buffers[conversation_id]:
+        if entry.get("question_id") == question_id:
+            entry["question"] = (question or entry.get("question") or "").strip()
+            entry["answer"] = (answer or "").strip()
+            entry["skipped"] = bool(skipped)
+            entry["status"] = status
+            return
     _run_buffers[conversation_id].append(
         {
             "question_id": question_id,
             "question": (question or "").strip(),
             "answer": (answer or "").strip(),
             "skipped": bool(skipped),
+            "status": status,
         }
     )
 
@@ -98,12 +142,15 @@ def clear_run_buffer(conversation_id: str) -> None:
 async def wait_for_answer(
     conversation_id: str, question_id: str, timeout_s: float = 25.0
 ) -> Optional[Dict[str, Any]]:
-    """Poll the run buffer until an entry with `question_id` appears, or the
-    timeout elapses. Returns the buffer entry (which may have skipped=True
-    and empty answer), or None on timeout / cleared buffer.
+    """Poll the run buffer until a *resolved* entry with `question_id`
+    appears (status != "pending"), or the timeout elapses. Returns the
+    buffer entry (which may have skipped=True and empty answer), or None on
+    timeout / cleared buffer.
 
     Used by the chairman clarification flow: emit a question, wait, then
-    proceed to stage 3 with whatever (or nothing) the user said.
+    proceed to stage 3 with whatever (or nothing) the user said. Pending
+    entries (emitted-but-not-yet-answered) are intentionally skipped here
+    so the wait actually waits.
     """
     if not conversation_id or not question_id:
         return None
@@ -113,8 +160,11 @@ async def wait_for_answer(
             # Buffer was cleared (run cancelled / finished). Give up.
             return None
         for entry in _run_buffers[conversation_id]:
-            if entry.get("question_id") == question_id:
-                return entry
+            if entry.get("question_id") != question_id:
+                continue
+            if entry.get("status") == "pending":
+                continue
+            return entry
         if asyncio.get_event_loop().time() >= deadline:
             return None
         await asyncio.sleep(0.4)
@@ -142,9 +192,16 @@ def _safe_json(s: str) -> Optional[Dict[str, Any]]:
 
 def _excerpt_drafts(stage1_results: List[Dict[str, Any]]) -> str:
     """Pull short excerpts from up to 3 successful stage-1 drafts so the
-    question generator can spot what the drafts hand-wave or invent."""
+    question generator can spot what the drafts hand-wave or invent.
+
+    Excerpts are presented WITHOUT identifying labels (no "DRAFT A/B/C")
+    because the user never sees those labels and the model has a tendency
+    to quote them back at the writer ("In Draft B, you mention…"). Separate
+    excerpts with a horizontal rule so the model still knows they're
+    distinct drafts.
+    """
     out: List[str] = []
-    for i, r in enumerate(stage1_results or []):
+    for r in stage1_results or []:
         if r.get("error"):
             continue
         text = r.get("response") or ""
@@ -156,10 +213,10 @@ def _excerpt_drafts(stage1_results: List[Dict[str, Any]]) -> str:
         clip = text[:_DRAFT_EXCERPT_CHARS]
         if len(text) > _DRAFT_EXCERPT_CHARS:
             clip = clip + "\n[...]"
-        out.append(f"DRAFT {chr(65 + i)}:\n{clip}")
+        out.append(clip)
         if len(out) >= 3:
             break
-    return "\n\n".join(out)
+    return "\n\n---\n\n".join(out)
 
 
 def _format_known_facts(facts: List[Dict[str, Any]]) -> str:
@@ -203,6 +260,7 @@ Output ONE OR TWO short questions that:
   - never feel like an interrogation; sound like a curious editor
   - are answerable in 1-3 sentences
   - if the drafts hallucinate a specific (a teacher's name, a year, a place), ask the writer to ground that specific
+  - NEVER mention "draft", "excerpt", "the model", "version A/B/C", or any internal label — the writer never sees those. Refer only to the *content* of the claim you want grounded (e.g. "you mention a coffee machine in the break room — is there a specific brand…").
 
 If you cannot ask anything genuinely useful, return an empty list.
 
@@ -320,6 +378,7 @@ The question must:
   - be answerable in one or two sentences
   - never repeat anything in the known-facts or asked-this-run blocks
   - never be a generic interview question ("tell me more about your background")
+  - NEVER mention "draft", "excerpt", "the model", "version A/B/C", or any internal label — the writer never sees those. Refer only to the *content* of the phrase you want grounded.
 
 If no such question exists — the drafts are already grounded, or the only gaps are minor — return SKIP.
 

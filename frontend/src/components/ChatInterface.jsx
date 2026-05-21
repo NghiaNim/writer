@@ -1185,15 +1185,16 @@ function AssistantMessageBody({
                 />
             )}
 
-            {/* Stay visible while streaming, or briefly after the run
-                finishes if the user still has unanswered questions —
-                surfaces the "saved for next time" lock state instead of
-                silently disappearing. */}
+            {/* Render the panel for the entire streaming window so the user
+                sees a "questions are coming" placeholder before the first
+                interim_question SSE event lands (typically a few seconds
+                in). Also stays visible briefly after the run finishes if
+                any question is still pending — surfaces the "saved for
+                next time" lock state instead of silently disappearing. */}
             {((isStreaming && !msg.stage3) ||
-                (msg.runFinished && msg.interimQuestions?.some((q) => q.status === 'pending'))) &&
-                (msg.interimQuestions?.length > 0) && (
+                (msg.runFinished && msg.interimQuestions?.some((q) => q.status === 'pending'))) && (
                 <InterimQuestions
-                    questions={msg.interimQuestions}
+                    questions={msg.interimQuestions || []}
                     onAnswer={onAnswerInterim}
                     runFinished={Boolean(msg.runFinished)}
                     runFinishedReason={msg.runFinishedReason}
