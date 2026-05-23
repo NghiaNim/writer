@@ -172,6 +172,15 @@ export default function ChatInterface({
     const [dynamicSuggestions, setDynamicSuggestions] = useState([]);
     const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
+    // Fact-check "Fix this" flow. We track per-conversation:
+    //   fixingFlagIdx          — index of the flag currently being fixed
+    //   factCheckDismissedSet  — set of flag indexes the user has either
+    //                            dismissed manually or that auto-dismissed
+    //                            after a successful Fix landing.
+    // Both reset on conversationId change (see the existing cleanup effect).
+    const [fixingFlagIdx, setFixingFlagIdx] = useState(null);
+    const [factCheckDismissedSet, setFactCheckDismissedSet] = useState(new Set());
+
     // Rule-proposal flow: when the user TYPES a custom refinement (not a chip)
     // and the resulting essay finishes, ask if they want to save the
     // instruction as a durable rule for future essays. Chip clicks are
@@ -237,6 +246,8 @@ export default function ChatInterface({
         setRuleProposalState('idle');
         setRuleProposalRule(null);
         setRuleProposalError(null);
+        setFixingFlagIdx(null);
+        setFactCheckDismissedSet(new Set());
     }, [conversationId]);
 
     // When isLoading flips from true -> false AND a new draft has arrived
@@ -355,6 +366,69 @@ export default function ChatInterface({
         }
         setInput('');
     };
+
+    // "Fix this" on a fact-check flag → pre-fill the refinement dock
+    // with a structured instruction pinned to the flagged quote. The
+    // user can tweak the wording and submit, or just hit Run as-is.
+    // Once a new draft lands (isLoading flips true → false after this
+    // click), we auto-dismiss the flag — see the effect below.
+    const handleFixFlag = (flag, idx) => {
+        if (!flag) return;
+        const quote = (flag.quote || '').trim();
+        const status = flag.status === 'contradicts' ? 'contradicts a known fact' : 'is unsupported';
+        const note = (flag.note || '').trim();
+        const prefill = [
+            `Rewrite the sentence "${quote}" — it currently ${status}.`,
+            note ? `The issue: ${note}` : '',
+            'Replace the claim with something accurate, in the same voice. Keep the surrounding paragraph intact except where needed for coherence.',
+        ]
+            .filter(Boolean)
+            .join('\n\n');
+        setInput(prefill);
+        setFixingFlagIdx(idx);
+        setRefinementDockCollapsed(false);
+        setComposerCollapsed(false);
+        // Surface the dock — small scroll nudge so the textarea isn't off-screen.
+        setTimeout(() => {
+            const ta = document.querySelector('.refinement-prompt-input');
+            if (ta && typeof ta.scrollIntoView === 'function') {
+                ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                ta.focus();
+            }
+        }, 50);
+    };
+
+    const handleDismissFlag = (idx) => {
+        setFactCheckDismissedSet((prev) => {
+            const next = new Set(prev);
+            next.add(idx);
+            return next;
+        });
+        // If they dismissed the flag they were actively fixing, clear that
+        // state too so the spinner doesn't linger.
+        if (fixingFlagIdx === idx) setFixingFlagIdx(null);
+    };
+
+    // When a refinement run completes after the user clicked Fix, drop
+    // that flag from the visible list. We watch isLoading flipping
+    // true→false; if a fix was in flight, the latest draft is the
+    // attempted fix, so the flag has been "addressed" (a next
+    // fact-check pass will re-flag if the rewrite didn't actually
+    // resolve it). Dedicated ref so we don't race with the rule-
+    // proposal effect's use of prevLoadingRef.
+    const fixPrevLoadingRef = useRef(isLoading);
+    useEffect(() => {
+        const wasLoading = fixPrevLoadingRef.current;
+        fixPrevLoadingRef.current = isLoading;
+        if (wasLoading && !isLoading && fixingFlagIdx !== null) {
+            setFactCheckDismissedSet((prev) => {
+                const next = new Set(prev);
+                next.add(fixingFlagIdx);
+                return next;
+            });
+            setFixingFlagIdx(null);
+        }
+    }, [isLoading, fixingFlagIdx]);
 
     const handleKeyDown = (e) => {
         // Submit on Enter (without Shift)
@@ -1208,6 +1282,10 @@ function AssistantMessageBody({
                         msg.factCheckFlags || msg.metadata?.fact_check_flags || null
                     }
                     factCheckRunning={Boolean(msg.factCheckRunning)}
+                    onFixFlag={isLastMessage ? handleFixFlag : null}
+                    fixingFlagIdx={isLastMessage ? fixingFlagIdx : null}
+                    dismissedFlags={isLastMessage ? factCheckDismissedSet : null}
+                    onDismissFlag={isLastMessage ? handleDismissFlag : null}
                 />
             )}
 

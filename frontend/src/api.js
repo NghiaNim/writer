@@ -278,6 +278,31 @@ export const api = {
       }
       return response.json();
     },
+
+    /**
+     * List the caller's recent essay sessions (default: in-progress).
+     * Powers the sidebar's "Drafts in progress" section.
+     */
+    async list({ status = 'in_progress', limit = 20 } = {}) {
+      const params = new URLSearchParams();
+      if (status) params.set('status', status);
+      params.set('limit', String(limit));
+      const response = await authedFetch(`${API_BASE}/sessions?${params.toString()}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+
+    /** Delete an essay session the caller owns. */
+    async delete(sessionId) {
+      const response = await authedFetch(`${API_BASE}/sessions/${sessionId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.detail || 'Failed to delete session');
+      }
+      return response.json();
+    },
   },
 
   /**
@@ -783,6 +808,84 @@ export const api = {
       }
       return response.json();
     },
+    /**
+     * Stream tailored intake questions one at a time.
+     *
+     * Calls POST /api/intake/questions/stream and reads SSE events. The
+     * server emits one `sections` event followed by one `question` event
+     * per question, then a terminal `complete`.
+     *
+     * Returns `{ promise, abort }`. `abort()` cancels the underlying
+     * fetch so the caller can bail if the user navigates away.
+     */
+    streamQuestions({ topic, audience = '', essayType = 'general', onSections, onQuestion, onError }) {
+      const controller = new AbortController();
+      const promise = (async () => {
+        let response;
+        try {
+          response = await authedFetch(`${API_BASE}/api/intake/questions/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+            body: JSON.stringify({ topic, audience, essay_type: essayType }),
+            signal: controller.signal,
+          });
+        } catch (err) {
+          if (err?.name === 'AbortError') return { aborted: true };
+          throw err;
+        }
+        if (!response.ok) {
+          const detail = await extractError(response, 'Failed to stream questions');
+          if (onError) onError(detail);
+          throw new Error(detail);
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            let sepIdx;
+            while ((sepIdx = buffer.indexOf('\n\n')) >= 0) {
+              const rawEvent = buffer.slice(0, sepIdx);
+              buffer = buffer.slice(sepIdx + 2);
+              let eventName = 'message';
+              const dataLines = [];
+              for (const line of rawEvent.split('\n')) {
+                if (line.startsWith('event:')) {
+                  eventName = line.slice(6).trim();
+                } else if (line.startsWith('data:')) {
+                  dataLines.push(line.slice(5).trim());
+                }
+              }
+              if (dataLines.length === 0) continue;
+              let payload = null;
+              try {
+                payload = JSON.parse(dataLines.join('\n'));
+              } catch {
+                payload = null;
+              }
+              if (eventName === 'sections' && payload?.sections && onSections) {
+                onSections(payload.sections);
+              } else if (eventName === 'question' && payload?.question && onQuestion) {
+                onQuestion(payload.question, payload.index);
+              } else if (eventName === 'error' && onError) {
+                onError(payload?.message || 'Stream error');
+              } else if (eventName === 'complete') {
+                return { aborted: false, count: payload?.count || 0 };
+              }
+            }
+          }
+        } catch (err) {
+          if (err?.name === 'AbortError') return { aborted: true };
+          if (onError) onError(err?.message || 'Stream interrupted');
+          throw err;
+        }
+        return { aborted: false };
+      })();
+      return { promise, abort: () => controller.abort() };
+    },
     async brainstormTopics({ reflections }) {
       const response = await authedFetch(`${API_BASE}/api/intake/brainstorm-topics`, {
         method: 'POST',
@@ -808,6 +911,24 @@ export const api = {
       });
       if (!response.ok) {
         throw new Error(await extractError(response, 'Failed to swap question'));
+      }
+      return response.json();
+    },
+    async followUp({ topic, audience = '', essayType = 'general', question, answer, alreadyAsked = [] }) {
+      const response = await authedFetch(`${API_BASE}/api/intake/follow-up`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic,
+          audience,
+          essay_type: essayType,
+          question,
+          answer,
+          already_asked: alreadyAsked,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await extractError(response, 'Failed to load follow-up'));
       }
       return response.json();
     },

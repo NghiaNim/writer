@@ -26,6 +26,10 @@ export default function FinalEssay({
     versionLabel = null,
     factCheckFlags = null,
     factCheckRunning = false,
+    onFixFlag = null,
+    fixingFlagIdx = null,
+    dismissedFlags = null,
+    onDismissFlag = null,
 }) {
     const [isCopied, setIsCopied] = useState(false);
     const [showNotes, setShowNotes] = useState(false);
@@ -78,6 +82,10 @@ export default function FinalEssay({
             <FactCheckPanel
                 flags={factCheckFlags}
                 running={factCheckRunning}
+                onFixFlag={onFixFlag}
+                fixingFlagIdx={fixingFlagIdx}
+                dismissedFlags={dismissedFlags}
+                onDismissFlag={onDismissFlag}
             />
 
             <div className="final-essay-actions">

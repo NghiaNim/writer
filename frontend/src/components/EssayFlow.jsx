@@ -50,17 +50,19 @@ const BRAINSTORM_PROMPTS = [
     "What's a story your friends would say you tell too often? And what would surprise them about why you keep telling it?",
 ];
 
-// Common audiences as quick-pick chips on the topic step. The free-text
-// input stays available alongside — these are starting points, not the
-// only options. Order is rough-frequency for the user base we expect:
-// admissions essays first, then academic, then publishing, then journal.
+// Common audiences as quick-pick chips on the topic step. Reframed around
+// college-admissions writing since that's the primary use case — high-
+// school seniors applying to undergrad. Each chip primes the council to
+// write for a specific reader (a Common App reader scanning 50 essays a
+// day reads differently from a "why this school" committee). Free-text
+// input stays available for anything else.
 const AUDIENCE_PRESETS = [
-    'An admissions officer',
-    'A graduate admissions committee',
-    'A creative writing professor',
-    'A magazine editor',
-    'A general reader',
-    'Yourself (a journal entry)',
+    'Common App personal statement',
+    '"Why this school" supplemental',
+    '"Why this major" supplemental',
+    'Activity / extracurricular essay',
+    'Community / identity supplemental',
+    'Transfer or scholarship essay',
 ];
 
 function buildDraftMessage({ topic, audience, draft }) {
@@ -150,17 +152,56 @@ export default function EssayFlow({
     onDismissHandoffError,
     onOpenVoiceSettings,
     onOpenPastEssay,
+    initialSession = null,
+    // Called whenever this session's row changes meaningfully (created,
+    // step transition, autosaved content). App uses it to refresh the
+    // sidebar's drafts-in-progress list so the step label + timestamp
+    // stay in sync with what the user is doing right now.
+    onSessionChanged,
 }) {
     // Steps: 'topic' -> 'questions' -> 'core_idea' -> 'voice' (-> submit)
     //                  | 'draft' (alternate path from Step 1)
-    const [step, setStep] = useState('topic');
+    // When `initialSession` is provided (sidebar resume), seed every piece
+    // of state from the persisted row so the user lands exactly where they
+    // left off. The component re-mounts (via `key` bump in App.jsx) when
+    // the user picks a different draft, so we treat initialSession as
+    // one-shot at construction time — no useEffect that re-syncs later.
+    //
+    // We DERIVE the step from data when the persisted column is null
+    // (migration 010 not applied, or row created before the column
+    // existed). Mirror of `_derive_step_from_row` in backend/sessions.py
+    // so behavior matches whether you resume via direct GET or via the
+    // list-endpoint snapshot.
+    const _deriveStepFromSession = (s) => {
+        if (!s) return 'topic';
+        if (s.step) return s.step;
+        if ((s.status || '').toLowerCase() === 'ready') return 'voice';
+        const convo = Array.isArray(s.conversation) ? s.conversation : [];
+        let hasTimeline = false;
+        let hasQA = false;
+        for (const item of convo) {
+            if (!item || typeof item !== 'object') continue;
+            if (item.kind === 'timeline' && Array.isArray(item.events) && item.events.length > 0) {
+                hasTimeline = true;
+            } else if (item.question != null) {
+                hasQA = true;
+            }
+        }
+        if (hasTimeline) return 'voice';
+        if ((s.core_idea || '').trim()) return 'timeline';
+        if (hasQA) return 'core_idea';
+        return 'topic';
+    };
+    const [step, setStep] = useState(_deriveStepFromSession(initialSession));
 
-    // Persisted session row (created on Step 1 submit)
-    const [session, setSession] = useState(null);
+    // Persisted session row (created on Step 1 submit, or seeded from the
+    // sidebar resume click).
+    const [session, setSession] = useState(initialSession || null);
 
-    // Step 1 state
-    const [topic, setTopic] = useState('');
-    const [audience, setAudience] = useState('');
+    // Step 1 state — seeded from a resumed session so the user can edit
+    // their original topic + audience instead of seeing a blank form.
+    const [topic, setTopic] = useState(initialSession?.topic || '');
+    const [audience, setAudience] = useState(initialSession?.audience || '');
 
     // Step 2 state
     // Brainstorm lane state — only used when the user took the "I don't
@@ -175,15 +216,93 @@ export default function EssayFlow({
     //     section, question, subtext?, placeholder?, examples?,
     //     options?, max_select?, min_select? }
     // sections: [{ id, label }] — render order. Empty = flat list.
-    const [questions, setQuestions] = useState([]);
-    const [sections, setSections] = useState([]);
+    //
+    // Hydration from a resumed session: the persisted `conversation` array
+    // alternates between Q&A items (`{question, answer}`) and an optional
+    // timeline sentinel (`{kind: 'timeline', events}`). The `question`
+    // field may be a string (older persistence path) OR a full TypedQuestion
+    // object (newer path that runs at timeline step). We normalise both
+    // into a TypedQuestion list and a parallel answers map.
+    const _hydrateQA = (() => {
+        if (!initialSession?.conversation || !Array.isArray(initialSession.conversation)) {
+            return { questions: [], answers: {}, timeline: [] };
+        }
+        const qs = [];
+        const ans = {};
+        let timeline = [];
+        let i = 0;
+        for (const item of initialSession.conversation) {
+            if (!item || typeof item !== 'object') continue;
+            if (item.kind === 'timeline' && Array.isArray(item.events)) {
+                timeline = item.events;
+                continue;
+            }
+            const q = item.question;
+            const a = item.answer;
+            if (q == null) continue;
+            if (typeof q === 'string') {
+                qs.push({
+                    question_id: `resumed-${i}`,
+                    kind: 'text',
+                    section: 'positioning',
+                    question: q,
+                });
+            } else if (typeof q === 'object') {
+                qs.push({
+                    question_id: q.question_id || `resumed-${i}`,
+                    kind: q.kind || 'text',
+                    section: q.section || 'positioning',
+                    question: q.question || '',
+                    ...(q.subtext ? { subtext: q.subtext } : {}),
+                    ...(q.placeholder ? { placeholder: q.placeholder } : {}),
+                    ...(q.examples ? { examples: q.examples } : {}),
+                    ...(q.options ? { options: q.options } : {}),
+                    ...(q.max_select ? { max_select: q.max_select } : {}),
+                    ...(q.min_select ? { min_select: q.min_select } : {}),
+                });
+            } else {
+                continue;
+            }
+            if (typeof a === 'string') ans[i] = a;
+            i += 1;
+        }
+        return { questions: qs, answers: ans, timeline };
+    })();
+
+    const [questions, setQuestions] = useState(_hydrateQA.questions);
+    const [sections, setSections] = useState(() => {
+        // If we have hydrated questions, default to a generic section
+        // header so they render under a label; the actual sections are
+        // re-fetched only when the user clicks ↻ Get fresh questions.
+        if (_hydrateQA.questions.length === 0) return [];
+        const sectionIds = new Set(_hydrateQA.questions.map((q) => q.section).filter(Boolean));
+        const known = [
+            { id: 'positioning', label: 'How you want admissions to see you' },
+            { id: 'direction', label: "Where you're pointed" },
+            { id: 'story', label: 'A real moment, place, or thing' },
+            { id: 'tactics', label: 'Wrap-up' },
+        ];
+        return known.filter((s) => sectionIds.has(s.id));
+    });
     const [questionsLoading, setQuestionsLoading] = useState(false);
+    // True between "stream opened" and "stream complete or error". We
+    // intentionally keep this OFF the `disabled` chain — inputs stay
+    // interactive while later questions are still arriving so users can
+    // start answering the first question the moment it appears.
+    const [questionsStreaming, setQuestionsStreaming] = useState(false);
+    // Snapshot of the topic+audience the last time we streamed questions,
+    // and of the qa signature the last time we generated the core idea.
+    // Drives the "↻ Regenerate" buttons' enabled / accent state so the
+    // UI can tell users when their inputs have drifted from what was
+    // last computed without silently nuking their work.
+    const [lastQuestionsKey, setLastQuestionsKey] = useState('');
+    const [lastCoreIdeaKey, setLastCoreIdeaKey] = useState('');
     // Question index currently being swapped via the regenerate endpoint
     // — used for the spinner state on the Swap button.
     const [swappingIdx, setSwappingIdx] = useState(null);
     // answers[idx] is a string for text/examples_text/choice questions OR
     // an array of option strings for multi questions.
-    const [answers, setAnswers] = useState({});
+    const [answers, setAnswers] = useState(_hydrateQA.answers);
     // Questions the user has intentionally chosen to skip. Continue is
     // gated on every question being either answered OR explicitly
     // skipped, so users move forward without being forced to answer
@@ -191,7 +310,7 @@ export default function EssayFlow({
     const [skippedQuestions, setSkippedQuestions] = useState(new Set());
 
     // Step 3 state
-    const [coreIdea, setCoreIdea] = useState('');
+    const [coreIdea, setCoreIdea] = useState(initialSession?.core_idea || '');
     const [coreIdeaLoading, setCoreIdeaLoading] = useState(false);
 
     // Story-timeline step — students list the events they want to mention,
@@ -199,7 +318,7 @@ export default function EssayFlow({
     // the order the council should respect in the essay (paired with the
     // CHRONOLOGY_BLOCK directive on the backend). Empty list = the user
     // doesn't have one; the timeline block is omitted from the brief.
-    const [timelineEvents, setTimelineEvents] = useState([]);
+    const [timelineEvents, setTimelineEvents] = useState(_hydrateQA.timeline || []);
     const [newTimelineWhen, setNewTimelineWhen] = useState('');
     const [newTimelineWhat, setNewTimelineWhat] = useState('');
 
@@ -220,6 +339,26 @@ export default function EssayFlow({
 
     // Per-question example state: { [i]: { loading, error, text } }
     const [examples, setExamples] = useState({});
+
+    // Per-question follow-up state ("interview me" loop). Keyed by the
+    // INDEX of the original question.
+    //   followUps[i] = {
+    //     loading?: bool, error?: string,
+    //     question?: string, anchor?: string, subtext?: string,
+    //     questionId?: string,            // server-issued
+    //     answer?: string,                // user's reply
+    //     declined?: bool,                // server returned no question (answer was already specific)
+    //   }
+    const [followUps, setFollowUps] = useState({});
+    // Cap follow-ups per session so we don't pester the student.
+    const MAX_FOLLOW_UPS_PER_SESSION = 2;
+    const followUpsAskedCount = useMemo(
+        () =>
+            Object.values(followUps).filter(
+                (f) => f && f.question && !f.declined
+            ).length,
+        [followUps]
+    );
 
     const handleShowExample = async (i, question) => {
         const current = examples[i];
@@ -254,6 +393,64 @@ export default function EssayFlow({
                 },
             }));
         }
+    };
+
+    const handleRequestFollowUp = async (i) => {
+        const q = questions[i];
+        if (!q || q.kind !== 'text') return;
+        const answer = (answers[i] || '').trim();
+        if (answer.length < 20) return;
+        if (followUpsAskedCount >= MAX_FOLLOW_UPS_PER_SESSION) return;
+        setFollowUps((prev) => ({
+            ...prev,
+            [i]: { ...(prev[i] || {}), loading: true, error: null },
+        }));
+        try {
+            const res = await api.intake.followUp({
+                topic: topic.trim(),
+                audience: audience.trim(),
+                question: q.question,
+                answer,
+                alreadyAsked: questions
+                    .filter((qq) => qq?.question)
+                    .map((qq) => qq.question),
+            });
+            const fu = res?.question;
+            if (!fu || !fu.question) {
+                setFollowUps((prev) => ({
+                    ...prev,
+                    [i]: { loading: false, declined: true },
+                }));
+                return;
+            }
+            setFollowUps((prev) => ({
+                ...prev,
+                [i]: {
+                    loading: false,
+                    questionId: fu.question_id,
+                    question: fu.question,
+                    anchor: fu.anchor || '',
+                    subtext: fu.subtext || '',
+                    answer: '',
+                    declined: false,
+                },
+            }));
+        } catch (err) {
+            setFollowUps((prev) => ({
+                ...prev,
+                [i]: {
+                    loading: false,
+                    error: err?.message || 'Could not load follow-up',
+                },
+            }));
+        }
+    };
+
+    const handleFollowUpAnswerChange = (i, value) => {
+        setFollowUps((prev) => ({
+            ...prev,
+            [i]: { ...(prev[i] || {}), answer: value },
+        }));
     };
 
     const handleRegenerateExample = async (i, question) => {
@@ -297,9 +494,182 @@ export default function EssayFlow({
         if (step === 'draft') draftRef.current?.focus();
     }, [step]);
 
+    // Autosave the current step to the session row whenever it changes.
+    // Cheap (one PATCH per transition) and load-bearing for the sidebar
+    // resume feature — without it we'd have no way to know where the
+    // user was when they closed the tab. Skips while there's no session
+    // yet (we're still on Step 1 before the row was created).
+    useEffect(() => {
+        if (!session?.id) return;
+        // Don't autosave on the same step the row was loaded with — the
+        // initialSession already has it.
+        if (initialSession && initialSession.step === step) return;
+        api.sessions
+            .update(session.id, { step })
+            .then(() => {
+                // Tell App that the sidebar should refresh so the step
+                // label + relative time stay in sync.
+                onSessionChanged?.();
+            })
+            .catch((err) => console.warn('autosave step failed:', err));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step, session?.id]);
+
+    // Debounced autosave for the typed-in fields. Audience, core idea,
+    // and the Q&A list all get written ~1.5s after the user stops
+    // editing, so reload-mid-flow restores cleanly. We persist the FULL
+    // TypedQuestion object so resume can render multi-select / chips
+    // correctly, not just the text.
+    useEffect(() => {
+        if (!session?.id) return;
+        const handle = setTimeout(() => {
+            const patch = {};
+            const trimmedAudience = audience.trim();
+            const trimmedCoreIdea = coreIdea.trim();
+            const trimmedTopic = topic.trim();
+            if (trimmedTopic && trimmedTopic !== (session.topic || '').trim()) {
+                patch.topic = trimmedTopic;
+            }
+            if (trimmedAudience !== (session.audience || '').trim()) {
+                patch.audience = trimmedAudience || null;
+            }
+            if (trimmedCoreIdea !== (session.core_idea || '').trim()) {
+                patch.core_idea = trimmedCoreIdea;
+            }
+            // Build the conversation block: full question objects so
+            // resume can rebuild the typed UI.
+            const qa = questions
+                .map((q, i) => ({
+                    question: q,
+                    answer: serializeAnswer(q, answers[i]),
+                }))
+                .filter((item) => (item.answer || '').trim());
+            const withTimeline = timelineEvents.length
+                ? [...qa, { kind: 'timeline', events: timelineEvents }]
+                : qa;
+            const persistedConv = JSON.stringify(session.conversation || []);
+            const incomingConv = JSON.stringify(withTimeline);
+            if (incomingConv !== persistedConv) {
+                patch.conversation = withTimeline;
+            }
+            if (Object.keys(patch).length === 0) return;
+            api.sessions
+                .update(session.id, patch)
+                .then((row) => {
+                    // Refresh the in-memory session snapshot so the next
+                    // diff is against the latest persisted state.
+                    if (row) setSession(row);
+                    onSessionChanged?.();
+                })
+                .catch((err) => console.warn('autosave content failed:', err));
+        }, 1500);
+        return () => clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [topic, audience, coreIdea, questions, answers, timelineEvents, session?.id]);
+
     // -----------------------------------------------------------------------
     // Step 1 — Topic + Audience
     // -----------------------------------------------------------------------
+    // Helpers for the "forward never destroys work" rule. We snapshot the
+    // inputs whenever we run the heavy LLM step, then on later forward
+    // navigations we compare current vs snapshot to know whether the user
+    // would want to regenerate. The actual decision is theirs — they
+    // press the ↻ button if they want fresh content.
+    const currentQuestionsKey = () =>
+        JSON.stringify({
+            topic: topic.trim().toLowerCase(),
+            audience: audience.trim().toLowerCase(),
+        });
+
+    const FALLBACK_SECTIONS = [
+        { id: 'positioning', label: 'How you want admissions to see you' },
+        { id: 'story', label: 'A real moment, place, or thing' },
+        { id: 'tactics', label: 'Wrap-up' },
+    ];
+    const FALLBACK_QUESTIONS = [
+        {
+            question_id: 'fallback-1',
+            kind: 'text',
+            section: 'positioning',
+            question: 'If admissions had to remember three things about you, what would they be?',
+            subtext: "Not adjectives off a list — words that point at something you've actually done.",
+        },
+        {
+            question_id: 'fallback-2',
+            kind: 'text',
+            section: 'story',
+            question: "What's a moment from this year you keep replaying in your head?",
+            subtext: 'Where were you, who else was there, what made it stick?',
+        },
+        {
+            question_id: 'fallback-3',
+            kind: 'text',
+            section: 'story',
+            question: "What's something in your room right now that would be hard to throw away?",
+            subtext: "An object that has a story most people don't know.",
+        },
+        {
+            question_id: 'fallback-4',
+            kind: 'text',
+            section: 'tactics',
+            question: "After admissions reads this essay, what's one thing you'd NOT want them to assume about you?",
+            subtext: "Pin it to what you've already shared above — what could be misread, and how would you want it read instead?",
+        },
+    ];
+
+    // Kick off (or restart) the question stream. Used both on first
+    // Step 1 → Step 2 transition AND by the ↻ Regenerate button on
+    // Step 2. Resets the question list before streaming so old answers
+    // attached to old questions don't bleed into the new set.
+    const startQuestionStream = ({ trimmedTopic, trimmedAudience }) => {
+        setQuestionsLoading(true);
+        setQuestionsStreaming(true);
+        setQuestions([]);
+        setSections([]);
+        setAnswers({});
+        setSkippedQuestions(new Set());
+        setExamples({});
+        setFollowUps({});
+        setLastQuestionsKey(
+            JSON.stringify({
+                topic: trimmedTopic.toLowerCase(),
+                audience: trimmedAudience.toLowerCase(),
+            })
+        );
+        const { promise } = api.intake.streamQuestions({
+            topic: trimmedTopic,
+            audience: trimmedAudience,
+            onSections: (incomingSections) => {
+                setSections(incomingSections);
+            },
+            onQuestion: (question) => {
+                setQuestions((prev) => [...prev, question]);
+                setQuestionsLoading(false);
+            },
+            onError: (msg) => {
+                console.warn('intake stream error:', msg);
+            },
+        });
+        promise
+            .catch((err) => {
+                console.warn('intake/questions stream failed:', err);
+            })
+            .finally(() => {
+                setQuestionsLoading(false);
+                setQuestionsStreaming(false);
+                setSections((cur) => (cur.length ? cur : FALLBACK_SECTIONS));
+                setQuestions((cur) => (cur.length ? cur : FALLBACK_QUESTIONS));
+            });
+    };
+
+    const handleRegenerateQuestions = () => {
+        if (questionsStreaming) return;
+        startQuestionStream({
+            trimmedTopic: topic.trim(),
+            trimmedAudience: audience.trim(),
+        });
+    };
+
     const handleSubmitTopic = async (e) => {
         e?.preventDefault?.();
         setError(null);
@@ -308,58 +678,43 @@ export default function EssayFlow({
             setError('Tell me what your essay is about.');
             return;
         }
+        if (!audience.trim()) {
+            setError("Pick what kind of essay this is — the council needs to know who it's writing for.");
+            return;
+        }
         setSubmitting(true);
         try {
-            const created = await api.sessions.create(trimmedTopic);
-            setSession(created);
-            // Memory-check is non-blocking. Failures are silent.
-            api.sessions
-                .memoryCheck(trimmedTopic)
-                .then((res) => {
-                    if (res?.found && Array.isArray(res.matches)) {
-                        setMemoryMatches(res.matches);
-                    }
-                })
-                .catch(() => {});
+            // Re-use the existing session row if one already exists for
+            // this flow — going Back → forward shouldn't spawn a fresh
+            // essay_sessions row each time.
+            let s = session;
+            if (!s) {
+                s = await api.sessions.create(trimmedTopic);
+                setSession(s);
+                // New draft just landed — notify App so the sidebar
+                // surfaces it immediately.
+                onSessionChanged?.();
+                // Memory-check is non-blocking. Failures are silent.
+                api.sessions
+                    .memoryCheck(trimmedTopic)
+                    .then((res) => {
+                        if (res?.found && Array.isArray(res.matches)) {
+                            setMemoryMatches(res.matches);
+                        }
+                    })
+                    .catch(() => {});
+            }
 
-            // Kick off questions LLM call as we transition.
             setStep('questions');
-            setQuestionsLoading(true);
-            try {
-                const res = await api.intake.questions({
-                    topic: trimmedTopic,
-                    audience: audience.trim(),
+            // "Forward never destroys work": only stream if we don't
+            // already have questions. The ↻ button on Step 2 lets users
+            // explicitly request a fresh set when their topic/audience
+            // changed in a way that warrants it.
+            if (questions.length === 0) {
+                startQuestionStream({
+                    trimmedTopic,
+                    trimmedAudience: audience.trim(),
                 });
-                setQuestions(Array.isArray(res?.questions) ? res.questions : []);
-                setSections(Array.isArray(res?.sections) ? res.sections : []);
-            } catch (err) {
-                console.warn('intake/questions failed:', err);
-                setSections([
-                    { id: 'positioning', label: 'How you want them to see you' },
-                    { id: 'story', label: 'A specific moment' },
-                ]);
-                setQuestions([
-                    {
-                        question_id: 'fallback-1',
-                        kind: 'text',
-                        section: 'positioning',
-                        question: "What's the first thing you remember about this — a sound, a face, a sentence someone said?",
-                    },
-                    {
-                        question_id: 'fallback-2',
-                        kind: 'text',
-                        section: 'positioning',
-                        question: "What's the part of this you almost didn't put in the essay?",
-                    },
-                    {
-                        question_id: 'fallback-3',
-                        kind: 'text',
-                        section: 'story',
-                        question: "Who in your life would roll their eyes at this — and why are they almost right?",
-                    },
-                ]);
-            } finally {
-                setQuestionsLoading(false);
             }
         } catch (err) {
             setError(err.message || 'Could not start the session.');
@@ -613,13 +968,26 @@ export default function EssayFlow({
         return '';
     };
 
-    const buildAnsweredQa = () =>
-        questions
-            .map((q, i) => ({
-                question: q?.question || '',
-                answer: serializeAnswer(q, answers[i]),
-            }))
-            .filter((item) => item.question && item.answer);
+    const buildAnsweredQa = () => {
+        const out = [];
+        questions.forEach((q, i) => {
+            const baseQuestion = q?.question || '';
+            const baseAnswer = serializeAnswer(q, answers[i]);
+            if (baseQuestion && baseAnswer) {
+                out.push({ question: baseQuestion, answer: baseAnswer });
+            }
+            // Inline follow-up Q&A right after the parent so the brief
+            // reads as a real conversation, not a flat list.
+            const fu = followUps[i];
+            if (fu && fu.question && (fu.answer || '').trim()) {
+                out.push({
+                    question: `Follow-up: ${fu.question}`,
+                    answer: fu.answer.trim(),
+                });
+            }
+        });
+        return out;
+    };
 
     const handleSubmitAnswers = async () => {
         setError(null);
@@ -631,6 +999,46 @@ export default function EssayFlow({
         await advanceToCoreIdea();
     };
 
+    // Stable signature of the current Q&A used to decide whether the
+    // core idea is "still in sync." Normalises by lowercasing answers
+    // and trimming whitespace so cosmetic edits don't trigger the
+    // "inputs changed" indicator on the ↻ button.
+    const currentCoreIdeaKey = () => {
+        const qa = buildAnsweredQa();
+        return JSON.stringify(
+            qa.map(({ question, answer }) => ({
+                q: (question || '').trim(),
+                a: (answer || '').trim().toLowerCase(),
+            }))
+        );
+    };
+
+    const generateCoreIdea = async () => {
+        setCoreIdeaLoading(true);
+        try {
+            const qa = buildAnsweredQa();
+            const newKey = currentCoreIdeaKey();
+            const res = await api.intake.coreIdea({
+                topic: topic.trim(),
+                audience: audience.trim(),
+                qa,
+                sessionId: session.id,
+            });
+            setCoreIdea(res?.core_idea || '');
+            setLastCoreIdeaKey(newKey);
+        } catch (err) {
+            console.warn('intake/core-idea failed:', err);
+            setCoreIdea('');
+        } finally {
+            setCoreIdeaLoading(false);
+        }
+    };
+
+    const handleRegenerateCoreIdea = async () => {
+        if (coreIdeaLoading) return;
+        await generateCoreIdea();
+    };
+
     const advanceToCoreIdea = async () => {
         setSubmitting(true);
         try {
@@ -640,20 +1048,11 @@ export default function EssayFlow({
                 ...(audience.trim() ? { audience: audience.trim() } : {}),
             });
             setStep('core_idea');
-            setCoreIdeaLoading(true);
-            try {
-                const res = await api.intake.coreIdea({
-                    topic: topic.trim(),
-                    audience: audience.trim(),
-                    qa,
-                    sessionId: session.id,
-                });
-                setCoreIdea(res?.core_idea || '');
-            } catch (err) {
-                console.warn('intake/core-idea failed:', err);
-                setCoreIdea('');
-            } finally {
-                setCoreIdeaLoading(false);
+            // "Forward never destroys work": only generate if there's
+            // nothing to preserve. The ↻ button on Step 3 lets users
+            // explicitly rebuild from their (possibly edited) answers.
+            if (!coreIdea.trim()) {
+                await generateCoreIdea();
             }
         } catch (err) {
             setError(err.message || 'Could not save your answers.');
@@ -717,11 +1116,17 @@ export default function EssayFlow({
     // step 3 (timeline) and step 4 (voice) doesn't drop everything the
     // student just typed. We keep the Q&A entries Q&A-shaped and append
     // a single sentinel entry the council message builder ignores.
+    //
+    // `answers[i]` is a string for text/examples_text/choice questions
+    // but an Array for multi-select. Using `serializeAnswer` unifies
+    // both into a string so the persistence payload is always JSON-safe
+    // — calling .trim() on an array (the old path) throws and broke
+    // Step 4 Continue when any multi-select question was answered.
     const persistTimelineToSession = async (events) => {
         if (!session?.id) return;
         const qa = questions
-            .map((q, i) => ({ question: q, answer: (answers[i] || '').trim() }))
-            .filter((item) => item.answer);
+            .map((q, i) => ({ question: q, answer: serializeAnswer(q, answers[i]) }))
+            .filter((item) => (item.answer || '').trim());
         const conversation = events.length
             ? [...qa, { kind: 'timeline', events }]
             : qa;
@@ -737,14 +1142,27 @@ export default function EssayFlow({
 
     const handleSubmitTimeline = async () => {
         setError(null);
-        await persistTimelineToSession(timelineEvents);
+        try {
+            await persistTimelineToSession(timelineEvents);
+        } catch (e) {
+            // Belt-and-suspenders: persistTimelineToSession already
+            // swallows its own errors, but if something else throws
+            // (serialization, transient state) we still want Continue
+            // to navigate. The timeline lives in state and will be
+            // sent to the council either way.
+            console.warn('Timeline persist threw, navigating anyway:', e);
+        }
         setStep('voice');
     };
 
     const handleSkipTimeline = async () => {
         setError(null);
         setTimelineEvents([]);
-        await persistTimelineToSession([]);
+        try {
+            await persistTimelineToSession([]);
+        } catch (e) {
+            console.warn('Timeline persist threw, navigating anyway:', e);
+        }
         setStep('voice');
     };
 
@@ -958,53 +1376,56 @@ export default function EssayFlow({
                 )}
 
                 {step === 'topic' && (
-                    <form onSubmit={handleSubmitTopic} className="essay-flow-step">
-                        <h1 className="essay-flow-question">
-                            Let's start with what you're after.
-                        </h1>
-                        <p className="essay-flow-warm-subline">
-                            One short sentence. The first pour is always rough — that's fine.
-                        </p>
+                    <form onSubmit={handleSubmitTopic} className="essay-flow-step essay-flow-step--topic">
+                        <h1 className="essay-flow-question">What are you writing?</h1>
 
-                        <div className="essay-flow-field">
-                            <label htmlFor="essay-flow-topic" className="essay-flow-label">
-                                Topic
-                            </label>
-                            <p className="essay-flow-field-hint">
-                                One sentence — the smallest true thing about your essay.
-                            </p>
-                            <input
-                                id="essay-flow-topic"
-                                ref={topicRef}
-                                type="text"
-                                value={topic}
-                                onChange={(e) => setTopic(e.target.value)}
-                                placeholder="e.g. The summer I learned my mother had been a smuggler"
-                                disabled={disabled}
-                                className="essay-flow-input"
-                                maxLength={500}
-                            />
+                        <textarea
+                            id="essay-flow-topic"
+                            ref={topicRef}
+                            value={topic}
+                            onChange={(e) => setTopic(e.target.value)}
+                            placeholder={'Paste the prompt, or describe your essay.\n\ne.g. "Discuss an accomplishment, event, or realization that sparked a period of personal growth…"\n\nor: The summer my grandmother stopped recognizing my name.'}
+                            disabled={disabled}
+                            className="essay-flow-textarea essay-flow-textarea--topic"
+                            rows={6}
+                            maxLength={2000}
+                        />
+                        <div className="essay-flow-topic-hint">
+                            Long is fine — paste the whole prompt.
+                        </div>
+
+                        <div className="essay-flow-topic-secondary">
                             <button
                                 type="button"
                                 className="essay-flow-link essay-flow-link--soft"
                                 onClick={handleStartBrainstorm}
                                 disabled={disabled}
                             >
-                                I don't have a topic yet — help me find one →
+                                No topic yet?
+                            </button>
+                            <span className="essay-flow-topic-secondary-sep" aria-hidden="true">·</span>
+                            <button
+                                type="button"
+                                className="essay-flow-link essay-flow-link--soft"
+                                onClick={handleJumpToDraft}
+                                disabled={disabled || !topic.trim()}
+                            >
+                                Already wrote a draft?
                             </button>
                         </div>
 
-                        <div className="essay-flow-field">
-                            <label htmlFor="essay-flow-audience" className="essay-flow-label">
-                                Audience
-                            </label>
-                            <p className="essay-flow-field-hint">
-                                Who's reading this? Be specific — the answer changes everything.
-                            </p>
+                        <div className="essay-flow-topic-kind">
+                            <div className="essay-flow-topic-kind-label">
+                                What kind?
+                                <span className="essay-flow-topic-kind-required" aria-hidden="true"> *</span>
+                            </div>
+                            <div className="essay-flow-topic-kind-why">
+                                This changes everything the council writes — a Common App essay reads very differently from a "why this school" supplemental.
+                            </div>
                             <div
                                 className="essay-flow-audience-chips"
                                 role="group"
-                                aria-label="Common audiences"
+                                aria-label="Essay type"
                             >
                                 {AUDIENCE_PRESETS.map((preset) => {
                                     const isActive =
@@ -1031,29 +1452,28 @@ export default function EssayFlow({
                                 type="text"
                                 value={audience}
                                 onChange={(e) => setAudience(e.target.value)}
-                                placeholder="Or type your own — e.g. a magazine editor, your future self"
+                                placeholder="Or type your own — e.g. Stanford REA short answer"
                                 disabled={disabled}
-                                className="essay-flow-input"
+                                className="essay-flow-input essay-flow-input--inline"
                                 maxLength={250}
                             />
                         </div>
 
                         {error && <div className="essay-flow-error">{error}</div>}
-                        <div className="essay-flow-actions">
-                            <button
-                                type="button"
-                                className="essay-flow-link"
-                                onClick={handleJumpToDraft}
-                                disabled={disabled || !topic.trim()}
-                            >
-                                I already have a draft →
-                            </button>
+                        <div className="essay-flow-actions essay-flow-actions--single">
                             <button
                                 type="submit"
                                 className="essay-flow-primary"
-                                disabled={disabled || !topic.trim()}
+                                disabled={disabled || !topic.trim() || !audience.trim()}
+                                title={
+                                    !topic.trim()
+                                        ? 'Tell me what the essay is about first.'
+                                        : !audience.trim()
+                                            ? 'Pick what kind of essay this is — the council needs to know who it\'s writing for.'
+                                            : 'Continue to the next step'
+                                }
                             >
-                                {submitting ? 'Starting…' : 'Continue'}
+                                {submitting ? 'Starting…' : 'Continue →'}
                             </button>
                         </div>
                     </form>
@@ -1158,13 +1578,76 @@ export default function EssayFlow({
 
                 {step === 'questions' && (
                     <div className="essay-flow-step">
-                        <h2 className="essay-flow-question">A few questions to make this sound like you</h2>
+                        <div className="essay-flow-question-row">
+                            <h2 className="essay-flow-question">A few questions to make this sound like you</h2>
+                            {questions.length > 0 && (
+                                <button
+                                    type="button"
+                                    className={
+                                        'essay-flow-regenerate ' +
+                                        (currentQuestionsKey() !== lastQuestionsKey
+                                            ? 'essay-flow-regenerate--dirty'
+                                            : '')
+                                    }
+                                    onClick={handleRegenerateQuestions}
+                                    disabled={disabled || questionsStreaming}
+                                    title={
+                                        currentQuestionsKey() !== lastQuestionsKey
+                                            ? 'Your topic or audience changed — get a fresh question set tailored to the new input'
+                                            : 'Replace these with a fresh question set (your current answers will be cleared)'
+                                    }
+                                >
+                                    ↻ {questionsStreaming ? 'Generating…' : 'Get fresh questions'}
+                                </button>
+                            )}
+                        </div>
                         <p className="essay-flow-hint">
-                            Short answers. Skip or swap any that don't feel right.
+                            Talk as much as you want — the more detail you give, the better the council understands you. Think out loud, ramble, contradict yourself. We'll sort it out.
                         </p>
-                        {questionsLoading && (
+                        <div
+                            className="essay-flow-toolbar-legend"
+                            aria-label="What each per-question button does"
+                        >
+                            <span className="essay-flow-toolbar-legend-intro">
+                                Each question has three buttons:
+                            </span>
+                            <span className="essay-flow-toolbar-legend-item">
+                                <span
+                                    className="mic-button mic-button--sm"
+                                    role="presentation"
+                                    aria-hidden="true"
+                                    onClick={(e) => e.preventDefault()}
+                                >
+                                    <span className="mic-button-icon" aria-hidden="true">🎤</span>
+                                </span>
+                                <span>talk instead of type</span>
+                            </span>
+                            <span className="essay-flow-toolbar-legend-item">
+                                <span
+                                    className="essay-flow-skip-question"
+                                    role="presentation"
+                                    aria-hidden="true"
+                                    onClick={(e) => e.preventDefault()}
+                                >
+                                    Different question
+                                </span>
+                                <span>this one doesn't fit</span>
+                            </span>
+                            <span className="essay-flow-toolbar-legend-item">
+                                <span
+                                    className="essay-flow-skip-question"
+                                    role="presentation"
+                                    aria-hidden="true"
+                                    onClick={(e) => e.preventDefault()}
+                                >
+                                    Skip
+                                </span>
+                                <span>nothing to say</span>
+                            </span>
+                        </div>
+                        {questionsLoading && questions.length === 0 && (
                             <div className="essay-flow-hint" style={{ opacity: 0.8 }}>
-                                Drafting questions for your topic…
+                                Drafting questions for your topic… first one arrives in a second or two.
                             </div>
                         )}
                         {memoryMatches.length > 0 && !memoryDismissed && (
@@ -1295,9 +1778,9 @@ export default function EssayFlow({
                                                         className="essay-flow-skip-question"
                                                         onClick={() => handleSwapQuestion(i)}
                                                         disabled={disabled || isSwappingThis}
-                                                        title="This question doesn't fit — give me a different one"
+                                                        title="Give me a different question — this one doesn't fit"
                                                     >
-                                                        {isSwappingThis ? 'Swapping…' : 'Swap'}
+                                                        {isSwappingThis ? 'Swapping…' : 'Different question'}
                                                     </button>
                                                     <button
                                                         type="button"
@@ -1391,12 +1874,12 @@ export default function EssayFlow({
                                                 onChange={(e) => handleAnswerChange(i, e.target.value)}
                                                 placeholder={
                                                     q.placeholder ||
-                                                    'One or two sentences is plenty. Tap the mic to talk it through.'
+                                                    "Say as much as you want. Specifics, stories, contradictions, half-thoughts — all useful. Tap the mic to talk it through instead of typing."
                                                 }
-                                                rows={3}
+                                                rows={6}
                                                 disabled={disabled || isSwappingThis}
                                                 className="essay-flow-textarea"
-                                                style={{ minHeight: 90 }}
+                                                style={{ minHeight: 160 }}
                                             />
                                         )}
 
@@ -1460,6 +1943,90 @@ export default function EssayFlow({
                                                 </div>
                                             </div>
                                         )}
+
+                                        {(() => {
+                                            // Interview-mode follow-up. Shown only on text
+                                            // questions with a substantive answer. Capped at
+                                            // MAX_FOLLOW_UPS_PER_SESSION across the whole
+                                            // intake so we don't pester the student.
+                                            if (isSkipped) return null;
+                                            if (kind !== 'text') return null;
+                                            const answerLen = (textValue || '').trim().length;
+                                            const fu = followUps[i];
+                                            const showButton =
+                                                answerLen >= 20 &&
+                                                !fu?.question &&
+                                                !fu?.loading &&
+                                                !fu?.declined &&
+                                                followUpsAskedCount < MAX_FOLLOW_UPS_PER_SESSION;
+                                            return (
+                                                <>
+                                                    {showButton && (
+                                                        <div className="essay-flow-example-row">
+                                                            <button
+                                                                type="button"
+                                                                className="essay-flow-example-toggle"
+                                                                onClick={() => handleRequestFollowUp(i)}
+                                                                disabled={disabled || isSwappingThis}
+                                                                title="Ask the coach to dig deeper on your answer"
+                                                            >
+                                                                Coach me — go one level deeper
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {fu?.loading && (
+                                                        <div className="essay-flow-hint" style={{ opacity: 0.75, marginTop: '0.5rem' }}>
+                                                            Listening to what you wrote…
+                                                        </div>
+                                                    )}
+                                                    {fu?.error && (
+                                                        <div className="essay-flow-example-error">
+                                                            {fu.error}
+                                                        </div>
+                                                    )}
+                                                    {fu?.declined && (
+                                                        <div className="essay-flow-hint" style={{ opacity: 0.7, marginTop: '0.5rem' }}>
+                                                            Your answer is already specific enough — no follow-up needed.
+                                                        </div>
+                                                    )}
+                                                    {fu?.question && (
+                                                        <div className="essay-flow-example" style={{ borderLeftColor: '#fbbf24' }}>
+                                                            <div className="essay-flow-example-label">
+                                                                Coach follow-up
+                                                            </div>
+                                                            {fu.anchor && (
+                                                                <div
+                                                                    className="essay-flow-exchange-subtext"
+                                                                    style={{ fontStyle: 'italic', marginTop: '0.25rem' }}
+                                                                >
+                                                                    Pinned to: "{fu.anchor}"
+                                                                </div>
+                                                            )}
+                                                            <div
+                                                                className="essay-flow-exchange-q"
+                                                                style={{ marginTop: '0.5rem' }}
+                                                            >
+                                                                {fu.question}
+                                                            </div>
+                                                            {fu.subtext && (
+                                                                <div className="essay-flow-exchange-subtext">
+                                                                    {fu.subtext}
+                                                                </div>
+                                                            )}
+                                                            <textarea
+                                                                value={fu.answer || ''}
+                                                                onChange={(e) => handleFollowUpAnswerChange(i, e.target.value)}
+                                                                placeholder="Answer in as much detail as you want — this is optional, but it sharpens the essay a lot."
+                                                                rows={4}
+                                                                disabled={disabled}
+                                                                className="essay-flow-textarea"
+                                                                style={{ minHeight: 110, marginTop: '0.5rem' }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 );
                             };
@@ -1483,23 +2050,52 @@ export default function EssayFlow({
                             );
                         })()}
 
+                        {questionsStreaming && questions.length > 0 && (
+                            <div
+                                className="essay-flow-question-skeleton"
+                                aria-label="More questions on the way"
+                                role="status"
+                            >
+                                <div className="essay-flow-question-skeleton-line essay-flow-question-skeleton-line--long" />
+                                <div className="essay-flow-question-skeleton-line essay-flow-question-skeleton-line--medium" />
+                                <div className="essay-flow-question-skeleton-textarea" />
+                            </div>
+                        )}
+
                         {error && <div className="essay-flow-error">{error}</div>}
 
                         <div className="essay-flow-actions">
                             <button
                                 type="button"
+                                className="essay-flow-link"
+                                onClick={() => setStep('topic')}
+                                disabled={disabled || questionsLoading}
+                            >
+                                ← Back
+                            </button>
+                            <button
+                                type="button"
                                 className="essay-flow-primary"
                                 onClick={handleSubmitAnswers}
                                 disabled={
-                                    disabled || questionsLoading || !allQuestionsHandled
+                                    disabled ||
+                                    questionsLoading ||
+                                    questionsStreaming ||
+                                    !allQuestionsHandled
                                 }
                                 title={
-                                    allQuestionsHandled
-                                        ? 'Continue to your core idea'
-                                        : 'Answer or skip each question to continue'
+                                    questionsStreaming
+                                        ? 'Waiting for the remaining questions to arrive…'
+                                        : allQuestionsHandled
+                                            ? 'Continue to your core idea'
+                                            : 'Answer or skip each question to continue'
                                 }
                             >
-                                {submitting ? 'Saving…' : 'Continue'}
+                                {submitting
+                                    ? 'Saving…'
+                                    : questionsStreaming
+                                        ? 'Loading more…'
+                                        : 'Continue'}
                             </button>
                         </div>
                     </div>
@@ -1507,7 +2103,29 @@ export default function EssayFlow({
 
                 {step === 'core_idea' && (
                     <div className="essay-flow-step">
-                        <h2 className="essay-flow-question">The shape of it</h2>
+                        <div className="essay-flow-question-row">
+                            <h2 className="essay-flow-question">The shape of it</h2>
+                            {coreIdea.trim() && (
+                                <button
+                                    type="button"
+                                    className={
+                                        'essay-flow-regenerate ' +
+                                        (currentCoreIdeaKey() !== lastCoreIdeaKey
+                                            ? 'essay-flow-regenerate--dirty'
+                                            : '')
+                                    }
+                                    onClick={handleRegenerateCoreIdea}
+                                    disabled={disabled || coreIdeaLoading}
+                                    title={
+                                        currentCoreIdeaKey() !== lastCoreIdeaKey
+                                            ? 'Your answers changed — rebuild the core idea from the new answers'
+                                            : 'Rebuild the core idea from your answers (replaces your edits)'
+                                    }
+                                >
+                                    ↻ {coreIdeaLoading ? 'Rebuilding…' : 'Rebuild from answers'}
+                                </button>
+                            )}
+                        </div>
                         <p className="essay-flow-hint">
                             The spine the council will write to. Edit, reorder, or drop any beat.
                         </p>
@@ -1546,10 +2164,7 @@ export default function EssayFlow({
 
                 {step === 'timeline' && (
                     <div className="essay-flow-step">
-                        <h2 className="essay-flow-question">Story timeline</h2>
-                        <p className="essay-flow-hint">
-                            Optional. List events in the order they happened — the council will respect the sequence.
-                        </p>
+                        <h2 className="essay-flow-question">Story timeline (optional)</h2>
 
                         {timelineEvents.length > 0 && (
                             <ol className="essay-flow-timeline-list">
@@ -1646,10 +2261,10 @@ export default function EssayFlow({
                             <button
                                 type="button"
                                 className="essay-flow-link"
-                                onClick={handleSkipTimeline}
+                                onClick={() => setStep('core_idea')}
                                 disabled={disabled}
                             >
-                                Skip this step
+                                ← Back
                             </button>
                             <button
                                 type="button"

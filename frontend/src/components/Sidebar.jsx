@@ -17,6 +17,32 @@ function cleanTitle(raw) {
   return s.trim();
 }
 
+// Compact labels for the "Drafts in progress" rows. Mirrors the
+// frontend's STEP_ORDER but stripped to fit in the sidebar — "Step N ·
+// short label" reads better in a narrow column than full step titles.
+const STEP_LABELS_SHORT = {
+  topic: 'Step 1 · Topic',
+  brainstorm: 'Step 1 · Brainstorming',
+  draft: 'Step 1 · Draft mode',
+  questions: 'Step 2 · Questions',
+  core_idea: 'Step 3 · Core idea',
+  timeline: 'Step 4 · Timeline',
+  voice: 'Step 5 · Voice',
+};
+
+function formatRelativeTime(date) {
+  if (!(date instanceof Date)) return '';
+  const diffMs = Date.now() - date.getTime();
+  const minute = 60_000;
+  const hour = 3_600_000;
+  const day = 86_400_000;
+  if (diffMs < minute) return 'just now';
+  if (diffMs < hour) return `${Math.floor(diffMs / minute)}m ago`;
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}h ago`;
+  if (diffMs < 7 * day) return `${Math.floor(diffMs / day)}d ago`;
+  return date.toLocaleDateString();
+}
+
 export default function Sidebar({
   conversations,
   currentConversationId,
@@ -39,9 +65,42 @@ export default function Sidebar({
   // surfaces a tooltip explaining why.
   canStartNewConversation = true,
   maxConcurrentStreams = 3,
+  // "Drafts in progress" section — unfinished essay_sessions with
+  // metadata. Click to resume; trash to delete.
+  inProgressSessions = [],
+  currentSessionId = null,
+  onResumeSession,
+  onDeleteSession,
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(null);
+  const [confirmingDeleteSession, setConfirmingDeleteSession] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  // Collapsible "Drafts in progress" section. Persisted so the user's
+  // choice survives reload — students with many completed essays
+  // probably want drafts collapsed by default once they've scrolled
+  // through them.
+  const DRAFTS_EXPANDED_KEY = 'mc.sidebar.draftsExpanded';
+  const [draftsExpanded, setDraftsExpanded] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem(DRAFTS_EXPANDED_KEY);
+      // Default expanded on first visit; collapsed only if the user
+      // explicitly hid it last time.
+      return stored == null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+  const toggleDraftsExpanded = () => {
+    setDraftsExpanded((cur) => {
+      const next = !cur;
+      try {
+        window.localStorage.setItem(DRAFTS_EXPANDED_KEY, String(next));
+      } catch {
+        // localStorage disabled (private mode) — fine, just lose persistence.
+      }
+      return next;
+    });
+  };
 
   const isConversationStreaming = (convId) => {
     if (streamingIds && typeof streamingIds.has === 'function') {
@@ -154,6 +213,107 @@ export default function Sidebar({
           </button>
         )}
       </div>
+
+      {/* Drafts in progress — unfinished essay_sessions surfaced so
+          users can pick up where they left off. Hidden during search
+          (different mental mode) and when there's nothing to show.
+          The header is clickable to collapse the list, freeing screen
+          real-estate for completed essays below. */}
+      {!searchQuery && inProgressSessions.length > 0 && (
+        <div className={`sidebar-drafts ${draftsExpanded ? '' : 'sidebar-drafts--collapsed'}`}>
+          <button
+            type="button"
+            className="sidebar-drafts-header sidebar-drafts-header--toggle"
+            onClick={toggleDraftsExpanded}
+            aria-expanded={draftsExpanded}
+            aria-controls="sidebar-drafts-list"
+            title={draftsExpanded ? 'Hide drafts in progress' : 'Show drafts in progress'}
+          >
+            <span className="sidebar-drafts-header-chevron" aria-hidden="true">
+              {draftsExpanded ? '▾' : '▸'}
+            </span>
+            <span>Drafts in progress</span>
+            <span className="sidebar-drafts-header-count">{inProgressSessions.length}</span>
+          </button>
+          {draftsExpanded && <div id="sidebar-drafts-list" className="sidebar-drafts-list">
+          {inProgressSessions.map((s) => {
+            const topicPreview = (s.topic || '').trim();
+            const display =
+              topicPreview.length > 56
+                ? topicPreview.slice(0, 53) + '…'
+                : topicPreview || 'Untitled draft';
+            const stepLabel = STEP_LABELS_SHORT[s.step] || 'Step 1 · Topic';
+            const updated = s.updated_at ? new Date(s.updated_at) : null;
+            const updatedDisplay = updated && !Number.isNaN(updated.getTime())
+              ? formatRelativeTime(updated)
+              : '';
+            const confirming = confirmingDeleteSession === s.id;
+            const isActive = currentSessionId === s.id;
+            return (
+              <div
+                key={s.id}
+                className={`sidebar-draft-item ${isActive ? 'sidebar-draft-item--active' : ''}`}
+                onClick={() => onResumeSession?.(s)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onResumeSession?.(s);
+                  }
+                }}
+              >
+                <div className="sidebar-draft-title" title={topicPreview}>
+                  {display}
+                </div>
+                <div className="sidebar-draft-meta">
+                  <span className="sidebar-draft-step">{stepLabel}</span>
+                  {updatedDisplay && (
+                    <span className="sidebar-draft-time">{updatedDisplay}</span>
+                  )}
+                  {confirming ? (
+                    <div className="delete-confirm">
+                      <button
+                        className="confirm-yes-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteSession?.(s.id);
+                          setConfirmingDeleteSession(null);
+                        }}
+                        title="Confirm delete"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        className="confirm-no-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmingDeleteSession(null);
+                        }}
+                        title="Cancel"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmingDeleteSession(s.id);
+                      }}
+                      title="Delete this draft"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          </div>}
+        </div>
+      )}
 
       <div className="conversation-list">
         {filteredConversations.length === 0 ? (

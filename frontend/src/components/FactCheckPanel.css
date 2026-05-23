@@ -143,10 +143,62 @@
     transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
-.fact-check-dismiss:hover {
+.fact-check-dismiss:hover:not(:disabled) {
     background: rgba(148, 163, 184, 0.12);
     color: #cbd5e1;
     border-color: rgba(148, 163, 184, 0.55);
+}
+
+.fact-check-flag-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* "Fix this" sends the flagged passage to the refinement dock so the
+   council can rewrite it. Visually weightier than Dismiss to mark it as
+   the recommended action — gold accent matches the chairman/council
+   theme used elsewhere. */
+.fact-check-fix {
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    color: #fbbf24;
+    border-radius: 999px;
+    padding: 3px 12px;
+    font-size: 11px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.fact-check-fix:hover:not(:disabled) {
+    background: rgba(251, 191, 36, 0.2);
+    border-color: rgba(251, 191, 36, 0.7);
+    transform: translateY(-1px);
+}
+
+.fact-check-fix:disabled,
+.fact-check-dismiss:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* While a fix is in flight, the flag pulses gently so the user sees
+   that something is happening even before the new draft lands. */
+.fact-check-flag--fixing {
+    animation: fact-check-fix-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes fact-check-fix-pulse {
+    0%, 100% {
+        background: rgba(251, 191, 36, 0.04);
+    }
+    50% {
+        background: rgba(251, 191, 36, 0.1);
+    }
 }
 
 .fact-check-quote {

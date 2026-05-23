@@ -141,69 +141,92 @@ _INTAKE_SECTIONS = [
 _INTAKE_QUESTION_KINDS = {"text", "examples_text", "choice", "multi"}
 
 
-_INTAKE_SYSTEM_PROMPT = """You are an essay coach sitting across the table from a writer (typically a high-school or college student) preparing a personal essay. You are the coach who actually knows them. Your job is to design a SHORT INTAKE that pulls out the kind of specific, lived detail an outside reader couldn't invent.
+_INTAKE_SYSTEM_PROMPT = """You are an essay coach sitting across the table from a HIGH-SCHOOL SENIOR writing a college admissions essay. You are the coach who actually knows them. Your job is to design a SHORT INTAKE that pulls out the kind of specific, lived detail an admissions officer couldn't possibly guess from the rest of their application.
+
+THE WRITER IS A TEENAGER. They are tired, stressed, juggling Common App deadlines and a Why-this-school supplemental due Friday. Your questions must be:
+  - INSTANTLY GRASPABLE on first read. A 17-year-old should not have to re-read a question to understand it.
+  - CONCRETE, NOT ABSTRACT. "What's a moment from this year you keep replaying?" beats "What problem do you hope to work on one day?"
+  - GROUNDED IN THEIR ACTUAL LIFE. Ask about real things (their bedroom, their phone, their bus ride, their coach, their grandma's kitchen) — not generic existential prompts.
+  - EASY TO START ANSWERING. The first six words of an answer should come fast. If a student stares blankly, the question is too hard.
 
 You will use a four-part framework to choose what to ask. Cover at least three of the four parts:
 
-  1. POSITIONING — how the writer wants to be seen.
-     · "What 3 words do you want the reader to remember about you?"
-     · "Which role do you play in your own life?" (1-2 of: solves problems / takes care of others / asks unusual questions / connects people / keeps going quietly / creates things / notices small details / challenges old ideas / brings humor or warmth / learns from mistakes / takes responsibility early / turns curiosity into action)
-     · "What do you NOT want them to misunderstand about you?"
-     · "What's the one sentence you hope the reader says after they finish?"
+  1. POSITIONING — how the writer wants admissions to see them.
+     · "If admissions had to remember three things about you, what would you want them to be?"
+     · "Which of these sound like you?" (multi-select — pick 1-2: I'm the one who fixes things / I'm the one who notices what other people miss / I'm the one who shows up early / I'm the one who keeps asking why / I'm the one who makes the group laugh when it gets tense / I'm the one who keeps going after everyone else quits / I'm the one who builds the thing / I'm the one who takes care of people)
+     · "What's one thing about you that's easy to misread from the outside?"
+     · "What do your closest friends know about you that your teachers don't?"
 
-  2. DIRECTION (admissions / statement-of-purpose only — skip for journal/magazine audiences) — what they're pointed at.
-     · "What problem do you hope to solve one day?"
-     · "When did you first become interested in this field?"
-     · "What kind of people do you want to help, work with, or learn from?"
+  2. DIRECTION (skip ONLY if the prompt is purely reflective, e.g. a "describe a place" supplemental) — what they're pointed at.
+     · "What's something you'd genuinely keep doing even if no one watched and no one paid you?"
+     · "Picture yourself five years out — what are you working on?"
+     · "Is there a problem in the world you can't stop thinking about?"
+     · "What's a class, club, or YouTube rabbit hole that ate your weekends this year?"
 
-  3. PERSONAL STORY — the lived material.
-     · OBJECT prompts: "What object on your desk has a story?" / "What object reminds you of a mistake?" / "What object would you take to college?"
-     · PLACE prompts: "Where do you go when you need to think?" / "Where did you fail at something?" / "What place at home has the most memories?"
-     · MOMENT prompts: "Tell me about one time you stayed quiet but thought deeply." / "Tell me about one time you changed your mind." / "Tell me about one time you realized you were growing up."
-     · DAILY-LIFE prompts: "What do your friends always ask you for help with?" / "What part of your life would surprise the reader?"
+  3. PERSONAL STORY — the lived material. Pick prompts that fit the topic; rotate types:
+     · OBJECT: "What's something on your nightstand or in your backpack right now that has a story?" / "What's an object at home that would be hard to throw away?"
+     · PLACE: "Where do you go when you need to think?" / "What's a place that feels like yours, even if you don't own it?"
+     · MOMENT: "What's a moment from this year you keep replaying?" / "Tell me about a time you said the wrong thing — or didn't say something you should have."
+     · DAILY-LIFE: "What do people text you for help with?" / "What's a habit of yours that would surprise an admissions reader?"
+     · CONTRADICTION: "What's something you used to believe and now don't?" / "Where do you disagree with the people closest to you?"
 
-  4. TACTICS — why this story, this way.
-     · "What quality does this story prove?"
-     · "Could another student write the same essay, or is it clearly yours?"
-     · "What does this story show that's NOT already obvious?"
+  4. TACTICS — pressure-tests the angle. INCLUDE A LATE-STAGE "DON'T MISUNDERSTAND ME" QUESTION HERE.
+     · "Could another student at your school write this same essay? What makes it clearly yours?"
+     · "After admissions reads this, what would you NOT want them to assume about you?" — ask this near the end so the student can pin it to what they've already shared.
+     · "What part of yourself does this essay leave out — and is that okay?"
 
 DESIGN RULES — non-negotiable:
-  - Mix question KINDS. Don't return 5 textareas in a row. Include at least one multi-select ("Pick 1-2 that feel true") and at least one example-laden free-text ("here are 3 sample answers — yours can sound nothing like these").
-  - Personalize using KNOWN FACTS. If we already know the writer plays violin, don't ask "what's an activity you do?" — ask about their relationship to the instrument, the practice room, the teacher, the time they broke a string mid-recital.
-  - Be CONCRETE. "What was the first thing you smelled when you walked in?" beats "Set the scene." Specific objects, specific people, specific moments.
-  - Be ANSWERABLE. 1-3 sentences max. Multi-select rows should be tappable, not paragraphs.
-  - NEVER use the words "journey", "impact", "meaningful", "learning", "growth". They invite generic-AI answers.
+  - Mix question KINDS. Don't return 5 textareas in a row. Include at least one multi-select ("Which of these sound like you? Pick 1-2.") and at least one example-laden free-text ("here are 3 sample answers — yours can sound nothing like these").
+  - Personalize using KNOWN FACTS. If we already know the writer plays violin, don't ask "what's an activity you do?" — ask about the practice room, the teacher who pushed them, the time they broke a string mid-recital.
+  - Be CONCRETE. "What was on your phone screen right before you walked into that room?" beats "Set the scene."
+  - Be ANSWERABLE FAST. A student should be able to type the first sentence in under 10 seconds. Reserve depth for what they CHOOSE to add — never make depth a precondition for the first sentence.
+  - WORD COUNT: max 20 words per question. Subtext max 18 words. If a question runs longer, simplify it.
+  - NEVER use the words "journey", "impact", "meaningful", "learning experience", "growth as a person", "shaped who you are today". They invite generic-AI answers.
   - NEVER ask a question whose answer is already in the KNOWN FACTS block. If you must touch a known area, ask a follow-up that adds resolution.
+  - LATE-STAGE "DON'T MISUNDERSTAND ME": the LAST question in the set should reference what the student is sharing and ask what they don't want admissions to assume from it. Phrase the question itself generally (we don't see the answers yet, but the council will), but make it clear it's a wrap-up reflection.
 
-OUTPUT — strict JSON, no markdown fences, no commentary. Return 5-7 questions total, ordered by section (positioning → direction → story → tactics; omit direction if the audience doesn't warrant it):
+OUTPUT — strict JSON, no markdown fences, no commentary. Return 5-7 questions total, ordered by section (positioning → direction → story → tactics; omit direction only if the prompt is purely reflective). The last question should be a tactics-section "don't misunderstand me" prompt.
 
 {
   "sections": [
-    {"id": "positioning", "label": "How you want them to see you"},
-    {"id": "story", "label": "A specific moment, object, or place"}
+    {"id": "positioning", "label": "How you want admissions to see you"},
+    {"id": "story", "label": "A real moment, place, or thing"},
+    {"id": "tactics", "label": "Wrap-up"}
   ],
   "questions": [
     {
       "kind": "examples_text",
       "section": "positioning",
-      "question": "What 3 words do you want the admission officer to remember about you?",
-      "subtext": "After reading your whole application — what should they walk away with?",
-      "placeholder": "curious, responsible, creative",
-      "examples": ["curious, responsible, creative", "brave, kind, independent", "analytical, persistent, community-minded"]
+      "question": "If admissions had to remember three things about you, what would they be?",
+      "subtext": "Not adjectives off a list — words that point at something you've actually done.",
+      "placeholder": "e.g. the one who fixes things, the one who shows up early, the one who asks weird questions",
+      "examples": ["curious, stubborn, generous", "fixer, listener, builder", "the kid who runs the lights at every school play"]
     },
     {
       "kind": "multi",
       "section": "positioning",
-      "question": "Which role do you play in your own life? Pick 1-2 that feel true.",
+      "question": "Which of these sound like you? Pick 1-2.",
       "max_select": 2,
       "min_select": 1,
-      "options": ["I am the person who solves problems.", "I am the person who takes care of others.", "I am the person who notices small details.", "I am the person who challenges old ideas.", "I am the person who turns curiosity into action."]
+      "options": ["I'm the one who fixes things.", "I'm the one who notices what others miss.", "I'm the one who keeps going after everyone else quits.", "I'm the one who makes the group laugh when it gets tense.", "I'm the one who takes care of people.", "I'm the one who keeps asking why.", "I'm the one who builds the thing.", "I'm the one who shows up early."]
     },
     {
       "kind": "text",
       "section": "story",
-      "question": "Tell me about one time you stayed quiet but thought deeply.",
-      "subtext": "One small moment is enough. Where were you, who was there, what were you not saying out loud?"
+      "question": "What's a moment from this year you keep replaying in your head?",
+      "subtext": "Where were you, who else was there, and what made it stick?"
+    },
+    {
+      "kind": "text",
+      "section": "story",
+      "question": "What's something in your room right now that would be hard to throw away?",
+      "subtext": "An object that has a story most people don't know."
+    },
+    {
+      "kind": "text",
+      "section": "tactics",
+      "question": "After admissions reads this essay, what's one thing you'd NOT want them to assume about you?",
+      "subtext": "Pin it to something you've already shared above — what could be misread, and how would you want it read instead?"
     }
   ]
 }
@@ -217,7 +240,7 @@ Field reference:
   - options: 4-10 option strings (only for choice/multi)
   - max_select: integer 1-3 (only for multi). min_select defaults to 1.
 
-If the audience is "yourself (a journal entry)" or similar, skip Part 2 (direction) entirely and lean heavily on Part 3 (story). For admissions/statement-of-purpose audiences, include at least one positioning question AND at least one direction question."""
+If the audience signals a Common App personal statement, lean toward POSITIONING + STORY. If it's a "Why this school / why this major" supplemental, lean toward DIRECTION + STORY. If it's an activity essay, lean heavily on STORY + TACTICS. The TACTICS "don't misunderstand me" wrap-up always goes last."""
 
 
 def _normalize_intake_question(
@@ -293,62 +316,71 @@ def _normalize_intake_question(
 
 def _fallback_intake_payload() -> Dict[str, Any]:
     """Used when the model fails entirely. Mirrors the new typed shape so
-    the frontend's per-kind renderers still have something to draw."""
+    the frontend's per-kind renderers still have something to draw.
+
+    Questions are written for HIGH-SCHOOL SENIORS writing college admissions
+    essays. Concrete, fast-to-start, no jargon. The LAST question is always
+    the "don't misunderstand me" wrap-up so students reflect on how their
+    answers might be misread before the council writes anything.
+    """
     return {
         "sections": [
-            {"id": "positioning", "label": "How you want them to see you"},
-            {"id": "story", "label": "A specific moment"},
+            {"id": "positioning", "label": "How you want admissions to see you"},
+            {"id": "story", "label": "A real moment, place, or thing"},
+            {"id": "tactics", "label": "Wrap-up"},
         ],
         "questions": [
             {
                 "question_id": str(uuid.uuid4()),
                 "kind": "examples_text",
                 "section": "positioning",
-                "question": "What 3 words do you want the reader to remember about you after they finish?",
-                "subtext": "Not adjectives off a list — words that point at something specific you've actually done.",
-                "placeholder": "curious, responsible, creative",
+                "question": "If admissions had to remember three things about you, what would they be?",
+                "subtext": "Not adjectives off a list — words that point at something you've actually done.",
+                "placeholder": "e.g. the one who fixes things, the one who shows up early, the one who asks weird questions",
                 "examples": [
-                    "curious, responsible, creative",
-                    "brave, kind, independent",
-                    "analytical, persistent, community-minded",
+                    "curious, stubborn, generous",
+                    "fixer, listener, builder",
+                    "the kid who runs the lights at every school play",
                 ],
             },
             {
                 "question_id": str(uuid.uuid4()),
                 "kind": "multi",
                 "section": "positioning",
-                "question": "Which role do you play in your own life? Pick 1-2 that feel true.",
+                "question": "Which of these sound like you? Pick 1-2.",
                 "max_select": 2,
                 "min_select": 1,
                 "options": [
-                    "I am the person who solves problems.",
-                    "I am the person who takes care of others.",
-                    "I am the person who notices small details.",
-                    "I am the person who challenges old ideas.",
-                    "I am the person who keeps going quietly.",
-                    "I am the person who connects people.",
-                    "I am the person who turns curiosity into action.",
+                    "I'm the one who fixes things.",
+                    "I'm the one who notices what others miss.",
+                    "I'm the one who keeps going after everyone else quits.",
+                    "I'm the one who makes the group laugh when it gets tense.",
+                    "I'm the one who takes care of people.",
+                    "I'm the one who keeps asking why.",
+                    "I'm the one who builds the thing.",
+                    "I'm the one who shows up early.",
                 ],
             },
             {
                 "question_id": str(uuid.uuid4()),
                 "kind": "text",
                 "section": "story",
-                "question": "Tell me about one time you stayed quiet but thought deeply.",
-                "subtext": "Where were you, who else was there, what were you not saying out loud?",
+                "question": "What's a moment from this year you keep replaying in your head?",
+                "subtext": "Where were you, who else was there, what made it stick?",
             },
             {
                 "question_id": str(uuid.uuid4()),
                 "kind": "text",
                 "section": "story",
-                "question": "What object on your desk or in your bag has a story most people don't know?",
-                "subtext": "An object you'd take to college; an object that reminds you of a mistake.",
+                "question": "What's something in your room right now that would be hard to throw away?",
+                "subtext": "An object that has a story most people don't know.",
             },
             {
                 "question_id": str(uuid.uuid4()),
                 "kind": "text",
                 "section": "tactics",
-                "question": "Could another student write this same essay? What makes it clearly yours?",
+                "question": "After admissions reads this essay, what's one thing you'd NOT want them to assume about you?",
+                "subtext": "Pin it to what you've already shared above — what could be misread, and how would you want it read instead?",
             },
         ],
     }
@@ -583,6 +615,121 @@ async def _brainstorm_topics(reflections: List[Dict[str, str]]) -> List[Dict[str
         out.append({"topic": topic, "reason": reason})
         if len(out) >= 4:
             break
+    return out
+
+
+async def _generate_intake_follow_up(
+    *,
+    topic: str,
+    audience: str,
+    essay_type: str,
+    question: str,
+    answer: str,
+    already_asked: List[str],
+) -> Optional[Dict[str, str]]:
+    """Given a student's actual answer to one intake question, generate ONE
+    deeper follow-up question pinned to a specific thing they said.
+
+    Powers the "interview-me" loop in EssayFlow: after a student types an
+    answer, the UI quietly asks the model whether there's a sharper
+    follow-up worth surfacing. The model may also return SKIP to signal
+    "their answer is already specific enough — don't bother them."
+
+    Returns `{question, subtext, anchor}` on success (anchor is the exact
+    phrase from the student's answer the question is pinned to, so the UI
+    can show it as context), or None if the model declines / fails.
+    """
+    answer_text = (answer or "").strip()
+    if len(answer_text) < 20:
+        # Nothing meaningful to pin a follow-up to.
+        return None
+
+    asked_block = ""
+    if already_asked:
+        ask_lines = [
+            f"  - {q.strip()}"
+            for q in already_asked
+            if (q or "").strip() and q.strip() != question.strip()
+        ]
+        if ask_lines:
+            asked_block = (
+                "\n\nQUESTIONS ALREADY ASKED in this intake (do not repeat):\n"
+                + "\n".join(ask_lines)
+            )
+
+    sys_prompt = (
+        "You are a college essay coach who just heard a student answer ONE "
+        "intake question. Decide whether ONE deeper follow-up would unlock "
+        "more useful detail — or whether their answer is already specific "
+        "enough that asking more would be pestering.\n\n"
+        "FOLLOW-UP RULES:\n"
+        "  - The follow-up must point at a SPECIFIC PHRASE from the answer "
+        "(quote it back in the `anchor` field so the UI can show context).\n"
+        "  - The follow-up must ask for a CONCRETE, SENSORY, OR "
+        "BIOGRAPHICAL detail — never an abstract 'how did that feel.'\n"
+        "  - The follow-up must be readable in under 10 seconds by a tired "
+        "17-year-old. Max 20 words.\n"
+        "  - NEVER use 'journey', 'impact', 'meaningful', 'growth', 'shaped'.\n"
+        "  - If the answer is already concrete (names a moment, a person, a "
+        "place, a number, a contradiction) — RETURN `skip`. Do not invent a "
+        "follow-up for the sake of it.\n"
+        "  - If the answer is generic ('I'm passionate about helping people'), "
+        "the follow-up should pin them to a real instance.\n\n"
+        "OUTPUT — strict JSON, no markdown fences:\n"
+        '  {"action": "ask", "anchor": "<exact phrase from their answer>", "question": "<your follow-up>", "subtext": "<optional one-line nudge>"}\n'
+        "OR\n"
+        '  {"action": "skip"}\n'
+    )
+
+    audience_part = f"\nAUDIENCE / ESSAY TYPE: {audience or essay_type}" if (audience or essay_type) else ""
+    user_prompt = (
+        f"TOPIC: {topic.strip() or '(none given)'}{audience_part}\n\n"
+        f"QUESTION I JUST ASKED:\n  {question.strip()}\n\n"
+        f"STUDENT'S ANSWER:\n  {answer_text}"
+        f"{asked_block}\n\n"
+        f"Should I ask one follow-up, or move on?"
+    )
+
+    from .council import query_model
+
+    try:
+        res = await query_model(
+            _INTAKE_MODEL,
+            [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            timeout=30.0,
+            temperature=0.55,
+        )
+    except Exception as e:
+        print(f"WARN: intake follow-up LLM call failed: {e}")
+        return None
+
+    parsed = _safe_json_loads((res or {}).get("content", "")) if res else None
+    if not isinstance(parsed, dict):
+        return None
+    action = str(parsed.get("action") or "").strip().lower()
+    if action != "ask":
+        return None
+    follow_q = str(parsed.get("question") or "").strip().strip('"').strip("'").strip()
+    if not follow_q or len(follow_q) > 320:
+        return None
+    anchor = str(parsed.get("anchor") or "").strip().strip('"').strip("'").strip()
+    if len(anchor) > 240:
+        anchor = anchor[:237].rstrip() + "..."
+    subtext = str(parsed.get("subtext") or "").strip()
+    if len(subtext) > 240:
+        subtext = subtext[:237].rstrip() + "..."
+
+    out: Dict[str, str] = {
+        "question_id": str(uuid.uuid4()),
+        "question": follow_q,
+    }
+    if anchor:
+        out["anchor"] = anchor
+    if subtext:
+        out["subtext"] = subtext
     return out
 
 
@@ -2461,6 +2608,277 @@ async def api_intake_questions(
     return {"sections": sections, "questions": questions}
 
 
+# ---------------------------------------------------------------------------
+# Streaming intake-question generation.
+#
+# Why a separate endpoint: students perceive the ~5-10s wait on /api/intake/
+# questions as dead time. The non-stream endpoint stays as-is for older
+# clients and as a safety net. The streaming endpoint reshapes the model's
+# output as NDJSON (one JSON object per line) so we can parse-and-emit
+# each completed question to the client as it arrives.
+#
+# Event types (SSE):
+#   sections   {"sections": [{"id","label"}, ...]}
+#   question   {"index": N, "question": {full normalized payload}}
+#   complete   {"count": N}
+#   error      {"message": "..."}
+# ---------------------------------------------------------------------------
+
+_INTAKE_STREAM_PROMPT_TAIL = (
+    "\n\nIMPORTANT — STREAMING OUTPUT FORMAT:\n"
+    "Emit NDJSON: ONE JSON object per line, separated by literal newlines. "
+    "Do NOT wrap in an array. Do NOT include markdown fences.\n\n"
+    "First line: the sections object. Each subsequent line: one question object.\n\n"
+    "Line 1:\n"
+    "  {\"sections\": [{\"id\":\"positioning\",\"label\":\"How you want admissions to see you\"}, ...]}\n"
+    "Lines 2..N (one per question):\n"
+    "  {\"question\": {\"kind\":\"text\",\"section\":\"positioning\",\"question\":\"...\",\"subtext\":\"...\"}}\n"
+    "  {\"question\": {\"kind\":\"multi\",\"section\":\"positioning\",\"question\":\"...\",\"options\":[...],\"max_select\":2,\"min_select\":1}}\n"
+    "  ...\n\n"
+    "Emit each object on its OWN LINE. Do not emit any other text. The last "
+    "question line ends the stream — do NOT emit a closing array, do NOT "
+    "emit a summary line."
+)
+
+
+async def _stream_intake_questions_sse(
+    *,
+    topic: str,
+    audience: str,
+    essay_type: str,
+    user_id: str,
+):
+    """Async generator that yields SSE-formatted strings for the intake-
+    questions streaming endpoint.
+
+    Walks the model's NDJSON output line-by-line, normalises each question
+    through the same _normalize_intake_question() the non-stream path uses,
+    and emits one SSE event per validated unit. On any irrecoverable error
+    falls back to _fallback_intake_payload() and emits the fallback set
+    as if it streamed normally — the user still gets questions.
+    """
+    import json as _json
+
+    def _sse(event: str, data: Dict[str, Any]) -> str:
+        return f"event: {event}\ndata: {_json.dumps(data)}\n\n"
+
+    # Build the prompt — same facts/audience context as the non-stream
+    # path, but with the NDJSON output instruction appended.
+    facts: List[Dict[str, Any]] = []
+    if user_id:
+        try:
+            from .user_facts import load_recent_user_facts as _load_facts
+
+            facts = await asyncio.to_thread(_load_facts, user_id)
+        except Exception as e:
+            print(f"WARN: intake-stream fact load failed for {user_id}: {e}")
+            facts = []
+
+    facts_block = _format_facts_for_intake(facts)
+    audience_text = (audience or "").strip()
+    user_prompt = (
+        f"TOPIC: {(topic or '').strip() or '(none given)'}\n"
+        f"AUDIENCE: {audience_text or '(general reader)'}\n"
+        f"ESSAY TYPE: {(essay_type or 'general').strip()}\n\n"
+        f"KNOWN FACTS ABOUT THE WRITER (use these to personalise — never re-ask):\n{facts_block}\n\n"
+        f"Return 5-7 questions covering at least three of the four parts. Strict NDJSON only."
+    )
+
+    system_prompt = _INTAKE_SYSTEM_PROMPT + _INTAKE_STREAM_PROMPT_TAIL
+
+    sections: List[Dict[str, str]] = []
+    valid_section_ids: set = set()
+    emitted_questions = 0
+
+    def _normalise_and_emit_sections(payload_obj: Dict[str, Any]) -> Optional[str]:
+        nonlocal sections, valid_section_ids
+        raw = payload_obj.get("sections")
+        if not isinstance(raw, list):
+            return None
+        for s in raw:
+            if not isinstance(s, dict):
+                continue
+            sid = str(s.get("id") or "").strip().lower()
+            label = str(s.get("label") or "").strip()
+            if not sid or not label or len(label) > 80 or sid in valid_section_ids:
+                continue
+            valid_section_ids.add(sid)
+            sections.append({"id": sid, "label": label})
+        if not sections:
+            for s in _INTAKE_SECTIONS:
+                sections.append({"id": s["id"], "label": s["label"]})
+                valid_section_ids.add(s["id"])
+        return _sse("sections", {"sections": sections})
+
+    def _normalise_and_emit_question(payload_obj: Dict[str, Any]) -> Optional[str]:
+        nonlocal emitted_questions
+        raw = payload_obj.get("question")
+        if not isinstance(raw, dict):
+            return None
+        # Sections may not have arrived yet if the model emits questions
+        # first. Seed with framework defaults so normalise can attach the
+        # question to *something*.
+        if not valid_section_ids:
+            for s in _INTAKE_SECTIONS:
+                sections.append({"id": s["id"], "label": s["label"]})
+                valid_section_ids.add(s["id"])
+        norm = _normalize_intake_question(raw, valid_section_ids)
+        if norm is None:
+            return None
+        idx = emitted_questions
+        emitted_questions += 1
+        return _sse("question", {"index": idx, "question": norm})
+
+    buffer = ""
+    sections_emitted = False
+    try:
+        from .council import stream_model
+
+        async for chunk in stream_model(
+            _INTAKE_MODEL,
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            timeout=60.0,
+            temperature=0.65,
+        ):
+            buffer += chunk
+            # Walk completed lines (everything before the last newline).
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                line = line.strip()
+                if not line:
+                    continue
+                # Strip a possible leading "```json" / "```" if the model
+                # decides to wrap in markdown despite the instruction.
+                if line.startswith("```"):
+                    continue
+                try:
+                    parsed = _json.loads(line)
+                except Exception:
+                    # Not yet a complete JSON object — could be a model
+                    # quirk. Drop the line; the next attempt will succeed.
+                    continue
+                if not isinstance(parsed, dict):
+                    continue
+                if "sections" in parsed and not sections_emitted:
+                    evt = _normalise_and_emit_sections(parsed)
+                    if evt:
+                        sections_emitted = True
+                        yield evt
+                elif "question" in parsed:
+                    if not sections_emitted:
+                        # Auto-emit defaults so the client can render.
+                        evt = _normalise_and_emit_sections({"sections": []})
+                        if evt:
+                            sections_emitted = True
+                            yield evt
+                    evt = _normalise_and_emit_question(parsed)
+                    if evt:
+                        yield evt
+            if emitted_questions >= 8:
+                break
+
+        # Handle any trailing line that didn't end with a newline.
+        tail = buffer.strip()
+        if tail and not tail.startswith("```"):
+            try:
+                parsed = _json.loads(tail)
+                if isinstance(parsed, dict):
+                    if "sections" in parsed and not sections_emitted:
+                        evt = _normalise_and_emit_sections(parsed)
+                        if evt:
+                            sections_emitted = True
+                            yield evt
+                    elif "question" in parsed:
+                        if not sections_emitted:
+                            evt = _normalise_and_emit_sections({"sections": []})
+                            if evt:
+                                sections_emitted = True
+                                yield evt
+                        evt = _normalise_and_emit_question(parsed)
+                        if evt:
+                            yield evt
+            except Exception:
+                pass
+
+        if emitted_questions == 0:
+            # Model produced nothing usable — fall back to canned questions
+            # so the user still gets a path forward.
+            fb = _fallback_intake_payload()
+            if not sections_emitted:
+                evt = _normalise_and_emit_sections({"sections": fb.get("sections") or []})
+                if evt:
+                    sections_emitted = True
+                    yield evt
+            for q in (fb.get("questions") or []):
+                evt = _normalise_and_emit_question({"question": q})
+                if evt:
+                    yield evt
+
+        yield _sse("complete", {"count": emitted_questions})
+
+        posthog.capture(
+            "intake_started",
+            distinct_id=user_id,
+            properties={
+                "essay_type": essay_type,
+                "has_audience": bool(audience_text),
+                "question_count": emitted_questions,
+                "streamed": True,
+            },
+        )
+    except Exception as e:
+        print(f"WARN: intake-stream failed: {e}")
+        # Best-effort: send a fallback set so the user can keep moving.
+        try:
+            fb = _fallback_intake_payload()
+            if not sections_emitted:
+                evt = _normalise_and_emit_sections({"sections": fb.get("sections") or []})
+                if evt:
+                    yield evt
+            for q in (fb.get("questions") or []):
+                evt = _normalise_and_emit_question({"question": q})
+                if evt:
+                    yield evt
+            yield _sse("complete", {"count": emitted_questions, "fallback": True})
+        except Exception as inner:
+            yield _sse("error", {"message": str(inner) or str(e)})
+
+
+@app.post("/api/intake/questions/stream")
+async def api_intake_questions_stream(
+    body: IntakeQuestionsRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Stream tailored intake questions as they're generated.
+
+    SSE events: `sections`, `question` (one per question), `complete`,
+    `error`. Frontend appends each `question` event to its render list
+    so questions pop in progressively instead of all appearing after a
+    single round-trip wait.
+    """
+    if not (body.topic or "").strip():
+        raise HTTPException(status_code=400, detail="topic is required")
+
+    generator = _stream_intake_questions_sse(
+        topic=body.topic.strip(),
+        audience=(body.audience or "").strip(),
+        essay_type=(body.essay_type or "general").strip() or "general",
+        user_id=user.id,
+    )
+    return StreamingResponse(
+        generator,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 class BrainstormReflection(BaseModel):
     prompt: str = Field(..., max_length=400)
     answer: str = Field("", max_length=4000)
@@ -2552,6 +2970,59 @@ async def api_intake_regenerate_question(
             detail="Couldn't find a different angle right now — try Skip instead.",
         )
     return {"question": question}
+
+
+class IntakeFollowUpRequest(BaseModel):
+    """Request body for /api/intake/follow-up — the interview-mode loop.
+
+    Given one Q&A pair, the backend optionally returns a follow-up
+    question pinned to the student's actual answer. Returning a 200 with
+    `{question: null}` means "no follow-up is worth asking" — that's the
+    happy path when the student's answer is already specific.
+    """
+
+    topic: str
+    audience: str = ""
+    essay_type: str = "general"
+    question: str
+    answer: str
+    already_asked: List[str] = Field(default_factory=list)
+
+
+@app.post("/api/intake/follow-up")
+async def api_intake_follow_up(
+    body: IntakeFollowUpRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Generate ONE interview-style follow-up to a student's answer, or
+    return `{question: null}` if their answer is already specific.
+
+    Called from EssayFlow after the student types a meaningful answer
+    to an intake question. The follow-up is inlined under the original
+    question — it's an opt-in nudge, not a required step.
+    """
+    if not (body.topic or "").strip():
+        raise HTTPException(status_code=400, detail="topic is required")
+    if not (body.question or "").strip():
+        raise HTTPException(status_code=400, detail="question is required")
+
+    follow_up = await _generate_intake_follow_up(
+        topic=body.topic.strip(),
+        audience=(body.audience or "").strip(),
+        essay_type=(body.essay_type or "general").strip() or "general",
+        question=body.question.strip(),
+        answer=(body.answer or "").strip(),
+        already_asked=[q for q in (body.already_asked or []) if q],
+    )
+    posthog.capture(
+        "intake_follow_up_requested",
+        distinct_id=user.id,
+        properties={
+            "answer_chars": len((body.answer or "").strip()),
+            "follow_up_returned": bool(follow_up),
+        },
+    )
+    return {"question": follow_up}
 
 
 class IntakeExampleRequest(BaseModel):
