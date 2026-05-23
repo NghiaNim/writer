@@ -134,10 +134,20 @@ function AppShell() {
   // empty hero with no explanation.
   const [streamHandoffError, setStreamHandoffError] = useState(null);
 
-  // Load settings + conversations on mount
+  // "Drafts in progress" — unfinished essay_sessions for the sidebar.
+  // Loaded on mount + after every session create/update/delete so the
+  // list stays roughly in sync without a websocket.
+  const [inProgressSessions, setInProgressSessions] = useState([]);
+  // The session passed to EssayFlow as initialSession on resume. Stays
+  // null when starting a fresh essay — null = "blank form." The key
+  // bump on essayFlowKey forces EssayFlow to remount when this changes.
+  const [resumeSession, setResumeSession] = useState(null);
+
+  // Load settings + conversations + in-progress drafts on mount
   useEffect(() => {
     checkInitialSetup();
     loadConversations();
+    loadInProgressSessions();
   }, []);
 
   const checkInitialSetup = async () => {
@@ -257,6 +267,47 @@ function AppShell() {
     }
   };
 
+  const loadInProgressSessions = async () => {
+    try {
+      const list = await api.sessions.list({ status: 'in_progress', limit: 20 });
+      setInProgressSessions(Array.isArray(list) ? list : []);
+    } catch (error) {
+      console.warn('Failed to load in-progress sessions:', error);
+      // Non-blocking — the sidebar just won't show the section.
+    }
+  };
+
+  const handleResumeSession = async (sessionListItem) => {
+    try {
+      // Fetch the full session row (the list item has only metadata).
+      const fullSession = await api.sessions.get(sessionListItem.id);
+      setResumeSession(fullSession);
+      setCurrentSessionId(fullSession.id);
+      setCurrentConversationId(null);
+      setEssayFlowVisible(true);
+      setEssayFlowKey((k) => k + 1);
+      setSidebarOpen(false);
+    } catch (err) {
+      console.error('Failed to resume session:', err);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    try {
+      await api.sessions.delete(sessionId);
+      setInProgressSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      // If the user was actively viewing this session, drop them back
+      // to a blank EssayFlow.
+      if (currentSessionId === sessionId) {
+        setResumeSession(null);
+        setCurrentSessionId(null);
+        setEssayFlowKey((k) => k + 1);
+      }
+    } catch (err) {
+      console.error('Failed to delete session:', err);
+    }
+  };
+
   const loadConversation = async (id) => {
     try {
       const conv = await api.getConversation(id);
@@ -272,6 +323,9 @@ function AppShell() {
     // completes. Bumping the key forces a fresh EssayFlow component (clears
     // any in-progress topic / so-what / draft state from a previous run).
     setStreamHandoffError(null);
+    // Clear any resumed-draft seed so the fresh EssayFlow starts blank
+    // instead of rehydrating from the previous draft.
+    setResumeSession(null);
     setEssayFlowKey((k) => k + 1);
     setEssayFlowVisible(true);
     setCurrentConversationId(null);
@@ -1188,6 +1242,9 @@ function AppShell() {
       liveConversationsRef.current.delete(targetConversationId);
       // Reload conversations to ensure title/messages are synced, even if aborted
       loadConversations();
+      // The session has either just been completed (full essay) or
+      // abandoned mid-stream — refresh in-progress drafts list too.
+      loadInProgressSessions();
     }
   };
 
@@ -1366,16 +1423,22 @@ function AppShell() {
         streamingIds={streamingIds}
         canStartNewConversation={canStartNewConversation}
         maxConcurrentStreams={MAX_CONCURRENT_STREAMS}
+        inProgressSessions={inProgressSessions}
+        currentSessionId={currentSessionId}
+        onResumeSession={handleResumeSession}
+        onDeleteSession={handleDeleteSession}
       />
       {essayFlowVisible ? (
         <EssayFlow
           key={essayFlowKey}
+          initialSession={resumeSession}
           onComplete={handleEssayFlowComplete}
           isBusy={isLoading}
           handoffError={streamHandoffError}
           onDismissHandoffError={() => setStreamHandoffError(null)}
           onOpenVoiceSettings={() => handleOpenSettings('voice')}
           onOpenPastEssay={handleSelectConversation}
+          onSessionChanged={loadInProgressSessions}
         />
       ) : (
         <ChatInterface

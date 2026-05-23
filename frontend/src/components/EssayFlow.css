@@ -108,6 +108,215 @@
     color: var(--text-secondary);
 }
 
+/* Step 1 — Conversational minimal redesign.
+   Drops labels and sublines in favor of a single h1, a roomy textarea
+   whose placeholder carries the example, and a chip picker that speaks
+   for itself. Goal: each piece of text adds NEW information; no level
+   of the visual hierarchy paraphrases another. */
+.essay-flow-step--topic {
+    gap: 18px;
+}
+
+.essay-flow-textarea--topic {
+    min-height: 180px;
+    font-size: 15px;
+    line-height: 1.55;
+}
+
+.essay-flow-topic-hint {
+    margin-top: -10px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    opacity: 0.75;
+}
+
+.essay-flow-topic-secondary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 2px;
+}
+
+.essay-flow-topic-secondary-sep {
+    color: var(--text-secondary);
+    opacity: 0.4;
+    font-size: 14px;
+}
+
+.essay-flow-topic-kind {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.essay-flow-topic-kind-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.essay-flow-topic-kind-required {
+    color: var(--accent, #fbbf24);
+    margin-left: 2px;
+}
+
+/* The audience field is load-bearing — it changes the questions on
+   Step 2 AND how the council writes. The "why" line earns its keep by
+   telling the user why picking matters, without restating the label. */
+.essay-flow-topic-kind-why {
+    font-size: 13px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    margin-top: -4px;
+}
+
+.essay-flow-input--inline {
+    margin-top: 4px;
+    font-size: 14px;
+}
+
+.essay-flow-actions--single {
+    justify-content: flex-end;
+}
+
+/* Header row that lets a step's h2 share its line with a small
+   ↻ Regenerate button. Used by Step 2 and Step 3 so users can
+   explicitly request fresh content without us silently destroying
+   their work on Continue. */
+.essay-flow-question-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.essay-flow-regenerate {
+    background: transparent;
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+}
+
+.essay-flow-regenerate:hover:not(:disabled) {
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.essay-flow-regenerate:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Dirty state — the user has changed inputs since the last
+   generation. Pulses gold to nudge the user toward regenerating
+   without forcing it. */
+.essay-flow-regenerate--dirty {
+    color: var(--accent, #fbbf24);
+    border-color: rgba(251, 191, 36, 0.4);
+    animation: essay-flow-regenerate-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes essay-flow-regenerate-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.08);
+    }
+}
+
+/* Shimmer card that hangs under the last fully-arrived question while
+   the stream is still landing more. Smaller layout shift than the
+   old "More on the way" paragraph and gives the eye a concrete
+   placeholder for the next question. */
+.essay-flow-question-skeleton {
+    margin-top: 12px;
+    padding: 16px;
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.06));
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.015);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: essay-flow-skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+.essay-flow-question-skeleton-line {
+    height: 12px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05));
+    background-size: 200% 100%;
+    animation: essay-flow-skeleton-sweep 1.6s ease-in-out infinite;
+}
+
+.essay-flow-question-skeleton-line--long { width: 75%; }
+.essay-flow-question-skeleton-line--medium { width: 50%; }
+
+.essay-flow-question-skeleton-textarea {
+    height: 80px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+    background-size: 200% 100%;
+    animation: essay-flow-skeleton-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes essay-flow-skeleton-sweep {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+@keyframes essay-flow-skeleton-pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 0.85; }
+}
+
+/* Legend strip that appears under the Step 2 intro hint — renders the
+   actual MicButton + Skip-style buttons inline so users see exactly what
+   to look for next to each question. The buttons themselves are inert
+   (aria-hidden, no-op onClick) but visually identical to the real ones. */
+.essay-flow-toolbar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 18px;
+    margin: 0 0 12px 0;
+    padding: 10px 14px;
+    border: 1px dashed var(--border, rgba(255, 255, 255, 0.08));
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.essay-flow-toolbar-legend-intro {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.essay-flow-toolbar-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Demo controls inside the legend must not look interactive. Remove
+   any hover lift / cursor change the real controls have. */
+.essay-flow-toolbar-legend .mic-button,
+.essay-flow-toolbar-legend .essay-flow-skip-question {
+    cursor: default;
+    pointer-events: none;
+}
+
 /* Field group — wraps a label + per-field hint + input so the two
    fields on the topic step read as distinct sections instead of one
    continuous stack of identical-looking inputs. */

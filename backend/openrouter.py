@@ -123,6 +123,85 @@ async def query_model(
     }
 
 
+async def stream_model(
+    model: str,
+    messages: List[Dict[str, str]],
+    timeout: float = 120.0,
+    temperature: float = 0.7,
+):
+    """Stream chat completion text deltas from OpenRouter.
+
+    Async generator: yields the next text chunk as a string each iteration.
+    Returns on stream completion. Yields a final empty string only if the
+    stream ends with no content. Errors raise — callers should wrap.
+
+    Used by the intake-questions streaming endpoint: callers accumulate
+    the yielded chunks into a buffer and parse complete NDJSON lines as
+    they arrive. We deliberately don't try to be clever about JSON
+    parsing in here — that's the caller's job.
+    """
+    api_key = get_openrouter_api_key()
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "stream": True,
+    }
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        async with client.stream(
+            "POST",
+            OPENROUTER_API_URL,
+            headers=headers,
+            json=payload,
+        ) as response:
+            if response.status_code != 200:
+                # Drain so the connection can close cleanly, then raise.
+                body = ""
+                try:
+                    body = (await response.aread()).decode("utf-8", "replace")
+                except Exception:
+                    pass
+                raise RuntimeError(
+                    f"OpenRouter stream HTTP {response.status_code}: {body[:240]}"
+                )
+
+            # OpenAI-compatible SSE format: lines like
+            #   data: {"choices": [{"delta": {"content": "..."}}]}
+            # ending with `data: [DONE]`. Comments (`: keep-alive`) and
+            # blank lines are skipped.
+            import json as _json
+
+            async for raw_line in response.aiter_lines():
+                if not raw_line:
+                    continue
+                line = raw_line.strip()
+                if not line or line.startswith(":"):
+                    continue
+                if not line.startswith("data:"):
+                    continue
+                payload_str = line[5:].strip()
+                if payload_str == "[DONE]":
+                    return
+                try:
+                    chunk = _json.loads(payload_str)
+                except Exception:
+                    continue
+                try:
+                    delta = chunk["choices"][0].get("delta") or {}
+                except (KeyError, IndexError):
+                    continue
+                content_piece = delta.get("content")
+                if not content_piece:
+                    continue
+                yield content_piece
+
+
 async def query_models_parallel(
     models: List[str],
     messages: List[Dict[str, str]],

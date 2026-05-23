@@ -155,6 +155,30 @@ async def query_model(model: str, messages: List[Dict[str, str]], timeout: float
     return await provider.query(model, messages, timeout, temperature)
 
 
+async def stream_model(model: str, messages: List[Dict[str, str]], timeout: float = 120.0, temperature: float = 0.7):
+    """Stream text deltas from the appropriate provider as an async generator.
+
+    Currently only OpenRouter implements native streaming under this
+    interface. For non-OpenRouter providers, falls back to a non-stream
+    `query_model` call and yields the full content as ONE chunk — the
+    caller's chunk-accumulating logic still works, it just doesn't see
+    progressive arrival.
+    """
+    if model.startswith("openrouter:") or ":" not in model:
+        from . import openrouter as _or
+
+        model_id = model.removeprefix("openrouter:") if model.startswith("openrouter:") else model
+        async for piece in _or.stream_model(model_id, messages, timeout, temperature):
+            yield piece
+        return
+
+    # Non-streaming providers: do one shot, yield the whole content.
+    result = await query_model(model, messages, timeout, temperature)
+    content = (result or {}).get("content") or ""
+    if content:
+        yield content
+
+
 async def query_models_parallel(models: List[str], messages: List[Dict[str, str]]) -> Dict[str, Any]:
     """Dispatch parallel query to appropriate providers."""
     tasks = []

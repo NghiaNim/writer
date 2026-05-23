@@ -30,6 +30,10 @@ export default function FinalEssay({
     detectionScore = null,
     detectionScoreRunning = false,
     onDetectionOptimized = null,
+    onFixFlag = null,
+    fixingFlagIdx = null,
+    dismissedFlags = null,
+    onDismissFlag = null,
 }) {
     const [isCopied, setIsCopied] = useState(false);
     const [showNotes, setShowNotes] = useState(false);
@@ -89,6 +93,10 @@ export default function FinalEssay({
             <FactCheckPanel
                 flags={factCheckFlags}
                 running={factCheckRunning}
+                onFixFlag={onFixFlag}
+                fixingFlagIdx={fixingFlagIdx}
+                dismissedFlags={dismissedFlags}
+                onDismissFlag={onDismissFlag}
             />
 
             <DetectionScorePanel
