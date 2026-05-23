@@ -135,6 +135,10 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
   const [serperTestResult, setSerperTestResult] = useState(null);
   const [tavilyTestResult, setTavilyTestResult] = useState(null);
   const [braveTestResult, setBraveTestResult] = useState(null);
+  // Detection / Sapling
+  const [saplingApiKey, setSaplingApiKey] = useState('');
+  const [isTestingSapling, setIsTestingSapling] = useState(false);
+  const [saplingTestResult, setSaplingTestResult] = useState(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Enabled Providers (which sources are available)
@@ -667,6 +671,32 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       setBraveTestResult({ success: false, message: 'Test failed' });
     } finally {
       setIsTestingBrave(false);
+    }
+  };
+
+  const handleTestSapling = async () => {
+    if (!saplingApiKey && !settings.sapling_api_key_set) {
+      setSaplingTestResult({ success: false, message: 'Please enter a Sapling API key first' });
+      return;
+    }
+    setIsTestingSapling(true);
+    setSaplingTestResult(null);
+    try {
+      const keyToTest = saplingApiKey || null;
+      const result = await api.testSaplingKey(keyToTest);
+      setSaplingTestResult(result);
+
+      if (result.success && saplingApiKey) {
+        await api.updateSettings({ sapling_api_key: saplingApiKey });
+        setSaplingApiKey('');
+        await loadSettings();
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (err) {
+      setSaplingTestResult({ success: false, message: 'Test failed' });
+    } finally {
+      setIsTestingSapling(false);
     }
   };
 
@@ -1717,6 +1747,13 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                 isTestingBrave={isTestingBrave}
                 braveTestResult={braveTestResult}
                 setBraveTestResult={setBraveTestResult}
+                // Sapling (AI detection)
+                saplingApiKey={saplingApiKey}
+                setSaplingApiKey={setSaplingApiKey}
+                handleTestSapling={handleTestSapling}
+                isTestingSapling={isTestingSapling}
+                saplingTestResult={saplingTestResult}
+                setSaplingTestResult={setSaplingTestResult}
                 // Other Settings
                 fullContentResults={fullContentResults}
                 setFullContentResults={setFullContentResults}

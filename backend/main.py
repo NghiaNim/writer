@@ -1609,6 +1609,27 @@ async def send_message_stream(
                         fact_check_flags = []
                     yield f"data: {json.dumps({'type': 'fact_check_complete', 'data': {'flags': fact_check_flags}})}\n\n"
 
+            # Stage 5 — AI detection scoring. Runs the local burstiness +
+            # phrase detection analysis on the final essay. Lightweight
+            # (pure Python, no API calls in default mode), so always runs.
+            # Perplexity (torch) and Sapling (API) are skipped in the
+            # pipeline to keep latency low — the user can run them
+            # manually via the /api/detection/score endpoint.
+            detection_score_data = None
+            if essay_text_for_check:
+                yield f"data: {json.dumps({'type': 'detection_score_start'})}\n\n"
+                try:
+                    from .detection_scorer import full_analysis
+                    det_report = await full_analysis(
+                        essay_text_for_check,
+                        skip_perplexity=True,
+                        skip_sapling=True,
+                    )
+                    detection_score_data = det_report.to_dict()
+                except Exception as e:
+                    print(f"WARN: detection scoring failed: {e}")
+                yield f"data: {json.dumps({'type': 'detection_score_complete', 'data': {'score': detection_score_data}})}\n\n"
+
             # Wait for title generation if it was started
             if title_task:
                 try:
@@ -1629,6 +1650,8 @@ async def send_message_stream(
                 metadata["search_query"] = search_query
             if fact_check_flags:
                 metadata["fact_check_flags"] = fact_check_flags
+            if detection_score_data:
+                metadata["detection_score"] = detection_score_data
 
             storage.add_assistant_message(
                 conversation_id,
@@ -1860,6 +1883,7 @@ async def get_app_settings(user: AuthUser = Depends(get_current_user)):
         "deepseek_api_key_set": bool(settings.deepseek_api_key),
         "groq_api_key_set": bool(settings.groq_api_key),
         "custom_endpoint_api_key_set": bool(settings.custom_endpoint_api_key),
+        "sapling_api_key_set": bool(settings.sapling_api_key),
 
         # Enabled Providers
         "enabled_providers": settings.enabled_providers,
@@ -2137,6 +2161,7 @@ async def update_app_settings(
         "deepseek_api_key_set": bool(settings.deepseek_api_key),
         "groq_api_key_set": bool(settings.groq_api_key),
         "custom_endpoint_api_key_set": bool(settings.custom_endpoint_api_key),
+        "sapling_api_key_set": bool(settings.sapling_api_key),
 
         # Enabled Providers
         "enabled_providers": settings.enabled_providers,
@@ -2921,6 +2946,50 @@ async def test_serper_api(
             if response.status_code == 200:
                 return {"success": True, "message": "API key is valid"}
             elif response.status_code == 401 or response.status_code == 403:
+                return {"success": False, "message": "Invalid API key"}
+            else:
+                return {"success": False, "message": f"API error: {response.status_code}"}
+
+    except httpx.TimeoutException:
+        return {"success": False, "message": "Request timed out"}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+class TestSaplingRequest(BaseModel):
+    """Request to test Sapling AI detection API key."""
+    api_key: str | None = None
+
+
+@app.post("/api/settings/test-sapling")
+async def test_sapling_api(
+    request: TestSaplingRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Test Sapling API key with a small detection request."""
+    import httpx
+    settings = get_settings()
+    api_key = request.api_key or getattr(settings, 'sapling_api_key', '') or os.environ.get("SAPLING_API_KEY", "")
+
+    if not api_key:
+        return {"success": False, "message": "No API key provided"}
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                "https://api.sapling.ai/api/v1/aidetect",
+                json={
+                    "key": api_key,
+                    "text": "The quick brown fox jumps over the lazy dog.",
+                },
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if "score" in data:
+                    return {"success": True, "message": "API key is valid"}
+                return {"success": False, "message": "Unexpected response format"}
+            elif response.status_code in (401, 403):
                 return {"success": False, "message": "Invalid API key"}
             else:
                 return {"success": False, "message": f"API error: {response.status_code}"}

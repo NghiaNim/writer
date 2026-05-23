@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import ThinkBlockRenderer from './ThinkBlockRenderer';
 import FactCheckPanel from './FactCheckPanel';
+import DetectionScorePanel from './DetectionScorePanel';
 import { getModelVisuals, getShortModelName } from '../utils/modelHelpers';
 import StageTimer from './StageTimer';
 import './FinalEssay.css';
@@ -26,19 +27,29 @@ export default function FinalEssay({
     versionLabel = null,
     factCheckFlags = null,
     factCheckRunning = false,
+    detectionScore = null,
+    detectionScoreRunning = false,
+    onDetectionOptimized = null,
 }) {
     const [isCopied, setIsCopied] = useState(false);
     const [showNotes, setShowNotes] = useState(false);
+    const [optimizedEssay, setOptimizedEssay] = useState(null);
+
+    const handleOptimizedEssay = useCallback((newEssay) => {
+        setOptimizedEssay(newEssay);
+        if (onDetectionOptimized) onDetectionOptimized(newEssay);
+    }, [onDetectionOptimized]);
 
     if (!finalResponse) return null;
 
     const visuals = getModelVisuals(finalResponse?.model);
     const shortName = getShortModelName(finalResponse?.model);
 
-    const essayText =
+    const rawEssayText =
         typeof finalResponse?.response === 'string'
             ? finalResponse.response
             : String(finalResponse?.response || '');
+    const essayText = optimizedEssay || rawEssayText;
 
     const handleCopy = async () => {
         if (!essayText) return;
@@ -78,6 +89,13 @@ export default function FinalEssay({
             <FactCheckPanel
                 flags={factCheckFlags}
                 running={factCheckRunning}
+            />
+
+            <DetectionScorePanel
+                score={detectionScore}
+                running={detectionScoreRunning}
+                essayText={rawEssayText}
+                onOptimizedEssay={handleOptimizedEssay}
             />
 
             <div className="final-essay-actions">

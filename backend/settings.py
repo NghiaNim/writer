@@ -26,6 +26,7 @@ SECRET_FIELDS: Dict[str, str] = {
     "tavily_api_key": "TAVILY_API_KEY",
     "brave_api_key": "BRAVE_API_KEY",
     "serper_api_key": "SERPER_API_KEY",
+    "sapling_api_key": "SAPLING_API_KEY",
     "custom_endpoint_api_key": "CUSTOM_ENDPOINT_API_KEY",
 }
 
@@ -125,6 +126,7 @@ class Settings(BaseModel):
     tavily_api_key: Optional[str] = None
     brave_api_key: Optional[str] = None
     serper_api_key: Optional[str] = None
+    sapling_api_key: Optional[str] = None
     openrouter_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None

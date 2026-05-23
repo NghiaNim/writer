@@ -1208,6 +1208,10 @@ function AssistantMessageBody({
                         msg.factCheckFlags || msg.metadata?.fact_check_flags || null
                     }
                     factCheckRunning={Boolean(msg.factCheckRunning)}
+                    detectionScore={
+                        msg.detectionScore || msg.metadata?.detection_score || null
+                    }
+                    detectionScoreRunning={Boolean(msg.detectionScoreRunning)}
                 />
             )}
 

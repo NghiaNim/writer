@@ -988,6 +988,35 @@ function AppShell() {
               });
               break;
 
+            case 'detection_score_start':
+              safeSetConv((prev) => {
+                if (!prev) return prev;
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                if (!lastMsg || lastMsg.role !== 'assistant') return prev;
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  detectionScoreRunning: true,
+                };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'detection_score_complete':
+              safeSetConv((prev) => {
+                if (!prev) return prev;
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                if (!lastMsg || lastMsg.role !== 'assistant') return prev;
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  detectionScoreRunning: false,
+                  detectionScore: event?.data?.score || null,
+                };
+                return { ...prev, messages };
+              });
+              break;
+
             case 'interim_question':
             case 'clarification_question':
               // The backend asks the user one more question while the

@@ -478,6 +478,38 @@ export const api = {
   },
 
   /**
+   * Test Sapling AI detection API key.
+   */
+  async testSaplingKey(apiKey) {
+    const response = await authedFetch(`${API_BASE}/api/settings/test-sapling`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ api_key: apiKey }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to test API key');
+    }
+    return response.json();
+  },
+
+  /**
+   * Score essay text for AI detection risk.
+   */
+  async scoreDetection(text, options = {}) {
+    const response = await authedFetch(`${API_BASE}/api/detection/score`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, ...options }),
+    });
+    if (!response.ok) {
+      throw new Error(await extractError(response, 'Detection scoring failed'));
+    }
+    return response.json();
+  },
+
+  /**
    * Test a specific provider's API key.
    */
   async testProviderKey(providerId, apiKey) {

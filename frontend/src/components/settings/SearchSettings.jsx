@@ -56,6 +56,13 @@ export default function SearchSettings({
     isTestingBrave,
     braveTestResult,
     setBraveTestResult,
+    // Sapling (AI detection)
+    saplingApiKey,
+    setSaplingApiKey,
+    handleTestSapling,
+    isTestingSapling,
+    saplingTestResult,
+    setSaplingTestResult,
     // Other Settings
     fullContentResults,
     setFullContentResults,
@@ -315,6 +322,44 @@ export default function SearchSettings({
                     </div>
                 </div>
             )}
+
+            {/* Sapling AI Detection */}
+            <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                <label>AI Detection (Sapling)</label>
+                <p className="setting-description">
+                    Optional external AI detection scorer. Free tier: 50K characters/day.
+                    Get a key at <a href="https://sapling.ai/docs/api/detector" target="_blank" rel="noopener noreferrer" style={{ color: '#6ee7b7' }}>sapling.ai</a>.
+                </p>
+                <div className="provider-key-section">
+                    <div className="key-input-row">
+                        <input
+                            type="password"
+                            placeholder={settings?.sapling_api_key_set ? '••••••••••••••••' : 'Enter Sapling API key'}
+                            value={saplingApiKey}
+                            onChange={e => {
+                                setSaplingApiKey(e.target.value);
+                                if (setSaplingTestResult) setSaplingTestResult(null);
+                            }}
+                            className={settings?.sapling_api_key_set && !saplingApiKey ? 'key-configured' : ''}
+                        />
+                        <button
+                            className="test-key-btn"
+                            onClick={handleTestSapling}
+                            disabled={isTestingSapling || (!saplingApiKey && !settings?.sapling_api_key_set)}
+                        >
+                            {isTestingSapling ? 'Testing...' : (settings?.sapling_api_key_set && !saplingApiKey ? 'Retest' : 'Test')}
+                        </button>
+                    </div>
+                    {settings?.sapling_api_key_set && !saplingApiKey && (
+                        <div className="key-status configured">API key configured</div>
+                    )}
+                    {saplingTestResult && (
+                        <div className={`test-result ${saplingTestResult.success ? 'success' : 'error'}`}>
+                            {saplingTestResult.success ? '✓' : '✗'} {saplingTestResult.message}
+                        </div>
+                    )}
+                </div>
+            </div>
         </section>
     );
 }
