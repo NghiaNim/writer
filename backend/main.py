@@ -3177,6 +3177,88 @@ async def test_openrouter_api(
         return {"success": False, "message": str(e)}
 
 
+# ---------------------------------------------------------------------------
+# Detection scoring & essay optimization
+# ---------------------------------------------------------------------------
+
+class DetectionScoreRequest(BaseModel):
+    text: str
+    sapling_api_key: Optional[str] = None
+    skip_perplexity: bool = False
+    skip_sapling: bool = False
+
+
+class OptimizeEssayRequest(BaseModel):
+    text: str
+    revision_model: Optional[str] = None
+    sapling_api_key: Optional[str] = None
+    risk_threshold: Optional[float] = None
+    max_iterations: Optional[int] = None
+    skip_perplexity: bool = False
+    skip_sapling: bool = False
+
+
+@app.post("/api/detection/score")
+async def score_essay_detection(
+    body: DetectionScoreRequest,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Score an essay for AI detection risk."""
+    from .detection_scorer import full_analysis
+
+    if not body.text or not body.text.strip():
+        raise HTTPException(status_code=400, detail="text is required")
+
+    sapling_key = body.sapling_api_key or os.environ.get("SAPLING_API_KEY", "")
+
+    report = await full_analysis(
+        body.text,
+        sapling_api_key=sapling_key,
+        skip_perplexity=body.skip_perplexity,
+        skip_sapling=body.skip_sapling,
+    )
+    return report.to_dict()
+
+
+@app.post("/api/detection/optimize")
+async def optimize_essay_endpoint(
+    body: OptimizeEssayRequest,
+    request: Request,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Iteratively optimize an essay to reduce AI detection risk. Streams SSE events."""
+    from .essay_optimizer import optimize_essay_stream, DEFAULT_REVISION_MODEL
+
+    if not body.text or not body.text.strip():
+        raise HTTPException(status_code=400, detail="text is required")
+
+    sapling_key = body.sapling_api_key or os.environ.get("SAPLING_API_KEY", "")
+
+    async def event_stream():
+        async for event in optimize_essay_stream(
+            essay=body.text,
+            revision_model=body.revision_model or DEFAULT_REVISION_MODEL,
+            sapling_api_key=sapling_key,
+            risk_threshold=body.risk_threshold or 0.35,
+            max_iterations=body.max_iterations or 3,
+            skip_perplexity=body.skip_perplexity,
+            skip_sapling=body.skip_sapling,
+        ):
+            if await request.is_disconnected():
+                break
+            yield event
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
     # Render (and most PaaS) inject the listening port via $PORT. Fall back to
