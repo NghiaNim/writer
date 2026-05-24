@@ -1,10 +1,12 @@
 .login-screen {
     min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
-    align-items: center;
+    align-items: safe center;
     justify-content: center;
-    padding: 24px;
+    padding: 16px;
     box-sizing: border-box;
+    overflow-y: auto;
 }
 
 .login-card {
@@ -18,6 +20,7 @@
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     animation: login-fade-in 0.45s ease-out both;
+    margin: auto;
 }
 
 @keyframes login-fade-in {
@@ -385,4 +388,95 @@
 
 .login-screen--coffee .login-footer {
     font-size: 14px;
+}
+
+/* ── Responsive: small screens ──────────────────────────────────── */
+
+@media (max-width: 480px) {
+    .login-screen {
+        padding: 12px;
+    }
+
+    .login-card {
+        padding: 28px 20px 22px;
+        border-radius: 14px;
+    }
+
+    .login-title {
+        font-size: 26px !important;
+    }
+
+    .login-subtitle {
+        font-size: 13px !important;
+    }
+
+    .login-header {
+        margin-bottom: 18px;
+    }
+
+    .login-tabs {
+        margin-bottom: 16px;
+    }
+
+    .login-field input {
+        padding: 10px 12px;
+        font-size: 14px !important;
+    }
+
+    .login-submit,
+    .login-google {
+        padding: 11px 14px;
+        font-size: 14px !important;
+    }
+
+    .login-screen--coffee .login-card {
+        max-width: 100%;
+        padding: 28px 20px 22px;
+    }
+
+    .login-screen--coffee .login-title-bean {
+        --bean-size: 14px;
+    }
+
+    .login-footer {
+        margin-top: 16px;
+    }
+}
+
+/* Very short viewports (landscape phones, small laptops) */
+@media (max-height: 600px) {
+    .login-screen {
+        align-items: flex-start;
+        padding-top: 12px;
+    }
+
+    .login-header {
+        margin-bottom: 14px;
+    }
+
+    .login-card {
+        padding-top: 24px;
+        padding-bottom: 20px;
+    }
+
+    .login-screen--coffee .login-card {
+        padding-top: 24px;
+        padding-bottom: 20px;
+    }
+
+    .login-tabs {
+        margin-bottom: 14px;
+    }
+
+    .login-form {
+        gap: 10px;
+    }
+
+    .login-submit {
+        margin-top: 4px;
+    }
+
+    .login-footer {
+        margin-top: 14px;
+    }
 }
