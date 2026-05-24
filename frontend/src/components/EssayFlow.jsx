@@ -1302,9 +1302,6 @@ export default function EssayFlow({
     const disabled = submitting || isBusy;
     const showTopicChip = step !== 'topic';
 
-    // Visible step indicator — only for the main 4-step intake. The draft
-    // branch (topic → draft) is a 2-step express path and the chip in the
-    // header is enough orientation there.
     const STEP_ORDER = ['topic', 'questions', 'core_idea', 'timeline', 'voice'];
     const STEP_LABELS = {
         topic: 'Topic & audience',
@@ -1313,8 +1310,17 @@ export default function EssayFlow({
         timeline: 'Story timeline',
         voice: 'Voice & ready',
     };
+    const STEP_PREV = {
+        questions: 'topic',
+        core_idea: 'questions',
+        timeline: 'core_idea',
+        voice: 'timeline',
+        draft: 'topic',
+    };
     const stepIndex = STEP_ORDER.indexOf(step);
     const showStepper = stepIndex >= 0;
+    const prevStep = STEP_PREV[step] || null;
+    const [questionsFullscreen, setQuestionsFullscreen] = useState(false);
 
     return (
         <div className="essay-flow essay-flow--coffee">
@@ -1334,43 +1340,59 @@ export default function EssayFlow({
                         ) : null}
                     </div>
                 )}
+                {/* Unified top bar: back button + topic chip + stepper dots */}
                 {showTopicChip && (
-                    <div className="essay-flow-topic-chip" title={topic}>
-                        <span>{topic}</span>
-                        {audience && (
-                            <>
-                                <span
-                                    className="essay-flow-topic-chip-arrow"
-                                    aria-hidden="true"
-                                >
-                                    →
-                                </span>
-                                <span>{audience}</span>
-                            </>
-                        )}
-                    </div>
-                )}
+                    <div className="essay-flow-top-bar">
+                        {prevStep ? (
+                            <button
+                                type="button"
+                                className="essay-flow-back-btn"
+                                onClick={() => setStep(prevStep)}
+                                disabled={disabled}
+                                title={`Back to ${STEP_LABELS[prevStep] || 'previous step'}`}
+                            >
+                                ←
+                            </button>
+                        ) : <div className="essay-flow-back-btn-spacer" />}
 
-                {showStepper && (
-                    <div className="essay-flow-stepper" aria-label="Intake progress">
-                        <div className="essay-flow-stepper-label">
-                            Step {stepIndex + 1} of {STEP_ORDER.length} · {STEP_LABELS[step]}
-                        </div>
-                        <div className="essay-flow-stepper-dots">
-                            {STEP_ORDER.map((s, i) => (
-                                <span
-                                    key={s}
-                                    className={
-                                        'essay-flow-stepper-dot ' +
-                                        (i < stepIndex
-                                            ? 'essay-flow-stepper-dot--done'
-                                            : i === stepIndex
-                                                ? 'essay-flow-stepper-dot--active'
-                                                : 'essay-flow-stepper-dot--pending')
-                                    }
-                                    aria-label={`Step ${i + 1}`}
-                                />
-                            ))}
+                        <div className="essay-flow-top-bar-center">
+                            <div className="essay-flow-topic-chip" title={topic}>
+                                <span>{topic}</span>
+                                {audience && (
+                                    <>
+                                        <span
+                                            className="essay-flow-topic-chip-arrow"
+                                            aria-hidden="true"
+                                        >
+                                            →
+                                        </span>
+                                        <span>{audience}</span>
+                                    </>
+                                )}
+                            </div>
+                            {showStepper && (
+                                <div className="essay-flow-stepper" aria-label="Intake progress">
+                                    <div className="essay-flow-stepper-label">
+                                        Step {stepIndex + 1} of {STEP_ORDER.length} · {STEP_LABELS[step]}
+                                    </div>
+                                    <div className="essay-flow-stepper-dots">
+                                        {STEP_ORDER.map((s, i) => (
+                                            <span
+                                                key={s}
+                                                className={
+                                                    'essay-flow-stepper-dot ' +
+                                                    (i < stepIndex
+                                                        ? 'essay-flow-stepper-dot--done'
+                                                        : i === stepIndex
+                                                            ? 'essay-flow-stepper-dot--active'
+                                                            : 'essay-flow-stepper-dot--pending')
+                                                }
+                                                aria-label={`Step ${i + 1}`}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -1577,9 +1599,17 @@ export default function EssayFlow({
                 )}
 
                 {step === 'questions' && (
-                    <div className="essay-flow-step">
+                    <div className={`essay-flow-step ${questionsFullscreen ? 'essay-flow-step--fullscreen' : ''}`}>
                         <div className="essay-flow-question-row">
                             <h2 className="essay-flow-question">A few questions to make this sound like you</h2>
+                            <button
+                                type="button"
+                                className="essay-flow-fullscreen-btn"
+                                onClick={() => setQuestionsFullscreen(v => !v)}
+                                title={questionsFullscreen ? 'Exit full screen' : 'Full screen'}
+                            >
+                                {questionsFullscreen ? '⊖' : '⊕'}
+                            </button>
                             {questions.length > 0 && (
                                 <button
                                     type="button"
@@ -2067,14 +2097,6 @@ export default function EssayFlow({
                         <div className="essay-flow-actions">
                             <button
                                 type="button"
-                                className="essay-flow-link"
-                                onClick={() => setStep('topic')}
-                                disabled={disabled || questionsLoading}
-                            >
-                                ← Back
-                            </button>
-                            <button
-                                type="button"
                                 className="essay-flow-primary"
                                 onClick={handleSubmitAnswers}
                                 disabled={
@@ -2142,14 +2164,6 @@ export default function EssayFlow({
                         )}
                         {error && <div className="essay-flow-error">{error}</div>}
                         <div className="essay-flow-actions">
-                            <button
-                                type="button"
-                                className="essay-flow-link"
-                                onClick={() => setStep('questions')}
-                                disabled={disabled}
-                            >
-                                ← Back
-                            </button>
                             <button
                                 type="button"
                                 className="essay-flow-primary"
@@ -2258,14 +2272,6 @@ export default function EssayFlow({
                         {error && <div className="essay-flow-error">{error}</div>}
 
                         <div className="essay-flow-actions">
-                            <button
-                                type="button"
-                                className="essay-flow-link"
-                                onClick={() => setStep('core_idea')}
-                                disabled={disabled}
-                            >
-                                ← Back
-                            </button>
                             <button
                                 type="button"
                                 className="essay-flow-primary"
@@ -2377,14 +2383,6 @@ export default function EssayFlow({
                         <div className="essay-flow-actions">
                             <button
                                 type="button"
-                                className="essay-flow-link"
-                                onClick={() => setStep('timeline')}
-                                disabled={disabled}
-                            >
-                                ← Back
-                            </button>
-                            <button
-                                type="button"
                                 className="essay-flow-primary"
                                 onClick={handleStartCouncil}
                                 disabled={disabled}
@@ -2449,14 +2447,6 @@ export default function EssayFlow({
 
                         {error && <div className="essay-flow-error">{error}</div>}
                         <div className="essay-flow-actions">
-                            <button
-                                type="button"
-                                className="essay-flow-link"
-                                onClick={() => setStep('topic')}
-                                disabled={disabled}
-                            >
-                                ← Back
-                            </button>
                             <button
                                 type="button"
                                 className="essay-flow-primary"

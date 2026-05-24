@@ -466,7 +466,8 @@
   transition: all 0.2s;
 }
 
-.conversation-item:hover .delete-btn {
+.conversation-item:hover .delete-btn,
+.sidebar-draft-item:hover .delete-btn {
   opacity: 1;
 }
 

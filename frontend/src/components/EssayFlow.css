@@ -55,13 +55,62 @@
     gap: 16px;
 }
 
+/* ── Top bar: back button + topic chip + stepper ────────────────── */
+
+.essay-flow-top-bar {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.essay-flow-top-bar-center {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.essay-flow-back-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 8px;
+    background: rgba(148, 163, 184, 0.06);
+    color: var(--text-secondary);
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+    margin-top: 2px;
+}
+
+.essay-flow-back-btn:hover:not(:disabled) {
+    background: rgba(148, 163, 184, 0.14);
+    border-color: rgba(148, 163, 184, 0.35);
+    color: var(--text-primary);
+}
+
+.essay-flow-back-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.essay-flow-back-btn-spacer {
+    width: 32px;
+    flex-shrink: 0;
+}
+
 .essay-flow-topic-chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     align-self: flex-start;
     padding: 5px 12px;
-    margin-bottom: 8px;
     background: rgba(59, 130, 246, 0.08);
     border: 1px solid rgba(59, 130, 246, 0.18);
     border-radius: 999px;
@@ -399,7 +448,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin: 0 0 14px 0;
+    margin: 0;
     padding-bottom: 14px;
     border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
@@ -550,6 +599,64 @@
 .essay-flow-link:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+/* ── Fullscreen mode for questions step ─────────────────────────── */
+
+.essay-flow-fullscreen-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 8px;
+    background: rgba(148, 163, 184, 0.06);
+    color: var(--text-secondary);
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease;
+}
+
+.essay-flow-fullscreen-btn:hover {
+    background: rgba(148, 163, 184, 0.14);
+    border-color: rgba(148, 163, 184, 0.35);
+    color: var(--text-primary);
+}
+
+.essay-flow-step--fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: var(--bg-primary, #0f172a);
+    overflow-y: auto;
+    padding: 32px 40px;
+    margin: 0;
+    max-width: none;
+    animation: essay-flow-fullscreen-in 200ms ease;
+}
+
+@keyframes essay-flow-fullscreen-in {
+    from { opacity: 0; transform: scale(0.98); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+.essay-flow-step--fullscreen .essay-flow-question {
+    font-size: 32px;
+}
+
+.essay-flow-step--fullscreen .essay-flow-exchange textarea {
+    min-height: 180px;
+    font-size: 16px;
+}
+
+.essay-flow-step--fullscreen .essay-flow-actions {
+    position: sticky;
+    bottom: 0;
+    padding: 16px 0;
+    background: var(--bg-primary, #0f172a);
+    border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .essay-flow-error {
@@ -1667,6 +1774,42 @@
 
 .essay-flow--coffee .essay-flow-link--soft:hover:not(:disabled) {
     color: var(--coffee-crema-bright);
+}
+
+/* Back button — warm border treatment. */
+.essay-flow--coffee .essay-flow-back-btn {
+    border-color: rgba(217, 119, 6, 0.2);
+    background: rgba(217, 119, 6, 0.06);
+    color: var(--coffee-crema);
+}
+
+.essay-flow--coffee .essay-flow-back-btn:hover:not(:disabled) {
+    border-color: rgba(217, 119, 6, 0.4);
+    background: rgba(217, 119, 6, 0.14);
+    color: var(--coffee-crema-bright);
+}
+
+/* Fullscreen button — same warm treatment. */
+.essay-flow--coffee .essay-flow-fullscreen-btn {
+    border-color: rgba(217, 119, 6, 0.2);
+    background: rgba(217, 119, 6, 0.06);
+    color: var(--coffee-crema);
+}
+
+.essay-flow--coffee .essay-flow-fullscreen-btn:hover {
+    border-color: rgba(217, 119, 6, 0.4);
+    background: rgba(217, 119, 6, 0.14);
+    color: var(--coffee-crema-bright);
+}
+
+/* Fullscreen mode — warm background. */
+.essay-flow--coffee .essay-flow-step--fullscreen {
+    background: var(--bg-primary, #1a0e04);
+}
+
+.essay-flow--coffee .essay-flow-step--fullscreen .essay-flow-actions {
+    background: var(--bg-primary, #1a0e04);
+    border-top-color: rgba(217, 119, 6, 0.15);
 }
 
 /* Topic chip — warm pill, same shape. */
