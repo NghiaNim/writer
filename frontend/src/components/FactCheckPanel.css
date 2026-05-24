@@ -105,6 +105,11 @@
     justify-content: space-between;
     gap: 8px;
     margin-bottom: 6px;
+    /* At very narrow widths the [tag] + [Fix this · Dismiss] buttons
+       can overflow on a single line. Wrap drops the buttons to a new
+       row instead of squishing them. */
+    flex-wrap: wrap;
+    row-gap: 6px;
 }
 
 .fact-check-tag {

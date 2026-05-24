@@ -488,7 +488,11 @@
 /* Draggable splitter — the user can drag this 6px strip to resize the
    drafts panel above. Visible only in sections mode + when drafts is
    expanded (otherwise there's nothing to resize). Gold accent matches
-   the in-progress council theme used elsewhere. */
+   the in-progress council theme used elsewhere.
+
+   On touch devices the visible 6px strip is too small for reliable
+   dragging, so we expand the hit area to 18px via a ::before overlay
+   that captures pointer events without changing the visual height. */
 .sidebar-resizer {
   height: 6px;
   flex-shrink: 0;
@@ -499,6 +503,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: none;
+}
+
+.sidebar-resizer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  bottom: -6px;
+  /* Expands the touch hit area to ~18px without resizing the
+     visible layout. */
 }
 
 .sidebar-resizer:hover .sidebar-resizer-handle,
@@ -513,6 +529,16 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
   transition: background-color 0.15s;
+}
+
+/* Hide the resizer on small screens — it's awkward to use on touch
+   alongside the close button and the mobile drawer is short enough
+   that vertical splits don't make sense. Users can still collapse the
+   drafts header to hide that section if they want more essays room. */
+@media (max-width: 480px) {
+  .sidebar-resizer {
+    display: none;
+  }
 }
 
 /* Past essays section — wraps the conversation-list with a parallel

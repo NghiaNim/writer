@@ -55,21 +55,27 @@
     gap: 16px;
 }
 
-/* ── Top bar: back button + topic chip + stepper ────────────────── */
+/* ── Top bar: back button + topic chip + stepper dots ────────────────
+   Same skeleton on every main step so the user's eye finds back, topic,
+   and progress in the same spots regardless of where they are in the
+   flow. The small-caps STEP N OF M · LABEL row sits just below this
+   bar (see .essay-flow-step-badge). */
 
 .essay-flow-top-bar {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 
 .essay-flow-top-bar-center {
     flex: 1;
     min-width: 0;
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    align-items: center;
+    /* Center the chip in the available middle space rather than letting
+       it slam against the back button. */
+    justify-content: flex-start;
 }
 
 .essay-flow-back-btn {
@@ -184,6 +190,8 @@
     align-items: center;
     gap: 10px;
     margin-top: 2px;
+    flex-wrap: wrap;
+    row-gap: 6px;
 }
 
 .essay-flow-topic-secondary-sep {
@@ -443,26 +451,19 @@
 /* Step indicator at the top of the intake flow — "Step 2 of 4 · A few
    questions" plus a row of dots. Replaces the prior "you're somewhere
    in a sequence but who knows where" feeling. */
-.essay-flow-stepper {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 0;
-    padding-bottom: 14px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.essay-flow-stepper-label {
+/* Small-caps "STEP N OF M · LABEL" badge that sits directly below the
+   top bar and above the step's h1/h2. Acts as a section identifier
+   and as the divider between header chrome and step content. */
+.essay-flow-step-badge {
     font-family: var(--font-ui);
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: #93c5fd;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    color: var(--accent, #fbbf24);
+    margin: 0 0 14px 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .essay-flow-stepper-dots {
@@ -883,6 +884,45 @@
     }
     .essay-flow-paths {
         grid-template-columns: 1fr;
+    }
+
+    /* Step 2 toolbar legend gets tight on narrow phones. Drop the
+       per-item flex to column so each control sits above its label;
+       also shrink the type one notch. */
+    .essay-flow-toolbar-legend {
+        font-size: 12px;
+        gap: 8px 14px;
+        padding: 8px 12px;
+    }
+    .essay-flow-toolbar-legend-intro {
+        flex-basis: 100%;
+    }
+
+    /* Question-row header: title + ↻ button. On phones the button
+       drops below the title for breathing room. */
+    .essay-flow-question-row {
+        gap: 8px;
+    }
+    .essay-flow-regenerate {
+        font-size: 11px;
+        padding: 3px 10px;
+    }
+
+    /* Step 1 textarea + chips: tighter padding so the chip picker
+       doesn't get cramped against the viewport edge. */
+    .essay-flow-textarea--topic {
+        min-height: 150px;
+        font-size: 14px;
+    }
+    .essay-flow-topic-kind-label,
+    .essay-flow-topic-kind-why {
+        font-size: 12px;
+    }
+
+    /* Follow-up "Coach me — go one level deeper" card heading reads
+       better one rung smaller. */
+    .essay-flow-example-label {
+        font-size: 11px;
     }
 }
 
@@ -1834,15 +1874,10 @@
     box-shadow: 0 0 32px rgba(217, 119, 6, 0.35);
 }
 
-/* Stepper label color sync. */
-.essay-flow--coffee .essay-flow-stepper-label {
+/* Step badge color sync — warm crema instead of cool blue. */
+.essay-flow--coffee .essay-flow-step-badge {
     color: var(--coffee-crema);
-}
-
-/* Stepper bottom divider — softer + warm-tinted. Minimalism move:
-   let the dots carry the rhythm, not a hard separator line. */
-.essay-flow--coffee .essay-flow-stepper {
-    border-bottom-color: rgba(217, 119, 6, 0.10);
+    border-bottom-color: rgba(217, 119, 6, 0.12);
 }
 
 /* Stepper dots — were cool blue, now warm crema/amber. */
