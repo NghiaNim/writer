@@ -28,6 +28,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
 .sidebar-title {
@@ -39,6 +41,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .sidebar-subtitle {
@@ -77,6 +82,7 @@
   color: #60a5fa;
   width: 36px;
   height: 36px;
+  flex-shrink: 0;
   border-radius: 10px;
   cursor: pointer;
   display: flex;

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../api';
 import CouncilConfig from './CouncilConfig';
 import MicButton from './common/MicButton';
@@ -1629,8 +1630,8 @@ export default function EssayFlow({
                     </div>
                 )}
 
-                {step === 'questions' && (
-                    <div className={`essay-flow-step ${questionsFullscreen ? 'essay-flow-step--fullscreen' : ''}`}>
+                {step === 'questions' && (() => {
+                    const fullscreenBtn = (
                         <button
                             type="button"
                             className="essay-flow-fullscreen-btn"
@@ -1640,8 +1641,7 @@ export default function EssayFlow({
                         >
                             {questionsFullscreen ? (
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="6 1 1 1 1 6" /><polyline points="10 15 15 15 15 10" />
-                                    <line x1="1" y1="1" x2="6" y2="6" /><line x1="15" y1="15" x2="10" y2="10" />
+                                    <rect x="4" y="4" width="8" height="8" rx="1" />
                                 </svg>
                             ) : (
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1650,6 +1650,11 @@ export default function EssayFlow({
                                 </svg>
                             )}
                         </button>
+                    );
+
+                    const stepContent = (
+                    <div className={`essay-flow-step ${questionsFullscreen ? 'essay-flow-step--fullscreen essay-flow--coffee' : ''}`}>
+                        {fullscreenBtn}
                         <div className="essay-flow-question-row">
                             <h2 className="essay-flow-question">A few questions to make this sound like you</h2>
                             {questions.length > 0 && (
@@ -2163,7 +2168,12 @@ export default function EssayFlow({
                             </button>
                         </div>
                     </div>
-                )}
+                    );
+
+                    return questionsFullscreen
+                        ? createPortal(stepContent, document.body)
+                        : stepContent;
+                })()}
 
                 {step === 'core_idea' && (
                     <div className="essay-flow-step">
