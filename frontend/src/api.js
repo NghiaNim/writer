@@ -535,6 +535,22 @@ export const api = {
   },
 
   /**
+   * Start a detection optimization stream. Returns the raw Response
+   * so the caller can read the SSE body via getReader().
+   */
+  async streamDetectionOptimize(text, options = {}) {
+    const response = await authedFetch(`${API_BASE}/api/detection/optimize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, skip_perplexity: true, ...options }),
+    });
+    if (!response.ok) {
+      throw new Error(await extractError(response, 'Optimization failed'));
+    }
+    return response;
+  },
+
+  /**
    * Test a specific provider's API key.
    */
   async testProviderKey(providerId, apiKey) {

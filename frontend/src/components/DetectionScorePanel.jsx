@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { API_BASE } from '../api';
+import { api } from '../api';
 import './DetectionScorePanel.css';
 
 /**
@@ -27,21 +27,7 @@ export default function DetectionScorePanel({
         setOptimizeProgress({ status: 'starting', iteration: 0 });
 
         try {
-            const token = localStorage.getItem('llm_council_session');
-            const parsed = token ? JSON.parse(token) : null;
-            const accessToken = parsed?.access_token || '';
-
-            const response = await fetch(`${API_BASE}/api/detection/optimize`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-                },
-                body: JSON.stringify({
-                    text: essayText,
-                    skip_perplexity: true,
-                }),
-            });
+            const response = await api.streamDetectionOptimize(essayText);
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
