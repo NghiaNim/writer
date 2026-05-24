@@ -554,7 +554,11 @@ export default function ChatInterface({
                 className={`messages-area${showRefinementDock ? ' messages-area--essay-refinement' : ''}`}
                 ref={messagesContainerRef}
             >
-                {(!conversation || conversation.messages.length === 0) ? (
+                {!conversation ? (
+                    /* Truly cold — no conversation at all. The
+                       top-of-component early return at the
+                       !conversation guard usually catches this; this
+                       branch is a defensive backup. */
                     <div className="hero-container">
                         <div className="hero-content">
                             <h1>Welcome to MidnightCoffee</h1>
@@ -564,6 +568,21 @@ export default function ChatInterface({
                             <div className="welcome-grid-container">
                                 <CouncilGrid models={councilModels} chairman={chairmanModel} status="idle" />
                             </div>
+                        </div>
+                    </div>
+                ) : conversation.messages.length === 0 ? (
+                    /* Conversation selected but the full messages
+                       haven't loaded yet — handleSelectConversation
+                       seeds with messages: [] so we don't show the
+                       previous conversation's content during the
+                       fetch window. Render a quiet loading hint
+                       instead of the Welcome hero (which would
+                       falsely suggest the user is on a fresh slate). */
+                    <div className="hero-container">
+                        <div className="hero-content">
+                            <p className="hero-subtitle" style={{ opacity: 0.55 }}>
+                                Loading your essay…
+                            </p>
                         </div>
                     </div>
                 ) : (
