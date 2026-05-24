@@ -621,13 +621,7 @@ export default function ChatInterface({
             </div>
 
             {/* Floating Command Capsule — above feedback strip so “How was this run?” stays visible */}
-            <div
-                className={`input-area ${
-                    !showRefinementDock && composerCollapsed && isLoading
-                        ? 'input-area-composer-collapsed'
-                        : ''
-                }`}
-            >
+            <div className="input-area">
                 {showEssayFeedbackBar ? (
                     <div className="essay-feedback-strip">
                         <div className="essay-feedback-strip-inner">
@@ -759,24 +753,17 @@ export default function ChatInterface({
                             </button>
                         ) : null}
                     </div>
-                ) : !showRefinementDock && isLoading && composerCollapsed ? (
-                    <div className="input-container input-composer-collapsed-strip">
+                ) : !showRefinementDock && isLoading ? (
+                    <div className="composer-status-pill">
+                        <span className="composer-status-dot" aria-hidden="true" />
+                        <span className="composer-status-text">Council is deliberating</span>
                         <button
                             type="button"
-                            className="composer-expand-btn"
-                            onClick={() => setComposerCollapsed(false)}
-                            title="Show topic/draft input and mode controls"
-                        >
-                            Show composer
-                        </button>
-                        <span className="composer-collapsed-hint">Drafting in progress</span>
-                        <button
-                            type="button"
-                            className="send-button stop-button"
+                            className="composer-stop-btn"
                             onClick={onAbort}
                             title="Stop generation"
                         >
-                            ⏹
+                            Stop
                         </button>
                     </div>
                 ) : showRefinementDock ? (
@@ -1036,19 +1023,6 @@ export default function ChatInterface({
                         className={`input-container essay-input essay-input-${essayMode}`}
                         onSubmit={handleSubmit}
                     >
-                        {isLoading ? (
-                            <div className="composer-minimize-bar">
-                                <button
-                                    type="button"
-                                    className="composer-minimize-btn"
-                                    onClick={() => setComposerCollapsed(true)}
-                                    title="Hide composer"
-                                >
-                                    Hide composer
-                                </button>
-                            </div>
-                        ) : null}
-                        {/* Phase 4: Topic / Draft mode toggle on top */}
                         <div className="essay-mode-toggle" role="tablist" aria-label="Essay input mode">
                             <button
                                 type="button"
@@ -1056,8 +1030,7 @@ export default function ChatInterface({
                                 aria-selected={essayMode === 'topic'}
                                 className={`essay-mode-btn ${essayMode === 'topic' ? 'active' : ''}`}
                                 onClick={() => onEssayModeChange?.('topic')}
-                                disabled={isLoading}
-                                title="Give the council a topic to write about from scratch"
+                                title="Write from scratch"
                             >
                                 <span className="essay-mode-icon">✎</span>
                                 Topic
@@ -1068,8 +1041,7 @@ export default function ChatInterface({
                                 aria-selected={essayMode === 'draft'}
                                 className={`essay-mode-btn ${essayMode === 'draft' ? 'active' : ''}`}
                                 onClick={() => onEssayModeChange?.('draft')}
-                                disabled={isLoading}
-                                title="Paste your own draft; the council refines it while preserving your voice"
+                                title="Paste your draft; the council refines it"
                             >
                                 <span className="essay-mode-icon">✦</span>
                                 Draft
@@ -1079,14 +1051,6 @@ export default function ChatInterface({
                                     ? 'Writes from scratch.'
                                     : 'Refines your draft, keeps your voice.'}
                             </span>
-                            <button
-                                type="button"
-                                className="config-link essay-voice-rules-link"
-                                onClick={() => onOpenSettings('voice')}
-                                title="Open Settings → My Voice: rules and reference paragraphs for every essay"
-                            >
-                                Voice rules
-                            </button>
                         </div>
 
                         <div className="input-row-top">
@@ -1096,7 +1060,6 @@ export default function ChatInterface({
                                     className="search-checkbox"
                                     checked={webSearch}
                                     onChange={() => setWebSearch(!webSearch)}
-                                    disabled={isLoading}
                                 />
                                 <span className="search-icon">🌐</span>
                                 {webSearch && <span className="search-label">Search On</span>}
@@ -1105,16 +1068,13 @@ export default function ChatInterface({
                             <textarea
                                 className="message-input"
                                 placeholder={
-                                    isLoading
-                                        ? 'Council is deliberating...'
-                                        : essayMode === 'draft'
-                                            ? 'Paste your draft here.'
-                                            : 'What essay do you want to write? (e.g. "Why most productivity advice fails for creatives")'
+                                    essayMode === 'draft'
+                                        ? 'Paste your draft here.'
+                                        : 'What essay do you want to write?'
                                 }
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                disabled={isLoading}
                                 rows={essayMode === 'draft' ? 6 : 2}
                                 style={{
                                     height: 'auto',
@@ -1125,7 +1085,6 @@ export default function ChatInterface({
                             <MicButton
                                 value={input}
                                 onChange={setInput}
-                                disabled={isLoading}
                                 showLabel
                                 title={
                                     essayMode === 'draft'
@@ -1134,15 +1093,9 @@ export default function ChatInterface({
                                 }
                             />
 
-                            {isLoading ? (
-                                <button type="button" className="send-button stop-button" onClick={onAbort} title="Stop Generation">
-                                    ⏹
-                                </button>
-                            ) : (
-                                <button type="submit" className="send-button" disabled={!input.trim()}>
-                                    ➤
-                                </button>
-                            )}
+                            <button type="submit" className="send-button" disabled={!input.trim()}>
+                                ➤
+                            </button>
                         </div>
 
                         </form>
