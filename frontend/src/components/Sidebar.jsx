@@ -273,6 +273,27 @@ export default function Sidebar({
             {' '}MidnightCoffee
           </div>
         </div>
+        {/* View-mode toggle sits in the header so its position is
+            anchored independent of whatever the body of the sidebar
+            is showing (sections / tabs / search). Hidden during
+            search because search overrides the view-mode gates. */}
+        {!searchQuery && (
+          <button
+            type="button"
+            className="icon-button sidebar-view-mode-header-btn"
+            onClick={() =>
+              setViewModeAndPersist(viewMode === 'sections' ? 'tabs' : 'sections')
+            }
+            title={
+              viewMode === 'sections'
+                ? 'Switch to tabbed view (one section at a time)'
+                : 'Switch to combined view (both sections visible)'
+            }
+            aria-label="Switch view mode"
+          >
+            {viewMode === 'sections' ? '⊟' : '☰'}
+          </button>
+        )}
         <button
           className="icon-button"
           onClick={onOpenSettings}
@@ -331,61 +352,42 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* View-mode toggle + (in tabs mode) a tab strip. Hidden during
-          search since search applies across the whole sidebar regardless
-          of view mode. In sections mode, the toggle sits alone on the
-          right; in tabs mode, the two-tab strip dominates the row. */}
-      {!searchQuery && (
-        <div className={`sidebar-view-toggle sidebar-view-toggle--${viewMode}`}>
-          {viewMode === 'tabs' ? (
-            <div className="sidebar-tabs" role="tablist" aria-label="Sidebar content">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'drafts'}
-                className={
-                  'sidebar-tab ' +
-                  (activeTab === 'drafts' ? 'sidebar-tab--active' : '')
-                }
-                onClick={() => setActiveTabAndPersist('drafts')}
-              >
-                <span className="sidebar-tab-icon" aria-hidden="true">✏️</span>
-                <span>Drafts</span>
-                <span className="sidebar-tab-count">{inProgressSessions.length}</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'essays'}
-                className={
-                  'sidebar-tab ' +
-                  (activeTab === 'essays' ? 'sidebar-tab--active' : '')
-                }
-                onClick={() => setActiveTabAndPersist('essays')}
-              >
-                <span className="sidebar-tab-icon" aria-hidden="true">☕</span>
-                <span>Essays</span>
-                <span className="sidebar-tab-count">{conversations?.length || 0}</span>
-              </button>
-            </div>
-          ) : (
-            <div className="sidebar-view-toggle-spacer" />
-          )}
-          <button
-            type="button"
-            className="sidebar-view-mode-btn"
-            onClick={() =>
-              setViewModeAndPersist(viewMode === 'sections' ? 'tabs' : 'sections')
-            }
-            title={
-              viewMode === 'sections'
-                ? 'Switch to tabbed view (one section at a time)'
-                : 'Switch to combined view (both sections visible)'
-            }
-            aria-label="Switch view mode"
-          >
-            {viewMode === 'sections' ? '⊟' : '☰'}
-          </button>
+      {/* In tabs mode, the tab strip occupies its own row. In sections
+          mode this row doesn't render at all (the view-mode toggle now
+          lives in the sidebar header, so there's nothing else to put
+          here). Hidden during search since search overrides view mode. */}
+      {!searchQuery && viewMode === 'tabs' && (
+        <div className="sidebar-view-toggle sidebar-view-toggle--tabs">
+          <div className="sidebar-tabs" role="tablist" aria-label="Sidebar content">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'drafts'}
+              className={
+                'sidebar-tab ' +
+                (activeTab === 'drafts' ? 'sidebar-tab--active' : '')
+              }
+              onClick={() => setActiveTabAndPersist('drafts')}
+            >
+              <span className="sidebar-tab-icon" aria-hidden="true">✏️</span>
+              <span>Drafts</span>
+              <span className="sidebar-tab-count">{inProgressSessions.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'essays'}
+              className={
+                'sidebar-tab ' +
+                (activeTab === 'essays' ? 'sidebar-tab--active' : '')
+              }
+              onClick={() => setActiveTabAndPersist('essays')}
+            >
+              <span className="sidebar-tab-icon" aria-hidden="true">☕</span>
+              <span>Essays</span>
+              <span className="sidebar-tab-count">{conversations?.length || 0}</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -414,21 +416,23 @@ export default function Sidebar({
               : undefined
           }
         >
-          <button
-            type="button"
-            className="sidebar-drafts-header sidebar-drafts-header--toggle"
-            onClick={toggleDraftsExpanded}
-            aria-expanded={draftsExpanded}
-            aria-controls="sidebar-drafts-list"
-            title={draftsExpanded ? 'Hide drafts in progress' : 'Show drafts in progress'}
-          >
-            <span className="sidebar-drafts-header-chevron" aria-hidden="true">
-              {draftsExpanded ? '▾' : '▸'}
-            </span>
-            <span>Drafts in progress</span>
-            <span className="sidebar-drafts-header-count">{filteredDrafts.length}</span>
-          </button>
-          {draftsExpanded && <div id="sidebar-drafts-list" className="sidebar-drafts-list">
+          {(viewMode === 'sections' || searchQuery) && (
+            <button
+              type="button"
+              className="sidebar-drafts-header sidebar-drafts-header--toggle"
+              onClick={toggleDraftsExpanded}
+              aria-expanded={draftsExpanded}
+              aria-controls="sidebar-drafts-list"
+              title={draftsExpanded ? 'Hide drafts in progress' : 'Show drafts in progress'}
+            >
+              <span className="sidebar-drafts-header-chevron" aria-hidden="true">
+                {draftsExpanded ? '▾' : '▸'}
+              </span>
+              <span>Drafts in progress</span>
+              <span className="sidebar-drafts-header-count">{filteredDrafts.length}</span>
+            </button>
+          )}
+          {(draftsExpanded || viewMode === 'tabs') && <div id="sidebar-drafts-list" className="sidebar-drafts-list">
           {filteredDrafts.map((s) => {
             const topicPreview = (s.topic || '').trim();
             const display =
