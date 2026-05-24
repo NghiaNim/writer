@@ -1600,16 +1600,27 @@ export default function EssayFlow({
 
                 {step === 'questions' && (
                     <div className={`essay-flow-step ${questionsFullscreen ? 'essay-flow-step--fullscreen' : ''}`}>
+                        <button
+                            type="button"
+                            className="essay-flow-fullscreen-btn"
+                            onClick={() => setQuestionsFullscreen(v => !v)}
+                            title={questionsFullscreen ? 'Exit full screen' : 'Expand for more room'}
+                            aria-label={questionsFullscreen ? 'Exit full screen' : 'Full screen'}
+                        >
+                            {questionsFullscreen ? (
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="6 1 1 1 1 6" /><polyline points="10 15 15 15 15 10" />
+                                    <line x1="1" y1="1" x2="6" y2="6" /><line x1="15" y1="15" x2="10" y2="10" />
+                                </svg>
+                            ) : (
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="10 1 15 1 15 6" /><polyline points="6 15 1 15 1 10" />
+                                    <line x1="15" y1="1" x2="10" y2="6" /><line x1="1" y1="15" x2="6" y2="10" />
+                                </svg>
+                            )}
+                        </button>
                         <div className="essay-flow-question-row">
                             <h2 className="essay-flow-question">A few questions to make this sound like you</h2>
-                            <button
-                                type="button"
-                                className="essay-flow-fullscreen-btn"
-                                onClick={() => setQuestionsFullscreen(v => !v)}
-                                title={questionsFullscreen ? 'Exit full screen' : 'Full screen'}
-                            >
-                                {questionsFullscreen ? '⊖' : '⊕'}
-                            </button>
                             {questions.length > 0 && (
                                 <button
                                     type="button"
