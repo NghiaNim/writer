@@ -227,6 +227,29 @@ function AppShell() {
     }
   };
 
+  // When we're viewing a conversation but don't have a council to chip-
+  // render with (e.g., user landed via the sidebar, or page refreshed
+  // mid-session), fetch their saved default. Without this, refinement
+  // runs on past essays render only the EssayLoadingStatus + interim
+  // questions panel — the CouncilChips strip that surfaces during the
+  // first draft is missing.
+  useEffect(() => {
+    if (!currentConversationId) return;
+    if (currentCouncil) return;
+    let cancelled = false;
+    api.councilConfig
+      .get()
+      .then((def) => {
+        if (!cancelled && def) setCurrentCouncil(def);
+      })
+      .catch(() => {
+        /* best-effort — chips just won't render */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentConversationId, currentCouncil]);
+
   // Load conversation details when selected (skip one fetch after EssayFlow
   // creates a row — see skipNextConversationFetchRef).
   useEffect(() => {
