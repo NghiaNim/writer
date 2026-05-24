@@ -31,6 +31,31 @@
     margin-bottom: 8px;
 }
 
+.fact-check-fix-all {
+    margin-left: auto;
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #fcd34d;
+    border-radius: 999px;
+    padding: 4px 14px;
+    font-family: var(--font-ui, system-ui, sans-serif);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease;
+    white-space: nowrap;
+}
+
+.fact-check-fix-all:hover:not(:disabled) {
+    background: rgba(245, 158, 11, 0.25);
+    border-color: rgba(245, 158, 11, 0.55);
+}
+
+.fact-check-fix-all:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .fact-check-icon {
     display: inline-flex;
     align-items: center;

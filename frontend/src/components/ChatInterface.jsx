@@ -372,23 +372,23 @@ export default function ChatInterface({
     // user can tweak the wording and submit, or just hit Run as-is.
     // Once a new draft lands (isLoading flips true → false after this
     // click), we auto-dismiss the flag — see the effect below.
-    const handleFixFlag = (flag, idx) => {
-        if (!flag) return;
-        const quote = (flag.quote || '').trim();
-        const status = flag.status === 'contradicts' ? 'contradicts a known fact' : 'is unsupported';
-        const note = (flag.note || '').trim();
+    const handleFixAll = (visibleFlags) => {
+        if (!visibleFlags || !visibleFlags.length) return;
+        const lines = visibleFlags.map((flag) => {
+            const quote = (flag.quote || '').trim();
+            const status = flag.status === 'contradicts' ? 'contradicts a known fact' : 'is unsupported';
+            const note = (flag.note || '').trim();
+            return `- "${quote}" — ${status}${note ? `. ${note}` : ''}`;
+        });
         const prefill = [
-            `Rewrite the sentence "${quote}" — it currently ${status}.`,
-            note ? `The issue: ${note}` : '',
-            'Replace the claim with something accurate, in the same voice. Keep the surrounding paragraph intact except where needed for coherence.',
-        ]
-            .filter(Boolean)
-            .join('\n\n');
+            `Fix these ${visibleFlags.length} flagged claims:`,
+            ...lines,
+            '',
+            'Replace each claim with something accurate, in the same voice. Keep the surrounding paragraphs intact except where needed for coherence.',
+        ].join('\n');
         setInput(prefill);
-        setFixingFlagIdx(idx);
+        setFixingFlagIdx('all');
         setRefinementDockCollapsed(false);
-        setComposerCollapsed(false);
-        // Surface the dock — small scroll nudge so the textarea isn't off-screen.
         setTimeout(() => {
             const ta = document.querySelector('.refinement-prompt-input');
             if (ta && typeof ta.scrollIntoView === 'function') {
@@ -751,30 +751,28 @@ export default function ChatInterface({
                         </span>
                     </div>
                 ) : showRefinementDock && refinementDockCollapsed ? (
-                    <div className="input-container input-composer-collapsed-strip">
+                    <div className="composer-status-pill">
+                        {isLoading && <span className="composer-status-dot" aria-hidden="true" />}
+                        <span className="composer-status-text">
+                            {isLoading ? 'Council is revising' : 'Refinement hidden'}
+                        </span>
                         <button
                             type="button"
-                            className="composer-expand-btn"
+                            className="composer-pill-action"
                             onClick={() => setRefinementDockCollapsed(false)}
-                            title="Show refinement panel"
                         >
-                            Expand refinement
+                            Show
                         </button>
-                        <span className="composer-collapsed-hint">
-                            {isLoading
-                                ? 'Council is updating your essay'
-                                : 'Refinement hidden — more room to read'}
-                        </span>
-                        {isLoading ? (
+                        {isLoading && (
                             <button
                                 type="button"
-                                className="send-button stop-button"
+                                className="composer-stop-btn"
                                 onClick={onAbort}
                                 title="Stop generation"
                             >
-                                ⏹
+                                Stop
                             </button>
-                        ) : null}
+                        )}
                     </div>
                 ) : !showRefinementDock && isLoading ? (
                     <div className="composer-status-pill">
@@ -795,14 +793,23 @@ export default function ChatInterface({
                         onSubmit={handleSubmit}
                     >
                         {isLoading ? (
-                            <div className="composer-minimize-bar">
+                            <div className="refinement-loading-bar">
+                                <span className="composer-status-dot" aria-hidden="true" />
+                                <span className="refinement-loading-bar-text">Revising…</span>
                                 <button
                                     type="button"
-                                    className="composer-minimize-btn"
+                                    className="refinement-dock-collapse-btn"
                                     onClick={() => setRefinementDockCollapsed(true)}
-                                    title="Hide refinement panel"
                                 >
-                                    Hide refinement
+                                    Hide
+                                </button>
+                                <button
+                                    type="button"
+                                    className="composer-stop-btn"
+                                    onClick={onAbort}
+                                    title="Stop generation"
+                                >
+                                    Stop
                                 </button>
                             </div>
                         ) : null}
@@ -867,34 +874,7 @@ export default function ChatInterface({
                             </div>
                         </div>
 
-                        {!isLoading ? (
-                            suggestionsLoading ? (
-                                <div
-                                    className="refinement-suggestions refinement-suggestions--loading"
-                                    role="status"
-                                >
-                                    Tailoring suggestions to your essay…
-                                </div>
-                            ) : (
-                                <div
-                                    className="refinement-suggestions"
-                                    role="group"
-                                    aria-label="Suggested refinements"
-                                >
-                                    {suggestionChips.map(({ label, instruction }, idx) => (
-                                        <button
-                                            key={`${label}-${idx}`}
-                                            type="button"
-                                            className="refinement-chip"
-                                            disabled={isLoading}
-                                            onClick={() => sendRefinementSuggestion(instruction)}
-                                        >
-                                            {label}
-                                        </button>
-                                    ))}
-                                </div>
-                            )
-                        ) : (
+                        {isLoading && (
                             <div className="refinement-loading-hint">
                                 Council is updating your essay…
                             </div>
@@ -1268,10 +1248,10 @@ function AssistantMessageBody({
                         msg.detectionScore || msg.metadata?.detection_score || null
                     }
                     detectionScoreRunning={Boolean(msg.detectionScoreRunning)}
-                    onFixFlag={isLastMessage ? onFixFlag : null}
-                    fixingFlagIdx={isLastMessage ? fixingFlagIdx : null}
-                    dismissedFlags={isLastMessage ? dismissedFlags : null}
-                    onDismissFlag={isLastMessage ? onDismissFlag : null}
+                    onFixAll={isLastMessage ? handleFixAll : null}
+                    fixingAll={isLastMessage && fixingFlagIdx === 'all'}
+                    dismissedFlags={isLastMessage ? factCheckDismissedSet : null}
+                    onDismissFlag={isLastMessage ? handleDismissFlag : null}
                 />
             )}
 
