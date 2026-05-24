@@ -515,6 +515,23 @@ export default function EssayFlow({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [step, session?.id]);
 
+    // Recovery: if we landed on step 2 (resume or navigation) but have
+    // no questions — either because the old autosave only persisted
+    // answered questions, or the session was created before questions
+    // streamed — regenerate them automatically.
+    useEffect(() => {
+        if (step !== 'questions') return;
+        if (questions.length > 0) return;
+        if (questionsLoading || questionsStreaming) return;
+        const trimmedTopic = topic.trim();
+        if (!trimmedTopic) return;
+        startQuestionStream({
+            trimmedTopic,
+            trimmedAudience: audience.trim(),
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [step]);
+
     // Debounced autosave for the typed-in fields. Audience, core idea,
     // and the Q&A list all get written ~1.5s after the user stops
     // editing, so reload-mid-flow restores cleanly. We persist the FULL
@@ -537,13 +554,14 @@ export default function EssayFlow({
                 patch.core_idea = trimmedCoreIdea;
             }
             // Build the conversation block: full question objects so
-            // resume can rebuild the typed UI.
+            // resume can rebuild the typed UI. Persist ALL questions
+            // (not just answered ones) so resuming at step 2 shows
+            // the full question set even if the user hasn't answered yet.
             const qa = questions
                 .map((q, i) => ({
                     question: q,
-                    answer: serializeAnswer(q, answers[i]),
-                }))
-                .filter((item) => (item.answer || '').trim());
+                    answer: serializeAnswer(q, answers[i]) || '',
+                }));
             const withTimeline = timelineEvents.length
                 ? [...qa, { kind: 'timeline', events: timelineEvents }]
                 : qa;
