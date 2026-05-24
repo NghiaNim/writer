@@ -469,8 +469,13 @@
    On touch devices the visible 6px strip is too small for reliable
    dragging, so we expand the hit area to 18px via a ::before overlay
    that captures pointer events without changing the visual height. */
+/* The resizer itself owns the hit area — no ::before overlay. Earlier
+   the overlay extended 6px above/below into the drafts and essays
+   sections, intercepting clicks on conversation rows below. We now
+   give the resizer real vertical space (14px) but keep the visible
+   handle small (40×2px) so it reads as a thin grip. */
 .sidebar-resizer {
-  height: 6px;
+  height: 14px;
   flex-shrink: 0;
   cursor: ns-resize;
   position: relative;
@@ -480,17 +485,6 @@
   align-items: center;
   justify-content: center;
   touch-action: none;
-}
-
-.sidebar-resizer::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -6px;
-  bottom: -6px;
-  /* Expands the touch hit area to ~18px without resizing the
-     visible layout. */
 }
 
 .sidebar-resizer:hover .sidebar-resizer-handle,
