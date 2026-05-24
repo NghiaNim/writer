@@ -43,6 +43,8 @@
   gap: 8px;
   overflow: hidden;
   min-width: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* The brand text portion of the title. Hidden on narrow sidebar
@@ -59,11 +61,6 @@
   .sidebar-title-text {
     display: none;
   }
-}
-
-.sidebar-title-prefix-unused {
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .sidebar-subtitle {
