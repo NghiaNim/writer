@@ -74,14 +74,26 @@ export default function DetectionScorePanel({
                                 });
                                 break;
                             case 'converged':
-                            case 'optimize_complete':
-                                if (event.data.essay && onOptimizedEssay) {
-                                    onOptimizedEssay(event.data.essay);
+                            case 'optimize_complete': {
+                                const optimizedText = event.data.essay;
+                                if (optimizedText && typeof optimizedText === 'string' && onOptimizedEssay) {
+                                    if (optimizedText.trim() !== essayText.trim()) {
+                                        onOptimizedEssay(optimizedText);
+                                    }
                                 }
                                 setOptimizeProgress({
                                     status: 'done',
                                     riskScore: event.data.risk_score || event.data.report?.risk_score,
                                     riskLabel: event.data.risk_label || event.data.report?.risk_label,
+                                    changed: optimizedText && optimizedText.trim() !== essayText.trim(),
+                                });
+                                break;
+                            }
+                            case 'no_weak_spots':
+                                setOptimizeProgress({
+                                    status: 'done',
+                                    riskScore: 0,
+                                    riskLabel: 'low',
                                 });
                                 break;
                             case 'revision_failed':
@@ -171,7 +183,7 @@ export default function DetectionScorePanel({
                 </ul>
             )}
 
-            {hasWeakSpots && (
+            {hasWeakSpots && risk_label !== 'low' && !optimizeProgress?.status && (
                 <div className="detection-actions">
                     <button
                         type="button"
@@ -195,8 +207,15 @@ export default function DetectionScorePanel({
                         {optimizeProgress.riskLabel || 'low'}
                     </span>
                     <span>
-                        Optimized risk: {Math.round((optimizeProgress.riskScore || 0) * 100)}%
+                        {optimizeProgress.changed
+                            ? `Optimized — risk now ${Math.round((optimizeProgress.riskScore || 0) * 100)}%`
+                            : `Already passing — risk ${Math.round((optimizeProgress.riskScore || 0) * 100)}%`}
                     </span>
+                </div>
+            )}
+            {optimizeProgress?.status === 'error' && (
+                <div className="detection-result" style={{ borderColor: 'rgba(248, 113, 113, 0.2)', background: 'rgba(248, 113, 113, 0.06)' }}>
+                    <span>Could not optimize: {optimizeProgress.error}</span>
                 </div>
             )}
         </aside>
