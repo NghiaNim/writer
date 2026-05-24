@@ -1340,61 +1340,74 @@ export default function EssayFlow({
                         ) : null}
                     </div>
                 )}
-                {/* Unified top bar: back button + topic chip + stepper dots */}
-                {showTopicChip && (
-                    <div className="essay-flow-top-bar">
-                        {prevStep ? (
-                            <button
-                                type="button"
-                                className="essay-flow-back-btn"
-                                onClick={() => setStep(prevStep)}
-                                disabled={disabled}
-                                title={`Back to ${STEP_LABELS[prevStep] || 'previous step'}`}
-                            >
-                                ←
-                            </button>
-                        ) : <div className="essay-flow-back-btn-spacer" />}
+                {/* Consistent top bar across all 5 main steps. Same skeleton
+                    every time — back button on the left, topic chip in the
+                    middle (when populated), 5-dot progress on the right —
+                    so the user's eye doesn't have to relearn the layout.
+                    Below it, a small-caps step badge identifies WHERE the
+                    user is in the flow. On Step 1 the back button + chip
+                    are absent (no previous step, nothing typed yet); the
+                    skeleton still occupies the row so the badge + h1 sit
+                    in the same place as on every other step. */}
+                {showStepper && (
+                    <>
+                        <div className="essay-flow-top-bar">
+                            {prevStep ? (
+                                <button
+                                    type="button"
+                                    className="essay-flow-back-btn"
+                                    onClick={() => setStep(prevStep)}
+                                    disabled={disabled}
+                                    title={`Back to ${STEP_LABELS[prevStep] || 'previous step'}`}
+                                    aria-label={`Back to ${STEP_LABELS[prevStep] || 'previous step'}`}
+                                >
+                                    ←
+                                </button>
+                            ) : (
+                                <div className="essay-flow-back-btn-spacer" aria-hidden="true" />
+                            )}
 
-                        <div className="essay-flow-top-bar-center">
-                            <div className="essay-flow-topic-chip" title={topic}>
-                                <span>{topic}</span>
-                                {audience && (
-                                    <>
-                                        <span
-                                            className="essay-flow-topic-chip-arrow"
-                                            aria-hidden="true"
-                                        >
-                                            →
-                                        </span>
-                                        <span>{audience}</span>
-                                    </>
+                            <div className="essay-flow-top-bar-center">
+                                {showTopicChip && (topic || audience) && (
+                                    <div className="essay-flow-topic-chip" title={topic}>
+                                        <span>{topic}</span>
+                                        {audience && (
+                                            <>
+                                                <span
+                                                    className="essay-flow-topic-chip-arrow"
+                                                    aria-hidden="true"
+                                                >
+                                                    →
+                                                </span>
+                                                <span>{audience}</span>
+                                            </>
+                                        )}
+                                    </div>
                                 )}
                             </div>
-                            {showStepper && (
-                                <div className="essay-flow-stepper" aria-label="Intake progress">
-                                    <div className="essay-flow-stepper-label">
-                                        Step {stepIndex + 1} of {STEP_ORDER.length} · {STEP_LABELS[step]}
-                                    </div>
-                                    <div className="essay-flow-stepper-dots">
-                                        {STEP_ORDER.map((s, i) => (
-                                            <span
-                                                key={s}
-                                                className={
-                                                    'essay-flow-stepper-dot ' +
-                                                    (i < stepIndex
-                                                        ? 'essay-flow-stepper-dot--done'
-                                                        : i === stepIndex
-                                                            ? 'essay-flow-stepper-dot--active'
-                                                            : 'essay-flow-stepper-dot--pending')
-                                                }
-                                                aria-label={`Step ${i + 1}`}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+
+                            <div className="essay-flow-stepper-dots" aria-label="Intake progress">
+                                {STEP_ORDER.map((s, i) => (
+                                    <span
+                                        key={s}
+                                        className={
+                                            'essay-flow-stepper-dot ' +
+                                            (i < stepIndex
+                                                ? 'essay-flow-stepper-dot--done'
+                                                : i === stepIndex
+                                                    ? 'essay-flow-stepper-dot--active'
+                                                    : 'essay-flow-stepper-dot--pending')
+                                        }
+                                        aria-label={`Step ${i + 1}`}
+                                    />
+                                ))}
+                            </div>
                         </div>
-                    </div>
+
+                        <div className="essay-flow-step-badge">
+                            Step {stepIndex + 1} of {STEP_ORDER.length} · {STEP_LABELS[step]}
+                        </div>
+                    </>
                 )}
 
                 {step === 'topic' && (

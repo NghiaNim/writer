@@ -281,6 +281,20 @@ function AppShell() {
     try {
       // Fetch the full session row (the list item has only metadata).
       const fullSession = await api.sessions.get(sessionListItem.id);
+
+      // Defense in depth: if the session already has a linked
+      // conversation (council was kicked off), route to that chat
+      // instead of bouncing the user back to EssayFlow. The sidebar
+      // refresh in handleEssayFlowComplete normally drops these from
+      // the in-progress list, but there's a brief race where a
+      // ready-but-not-yet-refreshed entry can still get clicked.
+      if (fullSession.conversation_id) {
+        loadInProgressSessions(); // also clean up the stale entry
+        handleSelectConversation(fullSession.conversation_id);
+        setSidebarOpen(false);
+        return;
+      }
+
       setResumeSession(fullSession);
       setCurrentSessionId(fullSession.id);
       setCurrentConversationId(null);
@@ -426,6 +440,13 @@ function AppShell() {
         } catch (e) {
           console.warn('Failed to link session to conversation:', e);
         }
+        // The session just transitioned to status='ready' (set in
+        // EssayFlow's handleStartCouncil right before this) — refresh
+        // the sidebar so the no-longer-in-progress draft drops out of
+        // the "Drafts in progress" list immediately. Without this the
+        // stale draft lingers and clicking it bounces the user back
+        // to EssayFlow even though the council is already running.
+        loadInProgressSessions();
       }
 
       await handleSendMessage(message, false, {
