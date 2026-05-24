@@ -30,8 +30,8 @@ export default function FinalEssay({
     detectionScore = null,
     detectionScoreRunning = false,
     onDetectionOptimized = null,
-    onFixFlag = null,
-    fixingFlagIdx = null,
+    onFixAll = null,
+    fixingAll = false,
     dismissedFlags = null,
     onDismissFlag = null,
 }) {
@@ -93,8 +93,8 @@ export default function FinalEssay({
             <FactCheckPanel
                 flags={factCheckFlags}
                 running={factCheckRunning}
-                onFixFlag={onFixFlag}
-                fixingFlagIdx={fixingFlagIdx}
+                onFixAll={onFixAll}
+                fixingAll={fixingAll}
                 dismissedFlags={dismissedFlags}
                 onDismissFlag={onDismissFlag}
             />
