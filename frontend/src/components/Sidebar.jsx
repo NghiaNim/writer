@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import './Sidebar.css';
 
 /**
@@ -75,29 +75,134 @@ export default function Sidebar({
   const [confirmingDelete, setConfirmingDelete] = useState(null);
   const [confirmingDeleteSession, setConfirmingDeleteSession] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  // Collapsible "Drafts in progress" section. Persisted so the user's
-  // choice survives reload — students with many completed essays
-  // probably want drafts collapsed by default once they've scrolled
-  // through them.
+
+  // The sidebar surfaces two related but distinct lists: unfinished
+  // "Drafts in progress" (essay_sessions) and "Past essays" (completed
+  // conversations). Two layout modes for them:
+  //
+  //   viewMode = 'sections' — both visible at once, each collapsible.
+  //                           Best for at-a-glance scanning, mirrors
+  //                           Linear's section pattern.
+  //   viewMode = 'tabs'      — only one list visible. Activated via a
+  //                           top-of-sidebar tab strip. Best for narrow
+  //                           screens or users with many of both.
+  //
+  // All four pieces of UI state (mode + per-section expanded + active
+  // tab) persist to localStorage so the user's choice survives reload.
+  const VIEW_MODE_KEY = 'mc.sidebar.viewMode';
   const DRAFTS_EXPANDED_KEY = 'mc.sidebar.draftsExpanded';
-  const [draftsExpanded, setDraftsExpanded] = useState(() => {
+  const ESSAYS_EXPANDED_KEY = 'mc.sidebar.essaysExpanded';
+  const ACTIVE_TAB_KEY = 'mc.sidebar.activeTab';
+
+  const loadFlag = (key, defaultValue) => {
     try {
-      const stored = window.localStorage.getItem(DRAFTS_EXPANDED_KEY);
-      // Default expanded on first visit; collapsed only if the user
-      // explicitly hid it last time.
-      return stored == null ? true : stored === 'true';
+      const stored = window.localStorage.getItem(key);
+      if (stored == null) return defaultValue;
+      if (defaultValue === true || defaultValue === false) return stored === 'true';
+      return stored;
     } catch {
-      return true;
+      return defaultValue;
+    }
+  };
+  const persistFlag = (key, value) => {
+    try {
+      window.localStorage.setItem(key, String(value));
+    } catch {
+      // localStorage disabled (private mode) — lose persistence quietly.
+    }
+  };
+
+  const [viewMode, setViewMode] = useState(() => loadFlag(VIEW_MODE_KEY, 'sections'));
+  const [draftsExpanded, setDraftsExpanded] = useState(() => loadFlag(DRAFTS_EXPANDED_KEY, true));
+  const [essaysExpanded, setEssaysExpanded] = useState(() => loadFlag(ESSAYS_EXPANDED_KEY, true));
+  const [activeTab, setActiveTab] = useState(() => loadFlag(ACTIVE_TAB_KEY, 'drafts'));
+
+  // Resizable split between drafts and essays. `null` means "auto" —
+  // the drafts section uses its intrinsic height up to a CSS max. As
+  // soon as the user drags the splitter we switch to an explicit
+  // height in pixels and persist it.
+  const DRAFTS_HEIGHT_KEY = 'mc.sidebar.draftsHeightPx';
+  const [draftsHeightPx, setDraftsHeightPx] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem(DRAFTS_HEIGHT_KEY);
+      if (!stored) return null;
+      const n = parseInt(stored, 10);
+      return Number.isFinite(n) && n >= 80 ? n : null;
+    } catch {
+      return null;
     }
   });
+  const draftsRef = useRef(null);
+
+  // Pointer events (instead of mouse events) so touch and stylus on
+  // tablets/phones can drag the splitter too. setPointerCapture keeps
+  // events flowing even when the pointer leaves the thin handle strip.
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const startHeight = draftsRef.current?.getBoundingClientRect().height || 200;
+    const maxHeight = window.innerHeight * 0.7;
+    const minHeight = 80;
+    const target = e.currentTarget;
+    const pointerId = e.pointerId;
+    try {
+      target.setPointerCapture(pointerId);
+    } catch {
+      // Older browsers / non-pointer paths — events still bubble fine.
+    }
+
+    const onMove = (ev) => {
+      const delta = ev.clientY - startY;
+      const next = Math.max(minHeight, Math.min(maxHeight, startHeight + delta));
+      setDraftsHeightPx(next);
+    };
+    const onUp = () => {
+      target.removeEventListener('pointermove', onMove);
+      target.removeEventListener('pointerup', onUp);
+      target.removeEventListener('pointercancel', onUp);
+      try {
+        target.releasePointerCapture(pointerId);
+      } catch {
+        // ok
+      }
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    target.addEventListener('pointermove', onMove);
+    target.addEventListener('pointerup', onUp);
+    target.addEventListener('pointercancel', onUp);
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  // Persist the resized height after the user releases the drag.
+  // We debounce via the effect itself (runs once per settled value).
+  useEffect(() => {
+    if (draftsHeightPx == null) return;
+    persistFlag(DRAFTS_HEIGHT_KEY, draftsHeightPx);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftsHeightPx]);
+
+  const setViewModeAndPersist = (next) => {
+    setViewMode(next);
+    persistFlag(VIEW_MODE_KEY, next);
+  };
+  const setActiveTabAndPersist = (next) => {
+    setActiveTab(next);
+    persistFlag(ACTIVE_TAB_KEY, next);
+  };
   const toggleDraftsExpanded = () => {
     setDraftsExpanded((cur) => {
       const next = !cur;
-      try {
-        window.localStorage.setItem(DRAFTS_EXPANDED_KEY, String(next));
-      } catch {
-        // localStorage disabled (private mode) — fine, just lose persistence.
-      }
+      persistFlag(DRAFTS_EXPANDED_KEY, next);
+      return next;
+    });
+  };
+  const toggleEssaysExpanded = () => {
+    setEssaysExpanded((cur) => {
+      const next = !cur;
+      persistFlag(ESSAYS_EXPANDED_KEY, next);
       return next;
     });
   };
@@ -116,6 +221,18 @@ export default function Sidebar({
       cleanTitle(conv.title || 'New Conversation').toLowerCase().includes(q)
     );
   }, [conversations, searchQuery]);
+
+  // Search also covers in-progress drafts so users can find an essay
+  // they started yesterday by typing its topic. Matches the same case-
+  // insensitive substring rule as essays. When the search box is empty
+  // this just returns the raw list unchanged.
+  const filteredDrafts = useMemo(() => {
+    if (!searchQuery.trim()) return inProgressSessions;
+    const q = searchQuery.toLowerCase();
+    return (inProgressSessions || []).filter((s) =>
+      (s.topic || '').toLowerCase().includes(q)
+    );
+  }, [inProgressSessions, searchQuery]);
 
   const handleAbortClick = (e) => {
     e.stopPropagation();
@@ -199,13 +316,13 @@ export default function Sidebar({
         <input
           type="text"
           className="search-input"
-          placeholder="Find a past pour…"
+          placeholder="Find a draft or past pour…"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
         {searchQuery && (
-          <button 
-            className="search-clear" 
+          <button
+            className="search-clear"
             onClick={() => setSearchQuery('')}
             title="Clear search"
           >
@@ -214,13 +331,89 @@ export default function Sidebar({
         )}
       </div>
 
+      {/* View-mode toggle + (in tabs mode) a tab strip. Hidden during
+          search since search applies across the whole sidebar regardless
+          of view mode. In sections mode, the toggle sits alone on the
+          right; in tabs mode, the two-tab strip dominates the row. */}
+      {!searchQuery && (
+        <div className={`sidebar-view-toggle sidebar-view-toggle--${viewMode}`}>
+          {viewMode === 'tabs' ? (
+            <div className="sidebar-tabs" role="tablist" aria-label="Sidebar content">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'drafts'}
+                className={
+                  'sidebar-tab ' +
+                  (activeTab === 'drafts' ? 'sidebar-tab--active' : '')
+                }
+                onClick={() => setActiveTabAndPersist('drafts')}
+              >
+                <span className="sidebar-tab-icon" aria-hidden="true">✏️</span>
+                <span>Drafts</span>
+                <span className="sidebar-tab-count">{inProgressSessions.length}</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'essays'}
+                className={
+                  'sidebar-tab ' +
+                  (activeTab === 'essays' ? 'sidebar-tab--active' : '')
+                }
+                onClick={() => setActiveTabAndPersist('essays')}
+              >
+                <span className="sidebar-tab-icon" aria-hidden="true">☕</span>
+                <span>Essays</span>
+                <span className="sidebar-tab-count">{conversations?.length || 0}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="sidebar-view-toggle-spacer" />
+          )}
+          <button
+            type="button"
+            className="sidebar-view-mode-btn"
+            onClick={() =>
+              setViewModeAndPersist(viewMode === 'sections' ? 'tabs' : 'sections')
+            }
+            title={
+              viewMode === 'sections'
+                ? 'Switch to tabbed view (one section at a time)'
+                : 'Switch to combined view (both sections visible)'
+            }
+            aria-label="Switch view mode"
+          >
+            {viewMode === 'sections' ? '⊟' : '☰'}
+          </button>
+        </div>
+      )}
+
       {/* Drafts in progress — unfinished essay_sessions surfaced so
-          users can pick up where they left off. Hidden during search
-          (different mental mode) and when there's nothing to show.
-          The header is clickable to collapse the list, freeing screen
-          real-estate for completed essays below. */}
-      {!searchQuery && inProgressSessions.length > 0 && (
-        <div className={`sidebar-drafts ${draftsExpanded ? '' : 'sidebar-drafts--collapsed'}`}>
+          users can pick up where they left off. Hidden when there's
+          nothing to show (after filtering) and in tabs mode when the
+          user has the Essays tab active. During an active search we
+          show both filtered lists regardless of view mode — search is
+          a meta mode that overrides the section/tab gates. */}
+      {filteredDrafts.length > 0 &&
+        (searchQuery || viewMode === 'sections' || activeTab === 'drafts') && (
+        <div
+          ref={draftsRef}
+          className={
+            'sidebar-drafts ' +
+            (draftsExpanded ? '' : 'sidebar-drafts--collapsed ') +
+            // When the drafts list is the only content visible (tabs
+            // mode with the drafts tab active, no search), let it
+            // absorb all remaining sidebar height instead of capping
+            // at the sections-mode max-height.
+            (viewMode === 'tabs' && !searchQuery ? 'sidebar-drafts--solo' : '')
+          }
+          style={
+            draftsExpanded && draftsHeightPx != null && viewMode === 'sections'
+              ? { height: draftsHeightPx, maxHeight: 'none' }
+              : undefined
+          }
+        >
           <button
             type="button"
             className="sidebar-drafts-header sidebar-drafts-header--toggle"
@@ -233,10 +426,10 @@ export default function Sidebar({
               {draftsExpanded ? '▾' : '▸'}
             </span>
             <span>Drafts in progress</span>
-            <span className="sidebar-drafts-header-count">{inProgressSessions.length}</span>
+            <span className="sidebar-drafts-header-count">{filteredDrafts.length}</span>
           </button>
           {draftsExpanded && <div id="sidebar-drafts-list" className="sidebar-drafts-list">
-          {inProgressSessions.map((s) => {
+          {filteredDrafts.map((s) => {
             const topicPreview = (s.topic || '').trim();
             const display =
               topicPreview.length > 56
@@ -264,7 +457,8 @@ export default function Sidebar({
                 }}
               >
                 <div className="sidebar-draft-title" title={topicPreview}>
-                  {display}
+                  <span className="sidebar-item-icon" aria-hidden="true">✏️</span>
+                  <span>{display}</span>
                 </div>
                 <div className="sidebar-draft-meta">
                   <span className="sidebar-draft-step">{stepLabel}</span>
@@ -315,81 +509,131 @@ export default function Sidebar({
         </div>
       )}
 
-      <div className="conversation-list">
-        {filteredConversations.length === 0 ? (
-          <div className="sidebar-empty-state">
-            {searchQuery ? (
-              <>
-                <div className="sidebar-empty-state-title">No matches</div>
-                <div className="sidebar-empty-state-hint">
-                  Nothing here for "{searchQuery}". Clear the search to see every essay.
-                </div>
-              </>
+      {/* Draggable splitter between drafts and essays. Only meaningful
+          in sections mode + when both sections will actually render
+          (drafts has matches, essays section will show). The handle
+          itself is a thin transparent strip; the hover/active state
+          gives a clear gold cue without dominating the layout. */}
+      {filteredDrafts.length > 0 &&
+        draftsExpanded &&
+        (viewMode === 'sections' || searchQuery) && (
+          <div
+            className="sidebar-resizer"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize drafts and essays sections"
+            onPointerDown={handleResizeStart}
+            title="Drag to resize"
+          >
+            <span className="sidebar-resizer-handle" aria-hidden="true" />
+          </div>
+        )}
+
+      {/* Past essays — completed conversations. In sections mode, this
+          gets its own collapsible header that mirrors "Drafts in
+          progress" above. During search the header is hidden because
+          the input itself is the section label. In tabs mode it only
+          renders when the Essays tab is active. */}
+      {(viewMode === 'sections' || activeTab === 'essays' || searchQuery) && (
+        <div className={`sidebar-essays ${essaysExpanded ? '' : 'sidebar-essays--collapsed'}`}>
+          {(viewMode === 'sections' || searchQuery) && (
+            <button
+              type="button"
+              className="sidebar-essays-header sidebar-essays-header--toggle"
+              onClick={toggleEssaysExpanded}
+              aria-expanded={essaysExpanded}
+              aria-controls="sidebar-essays-list"
+              title={essaysExpanded ? 'Hide past essays' : 'Show past essays'}
+            >
+              <span className="sidebar-essays-header-chevron" aria-hidden="true">
+                {essaysExpanded ? '▾' : '▸'}
+              </span>
+              <span>Past essays</span>
+              <span className="sidebar-essays-header-count">
+                {filteredConversations.length}
+              </span>
+            </button>
+          )}
+          {(essaysExpanded || searchQuery || viewMode === 'tabs') && (
+          <div id="sidebar-essays-list" className="conversation-list">
+            {filteredConversations.length === 0 ? (
+              <div className="sidebar-empty-state">
+                {searchQuery ? (
+                  <>
+                    <div className="sidebar-empty-state-title">No matches</div>
+                    <div className="sidebar-empty-state-hint">
+                      Nothing here for "{searchQuery}". Clear the search to see every essay.
+                    </div>
+                  </>
+                ) : (
+                  <div className="sidebar-empty-state-title">
+                    Nothing brewing yet.
+                  </div>
+                )}
+              </div>
             ) : (
-                <div className="sidebar-empty-state-title">
-                  Nothing brewing yet.
+              filteredConversations.map((conv) => {
+                const streaming = isConversationStreaming(conv.id);
+                const cleaned = cleanTitle(conv.title);
+                const display = cleaned || (streaming ? 'Drafting…' : 'New Conversation');
+                return (
+                <div
+                  key={conv.id}
+                  className={`conversation-item ${conv.id === currentConversationId ? 'active' : ''} ${streaming ? 'streaming' : ''}`}
+                  onClick={() => onSelectConversation(conv.id)}
+                >
+                  <div className="conversation-title">
+                    {streaming && (
+                      <span
+                        className="conversation-streaming-dot"
+                        title="Drafting in progress"
+                        aria-label="Drafting in progress"
+                      />
+                    )}
+                    <span className="sidebar-item-icon" aria-hidden="true">☕</span>
+                    <span className="conversation-title-text">{display}</span>
+                  </div>
+                  <div className="conversation-meta">
+                    <span>{new Date(conv.created_at).toLocaleDateString()}</span>
+                    {isLoading && conv.id === currentConversationId ? (
+                      <button className="stop-generation-btn small" onClick={handleAbortClick}>
+                        Stop
+                      </button>
+                    ) : confirmingDelete === conv.id ? (
+                      <div className="delete-confirm">
+                        <button
+                          className="confirm-yes-btn"
+                          onClick={(e) => handleConfirmDelete(e, conv.id)}
+                          title="Confirm delete"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          className="confirm-no-btn"
+                          onClick={handleCancelDelete}
+                          title="Cancel"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="delete-btn"
+                        onClick={(e) => handleDeleteClick(e, conv.id)}
+                        title="Delete conversation"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
                 </div>
+                );
+              })
             )}
           </div>
-        ) : (
-          filteredConversations.map((conv) => {
-            const streaming = isConversationStreaming(conv.id);
-            const cleaned = cleanTitle(conv.title);
-            const display = cleaned || (streaming ? 'Drafting…' : 'New Conversation');
-            return (
-            <div
-              key={conv.id}
-              className={`conversation-item ${conv.id === currentConversationId ? 'active' : ''} ${streaming ? 'streaming' : ''}`}
-              onClick={() => onSelectConversation(conv.id)}
-            >
-              <div className="conversation-title">
-                {streaming && (
-                  <span
-                    className="conversation-streaming-dot"
-                    title="Drafting in progress"
-                    aria-label="Drafting in progress"
-                  />
-                )}
-                <span className="conversation-title-text">{display}</span>
-              </div>
-              <div className="conversation-meta">
-                <span>{new Date(conv.created_at).toLocaleDateString()}</span>
-                {isLoading && conv.id === currentConversationId ? (
-                  <button className="stop-generation-btn small" onClick={handleAbortClick}>
-                    Stop
-                  </button>
-                ) : confirmingDelete === conv.id ? (
-                  <div className="delete-confirm">
-                    <button
-                      className="confirm-yes-btn"
-                      onClick={(e) => handleConfirmDelete(e, conv.id)}
-                      title="Confirm delete"
-                    >
-                      ✓
-                    </button>
-                    <button
-                      className="confirm-no-btn"
-                      onClick={handleCancelDelete}
-                      title="Cancel"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    className="delete-btn"
-                    onClick={(e) => handleDeleteClick(e, conv.id)}
-                    title="Delete conversation"
-                  >
-                    🗑️
-                  </button>
-                )}
-              </div>
-            </div>
-            );
-          })
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
     </>
   );
