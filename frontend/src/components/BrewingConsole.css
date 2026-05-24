@@ -1,0 +1,653 @@
+/*
+ * BrewingConsole — the in-flight drafting surface.
+ *
+ * Visual language: polished espresso bar at midnight. Warm cocoa surface,
+ * brushed copper rail, crema highlights on the active station, and a
+ * pour-over drip animation under whatever station is currently working.
+ *
+ * The whole console reads as one rhythm: pucks, persona dots, and the
+ * head bloom all share the same 4s breathing cycle so the eye sees one
+ * pulse, not many. That's the difference between "this UI feels alive"
+ * and "this UI flickers at me."
+ *
+ * Reference points the design borrows from (no copy, just inspiration):
+ *   - Decent Espresso DE1 pressure-profile dashboards (the rail spacing)
+ *   - Linear's "Issues syncing…" inline progress strip (eyebrow + dot tempo)
+ *   - Notion's command-bar bottom strip when a doc is regenerating
+ *
+ * The console deliberately AVOIDS:
+ *   - Big colored buttons during a wait (the old red Stop orb).
+ *   - Duplicated copy ("Council is updating your essay" said in three places).
+ *   - Terminal/console aesthetics that look like a build log. The backend is
+ *     a barista, not a CI runner.
+ */
+
+:root {
+    /* Local tokens — kept here so the console has a consistent palette
+       even if the global theme tweaks `--coffee-*`. */
+    --bc-surface: rgba(28, 19, 12, 0.78);
+    --bc-surface-edge: rgba(217, 119, 6, 0.18);
+    --bc-ink: #f3e7d4;
+    --bc-ink-dim: #b9a98e;
+    --bc-eyebrow: #f5b462;
+    --bc-crema: #f5b462;
+    --bc-crema-deep: #b45309;
+    --bc-glow: rgba(217, 119, 6, 0.55);
+    --bc-glow-soft: rgba(217, 119, 6, 0.18);
+    --bc-rail-line: rgba(217, 119, 6, 0.22);
+    --bc-rail-line-dim: rgba(120, 90, 60, 0.32);
+    --bc-puck-empty-bg: rgba(120, 80, 50, 0.18);
+    --bc-puck-empty-edge: rgba(217, 119, 6, 0.28);
+    --bc-puck-done-bg: rgba(180, 110, 50, 0.5);
+    --bc-puck-done-edge: rgba(245, 180, 98, 0.55);
+    --bc-puck-active-bg: radial-gradient(
+        circle at 35% 30%,
+        #fbd28a 0%,
+        #d97706 55%,
+        #5b2c0a 100%
+    );
+}
+
+/* ── Root container ────────────────────────────────────────────── */
+
+.bc-root {
+    position: relative;
+    background: var(--bc-surface);
+    border: 1px solid var(--bc-surface-edge);
+    border-radius: 14px;
+    padding: 16px 20px 18px;
+    margin: 12px 0 24px;
+    color: var(--bc-ink);
+    font-family: var(--font-ui, system-ui, sans-serif);
+    overflow: hidden;
+    box-shadow:
+        0 16px 40px -24px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(245, 180, 98, 0.06);
+}
+
+/* Faint top-edge highlight — the "chrome" of an espresso machine. */
+.bc-root::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(245, 180, 98, 0.42) 28%,
+        rgba(245, 180, 98, 0.42) 72%,
+        transparent 100%
+    );
+    pointer-events: none;
+}
+
+/* ── Top bar ───────────────────────────────────────────────────── */
+
+.bc-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 18px;
+    min-height: 22px;
+}
+
+.bc-head-title {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.bc-head-bloom {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle at 35% 30%,
+        #fbd28a 0%,
+        #d97706 55%,
+        #5b2c0a 100%
+    );
+    box-shadow: 0 0 0 0 var(--bc-glow);
+    animation: bc-bloom 4s ease-in-out infinite;
+    flex-shrink: 0;
+    transform: translateY(1px);
+}
+
+.bc-head-eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--bc-eyebrow);
+    flex-shrink: 0;
+}
+
+.bc-head-stage {
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--bc-ink-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.bc-head-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.bc-head-stop,
+.bc-head-min {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--bc-ink-dim);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: var(--font-ui, system-ui, sans-serif);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition:
+        color 140ms ease,
+        border-color 140ms ease,
+        background 140ms ease;
+}
+
+.bc-head-stop {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.bc-head-stop-glyph {
+    font-size: 9px;
+    line-height: 1;
+    transform: translateY(-1px);
+}
+
+.bc-head-stop:hover {
+    color: #fde0c0;
+    border-color: rgba(217, 119, 6, 0.35);
+    background: rgba(217, 119, 6, 0.08);
+}
+
+.bc-head-min {
+    width: 28px;
+    padding: 4px 0;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.bc-head-min:hover {
+    color: var(--bc-eyebrow);
+    border-color: rgba(217, 119, 6, 0.35);
+}
+
+/* ── Brew rail ─────────────────────────────────────────────────── */
+
+.bc-rail {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    margin: 0 0 18px;
+    padding: 0 4px 6px;
+    position: relative;
+}
+
+.bc-station {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding-bottom: 4px;
+}
+
+.bc-station-puck {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bc-puck-empty-bg);
+    border: 1px solid var(--bc-puck-empty-edge);
+    box-sizing: border-box;
+    transition:
+        background 220ms ease,
+        border-color 220ms ease,
+        box-shadow 220ms ease;
+    z-index: 2;
+}
+
+.bc-station--done .bc-station-puck {
+    background: var(--bc-puck-done-bg);
+    border-color: var(--bc-puck-done-edge);
+}
+
+/* The done puck shows a small "tick" — drawn with two pseudo-elements
+   so we don't rely on font glyphs being available. */
+.bc-station--done .bc-station-puck::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 11px;
+    width: 4px;
+    height: 1.5px;
+    background: #fde0c0;
+    transform: rotate(45deg);
+    border-radius: 1px;
+}
+.bc-station--done .bc-station-puck::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 10px;
+    width: 8px;
+    height: 1.5px;
+    background: #fde0c0;
+    transform: rotate(-45deg);
+    border-radius: 1px;
+}
+
+.bc-station--active .bc-station-puck {
+    background: var(--bc-puck-active-bg);
+    border-color: rgba(245, 180, 98, 0.85);
+    box-shadow:
+        0 0 0 0 var(--bc-glow),
+        inset 0 0 6px 1px rgba(245, 180, 98, 0.45);
+    animation:
+        bc-bloom 4s ease-in-out infinite,
+        bc-puck-spin 9s linear infinite;
+}
+
+.bc-station--skipped .bc-station-puck {
+    background: transparent;
+    border-style: dashed;
+    border-color: rgba(120, 90, 60, 0.45);
+}
+
+/* Pour-over drip — three falling dots staggered under the active puck.
+   Each dot fades in at the puck and fades out below the rail. */
+.bc-station-drip {
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 22px;
+    pointer-events: none;
+}
+.bc-station-drip i {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 4px;
+    height: 4px;
+    margin-left: -2px;
+    border-radius: 50%;
+    background: rgba(245, 180, 98, 0.85);
+    opacity: 0;
+    animation: bc-drip 1.4s ease-in infinite;
+}
+.bc-station-drip i:nth-child(2) { animation-delay: 0.45s; }
+.bc-station-drip i:nth-child(3) { animation-delay: 0.9s; }
+
+@keyframes bc-drip {
+    0%   { opacity: 0; transform: translateY(0) scale(0.6); }
+    20%  { opacity: 0.95; transform: translateY(2px) scale(1); }
+    80%  { opacity: 0.55; transform: translateY(16px) scale(0.85); }
+    100% { opacity: 0; transform: translateY(20px) scale(0.6); }
+}
+
+.bc-station-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    text-align: center;
+    line-height: 1;
+}
+
+.bc-station-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--bc-ink-dim);
+    transition: color 220ms ease;
+}
+
+.bc-station-sub {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: rgba(165, 145, 115, 0.7);
+    font-variant-numeric: tabular-nums;
+    transition: color 220ms ease;
+}
+
+.bc-station--done .bc-station-label,
+.bc-station--active .bc-station-label {
+    color: var(--bc-eyebrow);
+}
+
+.bc-station--active .bc-station-sub {
+    color: #fde0c0;
+}
+
+.bc-station--skipped .bc-station-label,
+.bc-station--skipped .bc-station-sub {
+    color: rgba(120, 90, 60, 0.55);
+}
+
+/* The connecting line between stations. Sits at puck-center vertically. */
+.bc-station-line {
+    position: absolute;
+    top: 11px; /* puck height/2 */
+    left: 60%;
+    right: -40%;
+    height: 2px;
+    background: var(--bc-rail-line-dim);
+    z-index: 1;
+    transition: background 220ms ease;
+}
+
+.bc-station-line--done {
+    background: linear-gradient(
+        90deg,
+        var(--bc-puck-done-edge),
+        var(--bc-rail-line)
+    );
+}
+
+.bc-station-line--active {
+    background: linear-gradient(
+        90deg,
+        rgba(245, 180, 98, 0.65),
+        var(--bc-rail-line-dim)
+    );
+}
+
+/* ── Status line ───────────────────────────────────────────────── */
+
+.bc-status {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 4px 2px;
+    margin-bottom: 14px;
+}
+
+.bc-status-prompt {
+    color: var(--bc-crema);
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.bc-status-msg {
+    flex: 1;
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-style: italic;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--bc-ink);
+    animation: bc-msg-in 380ms ease-out;
+}
+
+@keyframes bc-msg-in {
+    from { opacity: 0; transform: translateY(2px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.bc-status-cursor {
+    display: inline-block;
+    width: 8px;
+    height: 14px;
+    background: rgba(245, 180, 98, 0.78);
+    transform: translateY(2px);
+    animation: bc-cursor 1s steps(2, jump-none) infinite;
+    flex-shrink: 0;
+}
+
+@keyframes bc-cursor {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+/* ── Persona row ───────────────────────────────────────────────── */
+
+.bc-personas-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(217, 119, 6, 0.12);
+}
+
+.bc-persona {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--bc-ink-dim);
+    transition: color 220ms ease;
+}
+
+.bc-persona-puck {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--bc-puck-empty-bg);
+    border: 1px solid var(--bc-puck-empty-edge);
+    box-sizing: border-box;
+    transition:
+        background 220ms ease,
+        border-color 220ms ease,
+        box-shadow 220ms ease;
+}
+
+.bc-persona--working .bc-persona-puck,
+.bc-persona--reviewing .bc-persona-puck {
+    background: var(--bc-puck-active-bg);
+    border-color: rgba(245, 180, 98, 0.85);
+    animation: bc-bloom 2.4s ease-in-out infinite;
+}
+
+.bc-persona--done .bc-persona-puck {
+    background: var(--bc-puck-done-bg);
+    border-color: var(--bc-puck-done-edge);
+}
+
+.bc-persona--working,
+.bc-persona--reviewing {
+    color: #fde0c0;
+}
+
+.bc-persona--done {
+    color: var(--bc-eyebrow);
+}
+
+/* Chairman gets a gold tone — slightly different from the persona pucks
+   so the eye can find it without reading. */
+.bc-persona--chairman-waiting .bc-persona-puck {
+    background: rgba(120, 90, 40, 0.18);
+    border-color: rgba(251, 191, 36, 0.35);
+}
+.bc-persona--chairman-working .bc-persona-puck {
+    background: radial-gradient(
+        circle at 35% 30%,
+        #fde68a 0%,
+        #d97706 55%,
+        #5b2c0a 100%
+    );
+    border-color: rgba(251, 191, 36, 0.85);
+    animation: bc-bloom 2.4s ease-in-out infinite;
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.55);
+}
+.bc-persona--chairman-done .bc-persona-puck {
+    background: rgba(251, 191, 36, 0.5);
+    border-color: rgba(251, 191, 36, 0.75);
+}
+.bc-persona--chairman-working,
+.bc-persona--chairman-done {
+    color: #fde68a;
+}
+
+/* ── Bloom keyframe shared by head dot + active stations + personas ── */
+
+@keyframes bc-bloom {
+    0% {
+        box-shadow: 0 0 0 0 var(--bc-glow);
+    }
+    50% {
+        box-shadow: 0 0 0 12px rgba(217, 119, 6, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(217, 119, 6, 0);
+    }
+}
+
+@keyframes bc-puck-spin {
+    from { background-position: 0% 0%; }
+    to   { background-position: 100% 100%; }
+}
+
+/* ── Compact (minimized) state ─────────────────────────────────── */
+
+.bc-root--compact {
+    padding: 10px 14px;
+}
+
+.bc-compact-inner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+}
+
+.bc-compact-inner:focus-visible {
+    outline: 2px solid rgba(245, 180, 98, 0.55);
+    outline-offset: 3px;
+    border-radius: 8px;
+}
+
+.bc-compact-bloom {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--bc-puck-active-bg);
+    box-shadow: 0 0 0 0 var(--bc-glow);
+    animation: bc-bloom 4s ease-in-out infinite;
+    flex-shrink: 0;
+}
+
+.bc-compact-stage {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--bc-eyebrow);
+    flex-shrink: 0;
+}
+
+.bc-compact-progress {
+    font-size: 10px;
+    color: var(--bc-ink-dim);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+.bc-compact-msg {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--bc-ink);
+}
+
+.bc-compact-expand-hint {
+    flex-shrink: 0;
+    color: var(--bc-ink-dim);
+    font-size: 10px;
+}
+
+/* ── Aborted state ─────────────────────────────────────────────── */
+
+.bc-root.aborted {
+    border-color: rgba(248, 113, 113, 0.3);
+}
+
+.bc-root.aborted .bc-station-puck,
+.bc-root.aborted .bc-persona-puck,
+.bc-root.aborted .bc-head-bloom,
+.bc-root.aborted .bc-compact-bloom {
+    animation: none !important;
+    box-shadow: none !important;
+}
+
+.bc-root.aborted .bc-status-cursor,
+.bc-root.aborted .bc-station-drip {
+    display: none;
+}
+
+.bc-root.aborted .bc-head-eyebrow,
+.bc-root.aborted .bc-station--active .bc-station-label {
+    color: #fca5a5;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+    .bc-root {
+        padding: 14px 14px 16px;
+    }
+    .bc-rail {
+        gap: 0;
+    }
+    .bc-station-sub {
+        display: none;
+    }
+    .bc-status-msg {
+        font-size: 14px;
+    }
+    .bc-personas-row {
+        gap: 6px 10px;
+    }
+    .bc-persona-name {
+        max-width: 84px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .bc-station-label {
+        font-size: 9px;
+        letter-spacing: 0.12em;
+    }
+}

@@ -375,6 +375,67 @@
     line-height: 1.55;
 }
 
+/* Placeholder header tag — micro-pill that confirms questions ARE coming.
+   Sits to the right of the title in the head row. */
+.interim-questions__placeholder-tag {
+    margin-left: auto;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #fde68a;
+    padding: 3px 8px;
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 999px;
+    background: rgba(251, 191, 36, 0.08);
+}
+
+/* Lead line — calm, one sentence about what to expect. Heavier than the
+   cycling hint below it. */
+.interim-questions__placeholder-lead {
+    margin: 10px 0 8px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: #cbd5e1;
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-style: italic;
+}
+
+/* Cycling hint — the "the council might ask about…" peek. The text node's
+   `key` flips on each cycle so React re-mounts the span and we get a clean
+   crossfade animation per change. */
+.interim-questions__placeholder-hint {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(2, 6, 23, 0.45);
+    border-left: 2px solid rgba(251, 191, 36, 0.4);
+}
+
+.interim-questions__placeholder-hint-prompt {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #fbbf24;
+    flex-shrink: 0;
+}
+
+.interim-questions__placeholder-hint-text {
+    font-size: 13px;
+    line-height: 1.45;
+    color: #e2e8f0;
+    animation: interim-hint-in 380ms ease-out;
+}
+
+@keyframes interim-hint-in {
+    from { opacity: 0; transform: translateY(2px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Chairman variant — the FINAL clarification before stage 3. More emphatic
    border + a gold inner glow so the user notices this is the last
    shape-the-essay moment. */

@@ -8,11 +8,14 @@ import { PitchSummary, SpinePick } from './CouncilDecisions';
 import CouncilGrid from './CouncilGrid';
 import CouncilChips from './CouncilChips';
 import EssayLoadingStatus from './EssayLoadingStatus';
+import BrewingConsole from './BrewingConsole';
+import BrewBar from './BrewBar';
 import UserBriefMessage from './UserBriefMessage';
 import InterimQuestions from './InterimQuestions';
 import FinalEssay from './FinalEssay';
 import { api } from '../api';
 import MicButton from './common/MicButton';
+import { useTunable } from '../tunables';
 import './ChatInterface.css';
 
 const PERSONA_NAME_BY_KEY = {
@@ -154,6 +157,7 @@ export default function ChatInterface({
     activeCouncil = null,
     activeWordTarget = null,
 }) {
+    const brewingConsoleV2 = useTunable('brewingConsoleV2');
     const [input, setInput] = useState('');
     const [webSearch, setWebSearch] = useState(false);
     const [composerCollapsed, setComposerCollapsed] = useState(false);
@@ -203,6 +207,17 @@ export default function ChatInterface({
     }, [conversation]);
 
     const draftNavKey = draftMessageIndices.join(',');
+
+    // The most recent in-flight assistant message — feeds the bottom BrewBar
+    // its live stage / progress / cycling-message context. The BrewBar
+    // independently subscribes to the same `loading` shape that BrewingConsole
+    // uses up-stream, so the two surfaces stay in lockstep without us having
+    // to plumb cycle indices around.
+    const inflightMsg = useMemo(() => {
+        if (!isLoading || !conversation?.messages?.length) return null;
+        const last = conversation.messages[conversation.messages.length - 1];
+        return last?.role === 'assistant' ? last : null;
+    }, [conversation, isLoading]);
 
     const showRefinementDock =
         Boolean(conversation) &&
@@ -627,10 +642,11 @@ export default function ChatInterface({
                                         activeCouncil={activeCouncil}
                                         activeWordTarget={activeWordTarget}
                                         essayVersionLabel={versionLabelForAssistant}
-                                        onFixFlag={handleFixFlag}
-                                        fixingFlagIdx={fixingFlagIdx}
+                                        onFixAll={handleFixAll}
+                                        fixingAll={fixingFlagIdx === 'all'}
                                         dismissedFlags={factCheckDismissedSet}
                                         onDismissFlag={handleDismissFlag}
+                                        brewingConsoleV2={brewingConsoleV2}
                                     />
                                 )}
                             </div>
@@ -750,6 +766,34 @@ export default function ChatInterface({
                             <button className="config-link" onClick={() => onOpenSettings('council')}>Configure Council</button>
                         </span>
                     </div>
+                ) : brewingConsoleV2 &&
+                    isLoading &&
+                    (!showRefinementDock || refinementDockCollapsed) ? (
+                    /* Unified during-run strip. Replaces both the old
+                       "Council is revising / Show / Stop" pill and the
+                       no-refinement "Council is deliberating" pill so the
+                       bottom of the screen reads as one continuous brew
+                       rail with the console above. The "Refine" pull-tab
+                       only appears when there is actually a refinement
+                       dock to pull up.
+
+                       Skipped when the refinement dock is EXPANDED: in that
+                       case the user has the form open with their typed
+                       refinement, and the form's own loading bar is the
+                       right surface to show (we don't want to replace the
+                       form they're staring at). */
+                    <BrewBar
+                        loading={inflightMsg?.loading}
+                        progress={inflightMsg?.progress}
+                        msg={inflightMsg}
+                        aborted={Boolean(inflightMsg?.aborted)}
+                        onAbort={onAbort}
+                        onExpand={
+                            showRefinementDock && refinementDockCollapsed
+                                ? () => setRefinementDockCollapsed(false)
+                                : null
+                        }
+                    />
                 ) : showRefinementDock && refinementDockCollapsed ? (
                     <div className="composer-status-pill">
                         {isLoading && <span className="composer-status-dot" aria-hidden="true" />}
@@ -1132,6 +1176,9 @@ function AssistantMessageBody({
     fixingFlagIdx = null,
     dismissedFlags = null,
     onDismissFlag = null,
+    // brewingConsoleV2 = swap EssayLoadingStatus for the new BrewingConsole
+    // and let it absorb the persona-chip row.
+    brewingConsoleV2 = false,
 }) {
     // Track the whole stream lifecycle, not individual stage flags — the
     // backend yields events between stages (interim questions, the Flash
@@ -1196,7 +1243,9 @@ function AssistantMessageBody({
                 />
             )}
 
-            {chipState && (isStreaming || !msg.stage3) && (
+            {/* CouncilChips are folded into BrewingConsole when brewingConsoleV2
+                is on, so we only render the standalone chip row in the legacy path. */}
+            {!brewingConsoleV2 && chipState && (isStreaming || !msg.stage3) && (
                 <CouncilChips
                     personas={chipState.personas}
                     chairman={chipState.chairman}
@@ -1207,12 +1256,24 @@ function AssistantMessageBody({
             )}
 
             {isStreaming && !msg.stage3 && (
-                <EssayLoadingStatus
-                    loading={msg.loading}
-                    progress={msg.progress}
-                    msg={msg}
-                    onAbort={onAbort}
-                />
+                brewingConsoleV2 ? (
+                    <BrewingConsole
+                        loading={msg.loading}
+                        progress={msg.progress}
+                        msg={msg}
+                        aborted={Boolean(msg.aborted)}
+                        onAbort={onAbort}
+                        chipState={chipState}
+                        webSearched={Boolean(msg.metadata?.search_context)}
+                    />
+                ) : (
+                    <EssayLoadingStatus
+                        loading={msg.loading}
+                        progress={msg.progress}
+                        msg={msg}
+                        onAbort={onAbort}
+                    />
+                )
             )}
 
             {/* Render the panel for the entire streaming window so the user

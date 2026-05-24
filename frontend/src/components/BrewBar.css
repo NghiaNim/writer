@@ -1,0 +1,261 @@
+/*
+ * BrewBar — slim bottom strip during a council run.
+ *
+ * Sits in place of the old composer's "Expand refinement / Council is
+ * updating / red ⏹" combo. Two rows:
+ *
+ *   1. A 2-px ambient progress rail with a slow shimmer (NOT a typical
+ *      indeterminate barber-pole; the shimmer is gated to the filled
+ *      portion so the bar reads as actual progress, not as an animation).
+ *   2. Stage label + persona dot + live whisper + (Refine ▴) + (Stop)
+ *
+ * Stop is a quiet text link with a tiny ◾ glyph. NOT a colored button.
+ * Refine is a text pull-tab with a ▴ glyph — secondary affordance.
+ *
+ * The whole strip leans on the same warm-coffee tokens as BrewingConsole
+ * so the two surfaces read as one product, not two separately-themed
+ * panels.
+ */
+
+.brewbar {
+    display: flex;
+    flex-direction: column;
+    background: rgba(28, 19, 12, 0.86);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(217, 119, 6, 0.18);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow:
+        0 12px 32px -16px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(245, 180, 98, 0.06);
+    color: #f3e7d4;
+    font-family: var(--font-ui, system-ui, sans-serif);
+}
+
+/* ── Rail ─────────────────────────────────────────────────────── */
+
+.brewbar__rail {
+    position: relative;
+    height: 3px;
+    background: rgba(120, 80, 50, 0.18);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.brewbar__rail-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(217, 119, 6, 0.7) 0%,
+        rgba(245, 180, 98, 0.95) 60%,
+        rgba(245, 180, 98, 0.4) 100%
+    );
+    border-right: 1px solid rgba(245, 180, 98, 0.7);
+    box-shadow: 0 0 12px rgba(245, 180, 98, 0.35);
+    transition: width 480ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* A subtle highlight that crosses the FILLED portion only — clipped by
+   the rail-fill width via overflow:hidden on the parent. The shimmer is
+   slow (3.4s) so it reads as light moving across espresso, not as a
+   loading-bar barber-pole. */
+.brewbar__rail-shimmer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 230, 180, 0.45) 50%,
+        transparent 100%
+    );
+    background-size: 240px 100%;
+    background-repeat: no-repeat;
+    animation: brewbar-shimmer 3.4s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes brewbar-shimmer {
+    from { background-position: -240px 0; }
+    to   { background-position: 100% 0; }
+}
+
+/* ── Row ─────────────────────────────────────────────────────── */
+
+.brewbar__row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px 11px;
+    min-height: 36px;
+}
+
+/* ── Stage block ─────────────────────────────────────────────── */
+
+.brewbar__stage {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+.brewbar__bloom {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle at 35% 30%,
+        #fbd28a 0%,
+        #d97706 55%,
+        #5b2c0a 100%
+    );
+    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55);
+    animation: brewbar-bloom 4s ease-in-out infinite;
+    flex-shrink: 0;
+}
+
+@keyframes brewbar-bloom {
+    0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55); }
+    50% { box-shadow: 0 0 0 10px rgba(217, 119, 6, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+}
+
+.brewbar__stage-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #f5b462;
+}
+
+.brewbar__stage-count {
+    font-size: 10px;
+    font-weight: 600;
+    color: #b9a98e;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Whisper ─────────────────────────────────────────────────── */
+
+.brewbar__msg {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-style: italic;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #d6c5a8;
+    animation: brewbar-msg-in 380ms ease-out;
+}
+
+@keyframes brewbar-msg-in {
+    from { opacity: 0; transform: translateY(1px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Actions ─────────────────────────────────────────────────── */
+
+.brewbar__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.brewbar__refine,
+.brewbar__stop {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #b9a98e;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: var(--font-ui, system-ui, sans-serif);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition:
+        color 140ms ease,
+        border-color 140ms ease,
+        background 140ms ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.brewbar__refine:hover {
+    color: #fde0c0;
+    border-color: rgba(245, 180, 98, 0.35);
+    background: rgba(245, 180, 98, 0.06);
+}
+
+.brewbar__refine-glyph {
+    font-size: 9px;
+    line-height: 1;
+    transform: translateY(-1px);
+}
+
+.brewbar__stop:hover {
+    color: #fde0c0;
+    border-color: rgba(217, 119, 6, 0.35);
+    background: rgba(217, 119, 6, 0.08);
+}
+
+.brewbar__stop-glyph {
+    font-size: 9px;
+    line-height: 1;
+    transform: translateY(-1px);
+}
+
+/* ── Aborted ─────────────────────────────────────────────────── */
+
+.brewbar--aborted .brewbar__rail-fill {
+    background: rgba(248, 113, 113, 0.5);
+    box-shadow: none;
+}
+
+.brewbar--aborted .brewbar__rail-shimmer {
+    display: none;
+}
+
+.brewbar--aborted .brewbar__bloom {
+    animation: none;
+    background: #f87171;
+}
+
+.brewbar--aborted .brewbar__stage-label {
+    color: #fca5a5;
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+    .brewbar__row {
+        gap: 10px;
+        padding: 8px 12px 9px;
+    }
+    .brewbar__msg {
+        font-size: 12px;
+    }
+    .brewbar__refine span,
+    .brewbar__stop span {
+        display: none;
+    }
+}
+
+@media (max-width: 520px) {
+    /* On tight viewports the whisper line is the lowest-value piece —
+       hide it before the controls go away. */
+    .brewbar__msg {
+        display: none;
+    }
+}

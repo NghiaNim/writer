@@ -32,7 +32,17 @@
  * weeks should be inlined and removed — long-lived flags rot into dead code.
  */
 
-export const TUNABLES = [];
+export const TUNABLES = [
+  {
+    key: 'brewingConsoleV2',
+    type: 'bool',
+    default: true,
+    description:
+      'New drafting console: 5-station extraction rail + slim bottom brew bar. Replaces the old terminal panel + chunky "Expand refinement / Council is updating / red stop orb" strip during a run.',
+    addedOn: '2026-05-23',
+    owner: 'design',
+  },
+];
 
 /**
  * Build a lookup map from the registry for fast resolution.

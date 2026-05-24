@@ -95,6 +95,58 @@ function HeardItem({ entry }) {
     );
 }
 
+// Hints the placeholder cycles through while the first interim_question
+// SSE event hasn't landed yet. These mirror the categories the backend
+// extractor actually pulls into user_fact (biography / experience / belief
+// / interest / achievement / relationship / reference) so the user gets
+// a calibrated peek, not a misleading promise.
+const HINT_BANK = [
+    'the morning ritual you mentioned — what does it actually feel like?',
+    'one concrete moment where the thing went sideways',
+    'who said the line that lodged in your head',
+    'the year, the city, the cafe — anchors that ground the essay',
+    'the one detail you almost left out',
+    'who you secretly wrote this for',
+];
+
+function PlaceholderPanel() {
+    const [hintIdx, setHintIdx] = useState(0);
+    useEffect(() => {
+        const id = setInterval(() => {
+            setHintIdx((i) => (i + 1) % HINT_BANK.length);
+        }, 2800);
+        return () => clearInterval(id);
+    }, []);
+    return (
+        <aside
+            className="interim-questions interim-questions--placeholder"
+            aria-label="Questions from the council"
+        >
+            <div className="interim-questions__head">
+                <span className="interim-questions__pulse" aria-hidden="true" />
+                <span className="interim-questions__title">While we draft…</span>
+                <span className="interim-questions__placeholder-tag">
+                    questions arriving
+                </span>
+            </div>
+            <p className="interim-questions__placeholder-lead">
+                A question or two will surface here as the council notices a gap.
+            </p>
+            <p className="interim-questions__placeholder-hint">
+                <span className="interim-questions__placeholder-hint-prompt" aria-hidden="true">
+                    e.g.
+                </span>
+                <span
+                    className="interim-questions__placeholder-hint-text"
+                    key={hintIdx}
+                >
+                    {HINT_BANK[hintIdx]}
+                </span>
+            </p>
+        </aside>
+    );
+}
+
 /**
  * Side panel that appears alongside EssayLoadingStatus while the council is
  * working. Shows up to MAX_QUESTIONS_PER_RUN questions the backend asked,
@@ -136,21 +188,14 @@ export default function InterimQuestions({
     // so the user knows this panel exists and that questions will appear
     // here. Without this, the panel only materialises ~30s into the run
     // (after stage 1) and answers compete with the chairman's start.
+    //
+    // We cycle through "the council might ask about…" hints so the panel
+    // feels alive and gives the user a concrete sense of what's coming
+    // (otherwise they read a static "in a few seconds" line and ignore it).
     if (total === 0) {
         if (runFinished) return null;
         return (
-            <aside
-                className="interim-questions interim-questions--placeholder"
-                aria-label="Questions from the council"
-            >
-                <div className="interim-questions__head">
-                    <span className="interim-questions__pulse" aria-hidden="true" />
-                    <span className="interim-questions__title">While we draft…</span>
-                </div>
-                <p className="interim-questions__placeholder-body">
-                    A question or two will appear here in a few seconds.
-                </p>
-            </aside>
+            <PlaceholderPanel />
         );
     }
 
