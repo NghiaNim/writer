@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import MidnightLogo from './MidnightLogo';
 import './Sidebar.css';
 
 /**
@@ -269,8 +270,8 @@ export default function Sidebar({
         <div className="sidebar-header">
         <div className="sidebar-title-wrapper">
           <div className="sidebar-title">
-            <span className="coffee-bean sidebar-title-bean" aria-hidden="true" />
-            {' '}MidnightCoffee
+            <MidnightLogo size={22} className="midnight-logo--sidebar" />
+            <span className="sidebar-title-text">MidnightCoffee</span>
           </div>
         </div>
         {/* View-mode toggle sits in the header so its position is
@@ -294,13 +295,10 @@ export default function Sidebar({
             {viewMode === 'sections' ? '⊟' : '☰'}
           </button>
         )}
-        <button
-          className="icon-button"
-          onClick={onOpenSettings}
-          title="Settings"
-        >
-          ⚙️
-        </button>
+        {/* Settings moved to the top-right auth chip (see App.jsx) so
+            the sidebar header doesn't fight for space with two icon
+            buttons. The view-mode toggle stays here because it's a
+            sidebar-scoped control. */}
       </div>
 
       {/* Prominent New Discussion Button — enabled even when other

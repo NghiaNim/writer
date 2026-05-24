@@ -1,0 +1,69 @@
+/*
+ * MidnightLogo styling.
+ *
+ * The SVG is already a complete chip (background + cup + steam + moon),
+ * so we only need to handle alignment, the soft outer halo that sells
+ * "this is a real product mark, not a clip-art cup", and a hover lift
+ * for the few places where the logo is interactive (e.g. could become
+ * a click target back to home).
+ */
+
+.midnight-logo {
+    display: inline-block;
+    flex-shrink: 0;
+    border-radius: 22%;
+    /* The SVG already uses rx=14 on a 64-wide canvas; mirror that here so
+       any focus ring / shadow we add traces the corners properly. */
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.04) inset,
+        0 4px 14px -8px rgba(217, 119, 6, 0.55),
+        0 0 0 1px rgba(245, 180, 98, 0.18);
+    transition: box-shadow 220ms ease, transform 220ms ease;
+    user-select: none;
+}
+
+/* Subtle lift when the logo lives next to interactive surfaces. Pure
+   visual; doesn't change layout. */
+.midnight-logo:hover {
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.06) inset,
+        0 6px 18px -6px rgba(217, 119, 6, 0.7),
+        0 0 0 1px rgba(245, 180, 98, 0.32);
+}
+
+/* Variant overrides — let callers tune alignment / spacing without
+   reaching into the logo CSS. The component accepts a `className` prop
+   for exactly this reason. */
+.midnight-logo--sidebar {
+    margin-right: 8px;
+    transform: translateY(-1px);
+}
+
+.midnight-logo--login {
+    margin-right: 12px;
+    transform: translateY(-2px);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.06) inset,
+        0 8px 24px -10px rgba(217, 119, 6, 0.55),
+        0 0 0 1px rgba(245, 180, 98, 0.22);
+}
+
+.midnight-logo--welcome {
+    margin: 0 12px 0 0;
+    transform: translateY(-3px);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.06) inset,
+        0 10px 28px -12px rgba(217, 119, 6, 0.55),
+        0 0 0 1px rgba(245, 180, 98, 0.22);
+}
+
+/* Welcome titles need flex layout so the logo sits inline with the
+   "Welcome to MidnightCoffee" text instead of stacking above it. The
+   existing h1 rules in ChatInterface.css are display:block by default. */
+.welcome-title {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0;
+}

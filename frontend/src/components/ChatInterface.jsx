@@ -10,6 +10,7 @@ import CouncilChips from './CouncilChips';
 import EssayLoadingStatus from './EssayLoadingStatus';
 import BrewingConsole from './BrewingConsole';
 import BrewBar from './BrewBar';
+import MidnightLogo from './MidnightLogo';
 import UserBriefMessage from './UserBriefMessage';
 import InterimQuestions from './InterimQuestions';
 import FinalEssay from './FinalEssay';
@@ -457,7 +458,10 @@ export default function ChatInterface({
         return (
             <div className="chat-interface">
                 <div className="empty-state">
-                    <h1>Welcome to MidnightCoffee</h1>
+                    <h1 className="welcome-title">
+                        <MidnightLogo size={44} className="midnight-logo--welcome" />
+                        Welcome to MidnightCoffee
+                    </h1>
                     <p className="hero-message">
                         The Council is ready to deliberate. <button className="config-link" onClick={() => onOpenSettings('council')}>Configure it</button>
                     </p>
@@ -576,7 +580,10 @@ export default function ChatInterface({
                        branch is a defensive backup. */
                     <div className="hero-container">
                         <div className="hero-content">
-                            <h1>Welcome to MidnightCoffee</h1>
+                            <h1 className="welcome-title">
+                                <MidnightLogo size={44} className="midnight-logo--welcome" />
+                                Welcome to MidnightCoffee
+                            </h1>
                             <p className="hero-subtitle">
                                 The Council is ready to deliberate. <button className="config-link" onClick={() => onOpenSettings('council')}>Configure it</button>
                             </p>

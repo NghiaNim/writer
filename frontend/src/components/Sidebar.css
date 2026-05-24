@@ -42,6 +42,26 @@
   align-items: center;
   gap: 8px;
   overflow: hidden;
+  min-width: 0;
+}
+
+/* The brand text portion of the title. Hidden on narrow sidebar
+   widths so the logo alone represents the brand and the view-mode
+   toggle has room to sit cleanly in the header. */
+.sidebar-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+@media (max-width: 340px) {
+  .sidebar-title-text {
+    display: none;
+  }
+}
+
+.sidebar-title-prefix-unused {
   white-space: nowrap;
   text-overflow: ellipsis;
 }

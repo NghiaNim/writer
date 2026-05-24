@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { api, API_BASE, warmUpBackend } from '../api';
+import MidnightLogo from './MidnightLogo';
 import './Login.css';
 
 /**
@@ -149,10 +150,7 @@ export default function Login() {
             <div className="login-card">
                 <div className="login-header">
                     <h1 className="login-title">
-                        <span
-                            className="coffee-bean login-title-bean"
-                            aria-hidden="true"
-                        />
+                        <MidnightLogo size={40} className="midnight-logo--login" />
                         MidnightCoffee
                     </h1>
                     <p className="login-subtitle">

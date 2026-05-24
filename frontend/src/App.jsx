@@ -1469,9 +1469,22 @@ function AppShell() {
       </button>
 
       {/* Phase 1: minimal auth chip in the top-right.
-          Will be replaced by the full top nav in Phase 6. */}
+          Settings lives here too now (next to Sign out) — it's
+          account-scoped chrome rather than sidebar-scoped, so this is
+          the more natural home and it frees up cramped real estate in
+          the sidebar header. Will be replaced by the full top nav in
+          Phase 6. */}
       <div className="auth-chip" role="status" aria-label="Account">
         {user?.email && <span className="auth-chip-email">{user.email}</span>}
+        <button
+          type="button"
+          className="auth-chip-icon-btn"
+          onClick={() => handleOpenSettings('council')}
+          title="Settings"
+          aria-label="Settings"
+        >
+          ⚙️
+        </button>
         <button
           type="button"
           className="auth-chip-logout"

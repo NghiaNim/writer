@@ -37,6 +37,28 @@
   white-space: nowrap;
 }
 
+.auth-chip-icon-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border: 1px solid var(--border-glass);
+  border-radius: 999px;
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.auth-chip-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
 .auth-chip-logout {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
