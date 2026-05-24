@@ -328,6 +328,12 @@ function AppShell() {
       setCurrentConversation(conv);
     } catch (error) {
       console.error('Failed to load conversation:', error);
+      setCurrentConversation(null);
+      setCurrentConversationId(null);
+      setEssayFlowVisible(true);
+      setStreamHandoffError(
+        'That essay could not be loaded — it may have been deleted. You can keep writing here.'
+      );
     }
   };
 
