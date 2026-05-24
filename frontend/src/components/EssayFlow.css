@@ -638,7 +638,7 @@
     z-index: 1000;
     background: var(--bg-primary, #0f172a);
     overflow-y: auto;
-    padding: 40px 48px;
+    padding: 40px 60px 120px;
     margin: 0;
     max-width: none;
     animation: essay-flow-fullscreen-in 200ms ease;
@@ -657,12 +657,20 @@
 }
 
 .essay-flow-step--fullscreen .essay-flow-question {
-    font-size: 30px;
+    font-size: 28px;
+}
+
+.essay-flow-step--fullscreen .essay-flow-exchange {
+    max-width: 900px;
 }
 
 .essay-flow-step--fullscreen .essay-flow-exchange textarea {
-    min-height: 180px;
+    min-height: 200px;
     font-size: 16px;
+}
+
+.essay-flow-step--fullscreen .essay-flow-exchange-q {
+    font-size: 17px;
 }
 
 .essay-flow-step--fullscreen .essay-flow-actions {
@@ -671,15 +679,24 @@
     padding: 16px 0;
     background: var(--bg-primary, #0f172a);
     border-top: 1px solid rgba(148, 163, 184, 0.12);
+    max-width: 900px;
 }
 
 .essay-flow-step--fullscreen .essay-flow-question-row {
-    max-width: 760px;
+    max-width: 900px;
 }
 
-.essay-flow-step--fullscreen .essay-flow-question-section,
-.essay-flow-step--fullscreen .essay-flow-actions {
-    max-width: 760px;
+.essay-flow-step--fullscreen .essay-flow-question-section {
+    max-width: 900px;
+}
+
+.essay-flow-step--fullscreen .essay-flow-hint,
+.essay-flow-step--fullscreen .essay-flow-toolbar-legend {
+    max-width: 900px;
+}
+
+.essay-flow-step--fullscreen .essay-flow-memory {
+    max-width: 900px;
 }
 
 .essay-flow-error {
@@ -1877,6 +1894,10 @@
 .essay-flow--coffee .essay-flow-step--fullscreen .essay-flow-fullscreen-btn {
     background: rgba(30, 15, 5, 0.8);
     backdrop-filter: blur(8px);
+}
+
+.essay-flow--coffee .essay-flow-step--fullscreen .essay-flow-exchange-q {
+    color: var(--coffee-cream);
 }
 
 /* Topic chip — warm pill, same shape. */

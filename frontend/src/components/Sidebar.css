@@ -491,6 +491,7 @@
   align-items: center;
   justify-content: center;
   touch-action: none;
+  z-index: 2;
 }
 
 .sidebar-resizer:hover .sidebar-resizer-handle,
