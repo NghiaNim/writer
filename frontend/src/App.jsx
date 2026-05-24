@@ -358,6 +358,29 @@ function AppShell() {
     // session id for legacy conversations, so clear it — regenerate will
     // fall back to the user's default council config.
     setEssayFlowVisible(false);
+
+    // Seed currentConversation immediately so ChatInterface doesn't
+    // render with the PREVIOUS conversation's content for a frame
+    // (the "disused screen") and then drop to null (the "blank")
+    // while the useEffect catches up with loadConversation.
+    //
+    // Priority order:
+    //   1. live-cache (the conversation is currently streaming —
+    //      latest partial state lives in memory)
+    //   2. conversations-list summary (we have title + meta but no
+    //      messages yet — set messages: [] so ChatInterface shows a
+    //      loading state instead of blank)
+    //   3. null fallback — only when truly unknown
+    if (id !== currentConversationId) {
+      const cached = liveConversationsRef.current.get(id);
+      if (cached) {
+        setCurrentConversation(cached);
+      } else {
+        const summary = conversations.find((c) => c.id === id);
+        setCurrentConversation(summary ? { ...summary, messages: [] } : null);
+      }
+    }
+
     setCurrentConversationId(id);
     setCurrentSessionId(null);
   };
