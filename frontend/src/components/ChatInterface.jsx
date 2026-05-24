@@ -1170,10 +1170,10 @@ function AssistantMessageBody({
     activeCouncil = null,
     activeWordTarget = null,
     essayVersionLabel = null,
-    // Fact-check "Fix this" props — owned by ChatInterface state.
+    // Fact-check "Fix all" props — owned by ChatInterface state.
     // AssistantMessageBody just forwards them down to FinalEssay.
-    onFixFlag = null,
-    fixingFlagIdx = null,
+    onFixAll = null,
+    fixingAll = false,
     dismissedFlags = null,
     onDismissFlag = null,
     // brewingConsoleV2 = swap EssayLoadingStatus for the new BrewingConsole
@@ -1309,10 +1309,10 @@ function AssistantMessageBody({
                         msg.detectionScore || msg.metadata?.detection_score || null
                     }
                     detectionScoreRunning={Boolean(msg.detectionScoreRunning)}
-                    onFixAll={isLastMessage ? handleFixAll : null}
-                    fixingAll={isLastMessage && fixingFlagIdx === 'all'}
-                    dismissedFlags={isLastMessage ? factCheckDismissedSet : null}
-                    onDismissFlag={isLastMessage ? handleDismissFlag : null}
+                    onFixAll={isLastMessage ? onFixAll : null}
+                    fixingAll={isLastMessage && fixingAll}
+                    dismissedFlags={isLastMessage ? dismissedFlags : null}
+                    onDismissFlag={isLastMessage ? onDismissFlag : null}
                 />
             )}
 
