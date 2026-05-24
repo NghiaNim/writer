@@ -608,6 +608,10 @@ export default function ChatInterface({
                                         activeCouncil={activeCouncil}
                                         activeWordTarget={activeWordTarget}
                                         essayVersionLabel={versionLabelForAssistant}
+                                        onFixFlag={handleFixFlag}
+                                        fixingFlagIdx={fixingFlagIdx}
+                                        dismissedFlags={factCheckDismissedSet}
+                                        onDismissFlag={handleDismissFlag}
                                     />
                                 )}
                             </div>
@@ -1123,6 +1127,12 @@ function AssistantMessageBody({
     activeCouncil = null,
     activeWordTarget = null,
     essayVersionLabel = null,
+    // Fact-check "Fix this" props — owned by ChatInterface state.
+    // AssistantMessageBody just forwards them down to FinalEssay.
+    onFixFlag = null,
+    fixingFlagIdx = null,
+    dismissedFlags = null,
+    onDismissFlag = null,
 }) {
     // Track the whole stream lifecycle, not individual stage flags — the
     // backend yields events between stages (interim questions, the Flash
@@ -1239,10 +1249,10 @@ function AssistantMessageBody({
                         msg.detectionScore || msg.metadata?.detection_score || null
                     }
                     detectionScoreRunning={Boolean(msg.detectionScoreRunning)}
-                    onFixFlag={isLastMessage ? handleFixFlag : null}
+                    onFixFlag={isLastMessage ? onFixFlag : null}
                     fixingFlagIdx={isLastMessage ? fixingFlagIdx : null}
-                    dismissedFlags={isLastMessage ? factCheckDismissedSet : null}
-                    onDismissFlag={isLastMessage ? handleDismissFlag : null}
+                    dismissedFlags={isLastMessage ? dismissedFlags : null}
+                    onDismissFlag={isLastMessage ? onDismissFlag : null}
                 />
             )}
 
