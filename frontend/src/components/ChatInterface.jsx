@@ -5,15 +5,14 @@ import SearchContext from './SearchContext';
 import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import { PitchSummary, SpinePick } from './CouncilDecisions';
-import CouncilGrid from './CouncilGrid';
 import CouncilChips from './CouncilChips';
 import EssayLoadingStatus from './EssayLoadingStatus';
 import BrewingConsole from './BrewingConsole';
 import BrewBar from './BrewBar';
-import MidnightLogo from './MidnightLogo';
 import UserBriefMessage from './UserBriefMessage';
 import InterimQuestions from './InterimQuestions';
 import FinalEssay from './FinalEssay';
+import WelcomeHero from './WelcomeHero';
 import { api } from '../api';
 import MicButton from './common/MicButton';
 import { useTunable } from '../tunables';
@@ -458,19 +457,11 @@ export default function ChatInterface({
         return (
             <div className="chat-interface">
                 <div className="empty-state">
-                    <h1 className="welcome-title">
-                        <MidnightLogo size={44} className="midnight-logo--welcome" />
-                        Welcome to MidnightCoffee
-                    </h1>
-                    <p className="hero-message">
-                        The Council is ready to deliberate. <button className="config-link" onClick={() => onOpenSettings('council')}>Configure it</button>
-                    </p>
-
-                    {/* Council Preview Grid */}
-                    <div className="welcome-grid-container">
-                        <CouncilGrid models={councilModels} chairman={chairmanModel} status="idle" />
-                    </div>
-
+                    <WelcomeHero
+                        councilModels={councilModels}
+                        chairmanModel={chairmanModel}
+                        onOpenSettings={onOpenSettings}
+                    />
                 </div>
             </div>
         );
@@ -580,16 +571,11 @@ export default function ChatInterface({
                        branch is a defensive backup. */
                     <div className="hero-container">
                         <div className="hero-content">
-                            <h1 className="welcome-title">
-                                <MidnightLogo size={44} className="midnight-logo--welcome" />
-                                Welcome to MidnightCoffee
-                            </h1>
-                            <p className="hero-subtitle">
-                                The Council is ready to deliberate. <button className="config-link" onClick={() => onOpenSettings('council')}>Configure it</button>
-                            </p>
-                            <div className="welcome-grid-container">
-                                <CouncilGrid models={councilModels} chairman={chairmanModel} status="idle" />
-                            </div>
+                            <WelcomeHero
+                                councilModels={councilModels}
+                                chairmanModel={chairmanModel}
+                                onOpenSettings={onOpenSettings}
+                            />
                         </div>
                     </div>
                 ) : conversation.messages.length === 0 ? (
@@ -602,8 +588,8 @@ export default function ChatInterface({
                        falsely suggest the user is on a fresh slate). */
                     <div className="hero-container">
                         <div className="hero-content">
-                            <p className="hero-subtitle" style={{ opacity: 0.55 }}>
-                                Loading your essay…
+                            <p className="hero-subtitle hero-subtitle--loading">
+                                Warming the pot — loading your essay…
                             </p>
                         </div>
                     </div>

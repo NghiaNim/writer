@@ -21,21 +21,21 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: #93c5fd;
+    color: var(--accent-bright);
     flex-shrink: 0;
 }
 
 .user-brief-topic {
-    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-family: var(--font-content, Georgia, serif);
     font-size: 18px;
     line-height: 1.4;
-    color: #f1f5f9;
+    color: #f6efe0;
     font-weight: 500;
 }
 
 .user-brief-audience {
     font-size: 13px;
-    color: var(--text-secondary, #94a3b8);
+    color: var(--text-secondary);
     font-style: italic;
     margin-left: 0;
 }
@@ -44,8 +44,8 @@
     align-self: flex-start;
     margin-top: 6px;
     background: transparent;
-    border: 1px solid rgba(148, 163, 184, 0.28);
-    color: var(--text-secondary, #94a3b8);
+    border: 1px solid rgba(185, 169, 136, 0.28);
+    color: var(--text-secondary);
     border-radius: 999px;
     padding: 4px 12px;
     font-family: var(--font-ui);
@@ -58,9 +58,9 @@
 }
 
 .user-brief-toggle:hover {
-    background: rgba(59, 130, 246, 0.10);
-    border-color: rgba(59, 130, 246, 0.4);
-    color: #bfdbfe;
+    background: rgba(212, 145, 60, 0.10);
+    border-color: rgba(212, 145, 60, 0.4);
+    color: var(--accent-bright);
 }
 
 .user-brief-toggle-icon {
@@ -70,9 +70,9 @@
 .user-brief-details {
     margin-top: 8px;
     padding: 12px 14px;
-    background: rgba(15, 23, 42, 0.4);
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: 10px;
+    background: rgba(26, 19, 12, 0.4);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -85,13 +85,13 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    color: #94a3b8;
+    color: var(--text-secondary);
 }
 
 .user-brief-section .markdown-content {
     font-size: 14px;
     line-height: 1.55;
-    color: #cbd5e1;
+    color: #d4c5a5;
 }
 
 .user-brief-section .markdown-content p {
@@ -105,12 +105,12 @@
 /* Draft sub-block: a hair more visual weight since it's the actual
    text the user wrote, not derived metadata. */
 .user-brief-draft {
-    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
-    color: #e2e8f0;
+    font-family: var(--font-content, Georgia, serif);
+    color: #e8dcc6;
 }
 
 .user-brief-authors {
     font-size: 13px;
-    color: #cbd5e1;
+    color: #d4c5a5;
     font-style: italic;
 }

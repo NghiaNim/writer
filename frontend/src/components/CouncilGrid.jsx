@@ -22,7 +22,7 @@ const PROVIDER_CONFIG = {
     ollama: { color: '#ffffff', label: 'Local', logo: ollamaLogo },
     deepseek: { color: '#4e61e6', label: 'DeepSeek', logo: deepseekLogo },
     openrouter: { color: '#7f5af0', label: 'OpenRouter', logo: openrouterLogo },
-    custom: { color: '#06b6d4', label: 'Custom', logo: customLogo },
+    custom: { color: '#7dab9c', label: 'Custom', logo: customLogo },
     default: { color: '#888888', label: 'Model', logo: null, icon: '🤖' }
 };
 
@@ -208,7 +208,7 @@ export default function CouncilGrid({
             {/* Chairman Card - Always show, but state changes */}
             <div
                 className={`council-card chairman ${status === 'thinking' ? 'waiting' : 'ready'}`}
-                style={{ '--provider-color': (status !== 'thinking' && chairman) ? getProviderInfo(chairman).color : '#94a3b8' }}
+                style={{ '--provider-color': (status !== 'thinking' && chairman) ? getProviderInfo(chairman).color : '#b9a988' }}
                 onMouseEnter={(e) => status !== 'thinking' && handleMouseEnter(e, chairman || 'Chairman')}
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}

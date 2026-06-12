@@ -64,7 +64,7 @@ export default function BackupSettings({ onImport, onExport, onResetDefaults }) 
                     borderTop: '1px solid rgba(255, 255, 255, 0.1)',
                 }}
             >
-                <h4 style={{ color: '#f87171' }}>Danger Zone</h4>
+                <h4 style={{ color: '#d98c70' }}>Danger Zone</h4>
                 <p className="section-description">
                     Reset all settings to their default values. This will clear your council
                     selection and custom prompts. API keys will be preserved.

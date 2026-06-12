@@ -79,9 +79,9 @@ export default function PromptSettings({
                                         className="persona-editor"
                                         style={{
                                             padding: '14px',
-                                            background: 'rgba(59, 130, 246, 0.06)',
+                                            background: 'rgba(212, 145, 60, 0.06)',
                                             borderRadius: '8px',
-                                            border: '1px solid rgba(59, 130, 246, 0.18)',
+                                            border: '1px solid rgba(212, 145, 60, 0.18)',
                                         }}
                                     >
                                         <label
@@ -105,7 +105,7 @@ export default function PromptSettings({
                                                 marginBottom: '10px',
                                                 padding: '8px 10px',
                                                 background: 'rgba(0,0,0,0.25)',
-                                                color: '#e2e8f0',
+                                                color: '#e8dcc6',
                                                 border: '1px solid rgba(255,255,255,0.1)',
                                                 borderRadius: '6px',
                                                 fontFamily: 'inherit',
@@ -138,7 +138,7 @@ export default function PromptSettings({
                                                 marginBottom: '10px',
                                                 padding: '8px 10px',
                                                 background: 'rgba(0,0,0,0.25)',
-                                                color: '#e2e8f0',
+                                                color: '#e8dcc6',
                                                 border: '1px solid rgba(255,255,255,0.1)',
                                                 borderRadius: '6px',
                                                 fontFamily: 'inherit',
@@ -216,9 +216,9 @@ export default function PromptSettings({
                         <label>Stage 2: Peer Ranking</label>
 
                         {/* Stage 2 Temperature Slider - Positioned prominently */}
-                        <div className="stage2-heat-section" style={{ marginTop: '12px', marginBottom: '16px', padding: '15px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                        <div className="stage2-heat-section" style={{ marginTop: '12px', marginBottom: '16px', padding: '15px', background: 'rgba(201, 111, 74, 0.1)', borderRadius: '8px', border: '1px solid rgba(201, 111, 74, 0.2)' }}>
                             <div className="heat-slider-header">
-                                <h4 style={{ margin: 0, fontSize: '14px', color: '#e2e8f0' }}>Stage 2 Heat</h4>
+                                <h4 style={{ margin: 0, fontSize: '14px', color: '#e8dcc6' }}>Stage 2 Heat</h4>
                                 <span className="heat-value">{stage2Temperature.toFixed(1)}</span>
                             </div>
                             <p className="section-description" style={{ fontSize: '12px', margin: '8px 0' }}>

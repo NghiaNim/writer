@@ -23,13 +23,13 @@
     background: rgba(28, 19, 12, 0.86);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(217, 119, 6, 0.18);
-    border-radius: 14px;
+    border: 1px solid rgba(212, 145, 60, 0.18);
+    border-radius: 6px;
     overflow: hidden;
     box-shadow:
         0 12px 32px -16px rgba(0, 0, 0, 0.55),
-        inset 0 1px 0 rgba(245, 180, 98, 0.06);
-    color: #f3e7d4;
+        inset 0 1px 0 rgba(232, 181, 88, 0.06);
+    color: var(--coffee-cream, #efe5d1);
     font-family: var(--font-ui, system-ui, sans-serif);
 }
 
@@ -50,12 +50,12 @@
     bottom: 0;
     background: linear-gradient(
         90deg,
-        rgba(217, 119, 6, 0.7) 0%,
-        rgba(245, 180, 98, 0.95) 60%,
-        rgba(245, 180, 98, 0.4) 100%
+        #b5762c 0%,
+        #e8b558 60%,
+        rgba(232, 181, 88, 0.4) 100%
     );
-    border-right: 1px solid rgba(245, 180, 98, 0.7);
-    box-shadow: 0 0 12px rgba(245, 180, 98, 0.35);
+    border-right: 1px solid rgba(232, 181, 88, 0.7);
+    box-shadow: 0 0 12px rgba(232, 181, 88, 0.35);
     transition: width 480ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -69,7 +69,7 @@
     background: linear-gradient(
         90deg,
         transparent 0%,
-        rgba(255, 230, 180, 0.45) 50%,
+        rgba(246, 227, 189, 0.45) 50%,
         transparent 100%
     );
     background-size: 240px 100%;
@@ -110,19 +110,19 @@
     border-radius: 50%;
     background: radial-gradient(
         circle at 35% 30%,
-        #fbd28a 0%,
-        #d97706 55%,
+        #f6e3bd 0%,
+        #d4913c 55%,
         #5b2c0a 100%
     );
-    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55);
+    box-shadow: 0 0 0 0 rgba(212, 145, 60, 0.55);
     animation: brewbar-bloom 4s ease-in-out infinite;
     flex-shrink: 0;
 }
 
 @keyframes brewbar-bloom {
-    0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55); }
-    50% { box-shadow: 0 0 0 10px rgba(217, 119, 6, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(212, 145, 60, 0.55); }
+    50% { box-shadow: 0 0 0 10px rgba(212, 145, 60, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(212, 145, 60, 0); }
 }
 
 .brewbar__stage-label {
@@ -130,13 +130,13 @@
     font-weight: 700;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: #f5b462;
+    color: var(--coffee-crema, #e8b558);
 }
 
 .brewbar__stage-count {
     font-size: 10px;
     font-weight: 600;
-    color: #b9a98e;
+    color: var(--text-secondary, #b9a988);
     font-variant-numeric: tabular-nums;
 }
 
@@ -148,11 +148,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-family: var(--font-content, Georgia, serif);
     font-style: italic;
     font-size: 13px;
     line-height: 1.4;
-    color: #d6c5a8;
+    color: #d4c5a5;
     animation: brewbar-msg-in 380ms ease-out;
 }
 
@@ -174,8 +174,8 @@
 .brewbar__stop {
     background: transparent;
     border: 1px solid transparent;
-    color: #b9a98e;
-    border-radius: 6px;
+    color: var(--text-secondary, #b9a988);
+    border-radius: 3px;
     padding: 4px 10px;
     font-family: var(--font-ui, system-ui, sans-serif);
     font-size: 11px;
@@ -193,9 +193,9 @@
 }
 
 .brewbar__refine:hover {
-    color: #fde0c0;
-    border-color: rgba(245, 180, 98, 0.35);
-    background: rgba(245, 180, 98, 0.06);
+    color: #f6e3bd;
+    border-color: rgba(232, 181, 88, 0.35);
+    background: rgba(232, 181, 88, 0.06);
 }
 
 .brewbar__refine-glyph {
@@ -205,9 +205,9 @@
 }
 
 .brewbar__stop:hover {
-    color: #fde0c0;
-    border-color: rgba(217, 119, 6, 0.35);
-    background: rgba(217, 119, 6, 0.08);
+    color: #f6e3bd;
+    border-color: rgba(212, 145, 60, 0.35);
+    background: rgba(212, 145, 60, 0.08);
 }
 
 .brewbar__stop-glyph {
@@ -219,7 +219,7 @@
 /* ── Aborted ─────────────────────────────────────────────────── */
 
 .brewbar--aborted .brewbar__rail-fill {
-    background: rgba(248, 113, 113, 0.5);
+    background: rgba(205, 106, 74, 0.5);
     box-shadow: none;
 }
 
@@ -229,11 +229,11 @@
 
 .brewbar--aborted .brewbar__bloom {
     animation: none;
-    background: #f87171;
+    background: #d98c70;
 }
 
 .brewbar--aborted .brewbar__stage-label {
-    color: #fca5a5;
+    color: #e5a18d;
 }
 
 /* ── Responsive ───────────────────────────────────────────────── */

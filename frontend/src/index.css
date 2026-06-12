@@ -1,57 +1,79 @@
 :root {
-  /* --- Council Chamber Theme (refined Midnight Glass) --- */
+  /* ============================================================
+     METAMORPHOSIS — a midnight koffiehuis drawn by M.C. Escher.
 
-  /* Backgrounds */
-  --bg-dark: #0c1222;
-  --bg-darker: #060a12;
-  --bg-card: rgba(12, 18, 34, 0.72);
-  --bg-sidebar: rgba(8, 12, 22, 0.92);
+     Ink-and-paper woodcut palette: espresso grounds, bone paper,
+     roasted amber. Stage accents come from lithography pigments
+     (verdigris / terracotta / olive) instead of SaaS cyan/green.
+     Variable NAMES are kept from the old Midnight Glass theme so
+     every var() consumer re-themes automatically.
+     ============================================================ */
 
-  /* Text */
-  --text-primary: #f0f4f8;
-  --text-secondary: #9ca8b8;
-  --text-muted: #5c6b7c;
+  /* Grounds (ink) */
+  --bg-dark: #18120b;
+  --bg-darker: #0b0805;
+  --bg-card: rgba(26, 19, 12, 0.78);
+  --bg-sidebar: rgba(17, 12, 8, 0.94);
 
-  /* Accents */
-  --accent-primary: #3b82f6;
-  --accent-primary-dim: rgba(59, 130, 246, 0.25);
-  --accent-stage1: #22d3ee;
-  --accent-stage2: #f59e0b;
-  --accent-stage3: #10b981;
-  --accent-chairman: #fbbf24;
-  --accent-chairman-dim: rgba(251, 191, 36, 0.2);
+  /* Paper (text) */
+  --text-primary: #efe5d1;
+  --text-secondary: #b9a988;
+  --text-muted: #82735a;
 
-  /* Borders */
-  --border-color: rgba(148, 163, 184, 0.08);
-  --border-glass: rgba(255, 255, 255, 0.08);
+  /* Pigments */
+  --accent-primary: #d4913c;            /* roasted amber */
+  --accent-primary-deep: #b5762c;
+  --accent-primary-dim: rgba(212, 145, 60, 0.22);
+  --accent-bright: #e9c285;             /* crema highlight */
+  --accent-stage1: #7dab9c;             /* verdigris — drafts */
+  --accent-stage1-dim: rgba(125, 171, 156, 0.18);
+  --accent-stage2: #c96f4a;             /* terracotta — critique */
+  --accent-stage2-dim: rgba(201, 111, 74, 0.18);
+  --accent-stage3: #e8b558;             /* crema gold — revision */
+  --accent-chairman: #e8b558;
+  --accent-chairman-dim: rgba(232, 181, 88, 0.18);
+  --accent-danger: #cd6a4a;             /* fired brick */
+  --accent-success: #a3b56d;            /* olive leaf */
 
-  /* Typography */
-  --font-display: 'Syne', sans-serif;
-  --font-ui: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-content: 'Source Serif 4', Georgia, serif;
-  --font-code: 'JetBrains Mono', monospace;
+  /* Rules & frames */
+  --border-color: rgba(212, 145, 60, 0.12);
+  --border-glass: rgba(233, 194, 133, 0.13);
+  --border-strong: rgba(212, 145, 60, 0.32);
 
-  /* Shadows & glow */
-  --shadow-glass: 0 12px 40px rgba(0, 0, 0, 0.35);
-  --shadow-glow-blue: 0 0 24px rgba(59, 130, 246, 0.2), 0 4px 12px rgba(0, 0, 0, 0.15);
-  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.2);
+  /* Typography — Fraunces is the woodcut voice; Literata the book page. */
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-ui: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-content: 'Literata', Georgia, serif;
+  --font-code: 'IBM Plex Mono', monospace;
 
-  /* --- Coffee palette (third-wave / "Today's pour" aesthetic) ---
-     Opt-in via .login-screen--coffee, .sidebar--coffee, .essay-flow--coffee
-     modifier classes. Anchored to the values already used by
-     CoreIdeaBullets.css and EssayLoadingStatus.css so all coffee surfaces
-     share one chromatic vocabulary. */
-  --coffee-espresso: #22160e;
-  --coffee-roast: #3d2817;
+  /* Shadows & glow (old names kept for compatibility) */
+  --shadow-glass: 0 12px 40px rgba(5, 3, 1, 0.5);
+  --shadow-glow-blue: 0 0 24px rgba(212, 145, 60, 0.18), 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-soft: 0 4px 20px rgba(5, 3, 1, 0.3);
+
+  /* --- Coffee vocabulary (older component-level coffee rules read
+     these; harmonized to the Escher palette so both layers agree) --- */
+  --coffee-espresso: #1a130c;
+  --coffee-roast: #2a1d11;
   --coffee-bean: #6f4e2c;
-  --coffee-amber: #d97706;
-  --coffee-amber-deep: #b45309;
-  --coffee-crema: #f5b462;
-  --coffee-crema-bright: #fef3c7;
-  --coffee-cream: #f5e9d8;
-  --coffee-amber-dim: rgba(217, 119, 6, 0.20);
-  --coffee-amber-soft: rgba(217, 119, 6, 0.08);
-  --coffee-crema-glow: rgba(245, 180, 98, 0.12);
+  --coffee-amber: #d4913c;
+  --coffee-amber-deep: #b5762c;
+  --coffee-crema: #e8b558;
+  --coffee-crema-bright: #f6e3bd;
+  --coffee-cream: #efe5d1;
+  --coffee-amber-dim: rgba(212, 145, 60, 0.20);
+  --coffee-amber-soft: rgba(212, 145, 60, 0.08);
+  --coffee-crema-glow: rgba(232, 181, 88, 0.12);
+
+  /* ============================================================
+     Escher machinery — tessellations as data-URIs.
+     --tess-cubes: exact rhombille ("tumbling blocks") tiling in
+     2:1 isometric projection. Tile 48x72, lattice (48,0)/(24,36),
+     three face tones like a three-block woodcut print.
+     ============================================================ */
+  --tess-cubes: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='72' viewBox='0 0 48 72'%3E%3Cg fill='%23e8b558'%3E%3Cpath fill-opacity='.05' d='M24 0L48 12L24 24L0 12Z M0 36L24 48L0 60L-24 48Z M48 36L72 48L48 60L24 48Z M0 -36L24 -24L0 -12L-24 -24Z M48 -36L72 -24L48 -12L24 -24Z'/%3E%3Cpath fill-opacity='.02' d='M0 12L24 24L24 48L0 36Z M-24 48L0 60L0 84L-24 72Z M24 48L48 60L48 84L24 72Z M-24 -24L0 -12L0 12L-24 0Z M24 -24L48 -12L48 12L24 0Z'/%3E%3Cpath fill-opacity='.033' d='M48 12L48 36L24 48L24 24Z M24 48L24 72L0 84L0 60Z M72 48L72 72L48 84L48 60Z M24 -24L24 0L0 12L0 -12Z M72 -24L72 0L48 12L48 -12Z'/%3E%3C/g%3E%3C/svg%3E");
+  /* Wireframe variant — cube edges only, for chrome surfaces. */
+  --tess-cubes-line: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='72' viewBox='0 0 48 72'%3E%3Cg fill='none' stroke='%23e8b558' stroke-opacity='.07'%3E%3Cpath d='M24 0L48 12L48 36L24 48L0 36L0 12Z M0 12L24 24L48 12 M24 24L24 48'/%3E%3Cpath d='M0 36L24 48L24 72L0 84L-24 72L-24 48Z M-24 48L0 60L24 48 M0 60L0 84'/%3E%3Cpath d='M48 36L72 48L72 72L48 84L24 72L24 48Z M24 48L48 60L72 48 M48 60L48 84'/%3E%3Cpath d='M0 -36L24 -24L24 0L0 12L-24 0L-24 -24Z M-24 -24L0 -12L24 -24 M0 -12L0 12'/%3E%3Cpath d='M48 -36L72 -24L72 0L48 12L24 0L24 -24Z M24 -24L48 -12L72 -24 M48 -12L48 12'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 body {
@@ -60,17 +82,24 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #0a0805;
-  /* Warm cafe-lamp wash — single top radial in crema, no cool radials.
-     Replaces the prior blue+cyan wash that was leaking SaaS-indigo
-     through every surface even after component-level coffee styling. */
+  /* The print room at night: one warm lamp from above, tumbling
+     blocks receding into the dark like the opening bars of
+     Metamorphosis II. */
   background-image:
-    radial-gradient(ellipse 110% 65% at 50% -10%, rgba(245, 180, 98, 0.10) 0%, transparent 55%),
-    radial-gradient(ellipse 70% 45% at 90% 60%, rgba(217, 119, 6, 0.05) 0%, transparent 50%),
-    linear-gradient(180deg, #0e0a08 0%, #14100c 45%, #0a0805 100%);
+    radial-gradient(ellipse 110% 65% at 50% -10%, rgba(232, 181, 88, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 45% at 90% 60%, rgba(212, 145, 60, 0.05) 0%, transparent 50%),
+    var(--tess-cubes),
+    linear-gradient(180deg, #100c08 0%, #161009 45%, #0a0805 100%);
+  background-size: auto, auto, 96px 144px, auto;
   background-attachment: fixed;
   color: var(--text-primary);
   height: 100vh;
   overflow: hidden;
+}
+
+::selection {
+  background: rgba(212, 145, 60, 0.35);
+  color: #fdf6e9;
 }
 
 /* Global Scrollbar Styling */
@@ -80,19 +109,19 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.12);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.2);
+  background: rgba(212, 145, 60, 0.22);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.4);
+  background: rgba(212, 145, 60, 0.42);
 }
 
-/* --- Glassmorphism Utility Classes --- */
+/* --- Glassmorphism Utility Classes (warmed) --- */
 .glass-panel {
   background: var(--bg-card);
   backdrop-filter: blur(12px);
@@ -104,18 +133,76 @@ body {
 /* Fallback for browsers without backdrop-filter */
 @supports not (backdrop-filter: blur(12px)) {
   .glass-panel {
-    background: rgba(15, 23, 42, 0.95);
+    background: rgba(22, 16, 10, 0.96);
   }
 }
 
-/* Optional grain overlay for depth (subtle) */
+/* Paper grain — slightly coarser than before, like laid stock. */
 body::after {
   content: '';
   position: fixed;
   inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
   pointer-events: none;
   z-index: 0;
+}
+
+/* ============================================================
+   Escher utilities — shared across surfaces.
+   ============================================================ */
+
+/* Woodcut plate frame: a heavy rule with an offset hairline,
+   like the double-ruled border of a numbered print. */
+.plate-frame {
+  border: 1px solid var(--border-strong);
+  box-shadow:
+    inset 0 0 0 4px var(--bg-darker),
+    inset 0 0 0 5px var(--border-color),
+    var(--shadow-glass);
+}
+
+/* Printer's rule: ornamental divider — line · diamond · line. */
+.escher-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  color: var(--accent-primary);
+}
+
+.escher-rule::before,
+.escher-rule::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-strong));
+}
+
+.escher-rule::after {
+  background: linear-gradient(90deg, var(--border-strong), transparent);
+}
+
+.escher-rule-gem {
+  width: 7px;
+  height: 7px;
+  transform: rotate(45deg);
+  background: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--bg-darker), 0 0 0 4px var(--border-strong);
+  flex-shrink: 0;
+}
+
+/* Tessellation veil — drop on any positioned container to give it
+   a faint tumbling-blocks ground, fading out downward. */
+.tess-veil::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--tess-cubes-line);
+  background-size: 48px 72px;
+  -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0.9), transparent 70%);
+  mask-image: linear-gradient(180deg, rgba(0,0,0,0.9), transparent 70%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 /* Markdown Content Styling */
@@ -123,15 +210,15 @@ body::after {
   font-family: var(--font-content);
   font-size: 15px;
   line-height: 1.75;
-  color: #e2e8f0;
+  color: #e4d8c0;
 }
 
 .markdown-content h1,
 .markdown-content h2,
 .markdown-content h3,
 .markdown-content h4 {
-  font-family: var(--font-ui);
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-weight: 600;
   color: var(--text-primary);
   margin-top: 1.5em;
   margin-bottom: 0.5em;
@@ -143,15 +230,15 @@ body::after {
 
 .markdown-content code {
   font-family: var(--font-code);
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.32);
   padding: 0.2em 0.4em;
   border-radius: 4px;
   font-size: 0.9em;
-  color: #f472b6; /* Pink-400 for inline code */
+  color: #e9a06b; /* burnt-orange ink for inline code */
 }
 
 .markdown-content pre {
-  background: #020617; /* Almost black */
+  background: #0b0805;
   padding: 16px;
   border-radius: 8px;
   border: 1px solid var(--border-color);
@@ -172,14 +259,14 @@ body::after {
 }
 
 .markdown-content blockquote {
-  border-left: 4px solid var(--accent-primary);
+  border-left: 3px solid var(--accent-primary);
   margin: 1em 0;
-  padding-left: 1em;
   font-style: italic;
+  font-family: var(--font-content);
   color: var(--text-secondary);
-  background: rgba(59, 130, 246, 0.05);
+  background: rgba(212, 145, 60, 0.05);
   padding: 12px 16px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0;
 }
 
 /* Global Button Reset */
@@ -187,12 +274,14 @@ button {
   font-family: var(--font-ui);
 }
 
+:focus-visible {
+  outline: 2px solid var(--accent-primary-dim);
+  outline-offset: 2px;
+}
+
 /* --- Coffee bean glyph (shared utility) ---
    Pure-CSS coffee bean: tilted oval with a faux center crease via a
-   layered linear-gradient. Originally lived inline in CoreIdeaBullets.css
-   as `.coreidea-bullet-bean`; lifted here so login, sidebar, and any other
-   coffee surface can reuse the same shape without copy-paste drift.
-   `--bean-size` lets callers scale it. */
+   layered linear-gradient. `--bean-size` lets callers scale it. */
 .coffee-bean {
   display: inline-block;
   flex-shrink: 0;
@@ -217,5 +306,5 @@ button {
     );
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.25),
-    0 1px 1px rgba(245, 180, 98, 0.15) inset;
+    0 1px 1px rgba(232, 181, 88, 0.15) inset;
 }

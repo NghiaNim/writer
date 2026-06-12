@@ -4,6 +4,7 @@ import FactCheckPanel from './FactCheckPanel';
 import DetectionScorePanel from './DetectionScorePanel';
 import { getModelVisuals, getShortModelName } from '../utils/modelHelpers';
 import StageTimer from './StageTimer';
+import EscherBand from './EscherBand';
 import './FinalEssay.css';
 
 /**
@@ -89,6 +90,8 @@ export default function FinalEssay({
             <article className="final-essay-body markdown-content">
                 <ThinkBlockRenderer content={essayText || 'No response'} />
             </article>
+
+            <EscherBand height={26} className="final-essay-band" />
 
             <FactCheckPanel
                 flags={factCheckFlags}

@@ -3,7 +3,7 @@
   flex-direction: column;
   gap: 16px;
   padding: 20px;
-  border-radius: 12px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -46,9 +46,9 @@
   flex-direction: column;
   gap: 6px;
   padding: 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  background: var(--coffee-roast);
+  border: 1px solid var(--border-color);
   transition: opacity 0.15s ease, border-color 0.15s ease;
 }
 
@@ -57,7 +57,7 @@
 }
 
 .cc-persona.enabled {
-  border-color: rgba(59, 130, 246, 0.35);
+  border-color: rgba(212, 145, 60, 0.35);
 }
 
 .cc-toggle {
@@ -71,7 +71,7 @@
 .cc-toggle input[type='checkbox'] {
   width: 16px;
   height: 16px;
-  accent-color: #3b82f6;
+  accent-color: var(--accent-primary);
   cursor: pointer;
 }
 
@@ -99,7 +99,7 @@
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(0, 0, 0, 0.25);
-  color: #f3f4f6;
+  color: #f6efe0;
   font-family: var(--font-ui);
   font-size: 0.85rem;
   cursor: pointer;
@@ -111,7 +111,7 @@
 }
 
 .cc-model-select.missing {
-  border-color: rgba(244, 114, 182, 0.55);
+  border-color: rgba(233, 160, 107, 0.55);
 }
 
 .cc-model-wrap {
@@ -119,7 +119,7 @@
 }
 
 .cc-model-wrap.missing :global(.model-select__control) {
-  border-color: rgba(244, 114, 182, 0.55) !important;
+  border-color: rgba(233, 160, 107, 0.55) !important;
 }
 
 .cc-controls {
@@ -147,9 +147,9 @@
 .cc-lucky {
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(251, 191, 36, 0.1);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  color: #fbbf24;
+  background: rgba(232, 181, 88, 0.1);
+  border: 1px solid rgba(232, 181, 88, 0.3);
+  color: var(--accent-chairman);
   font-family: var(--font-ui);
   font-size: 0.8rem;
   cursor: pointer;
@@ -157,7 +157,7 @@
 }
 
 .cc-lucky:hover:not(:disabled) {
-  background: rgba(251, 191, 36, 0.18);
+  background: rgba(232, 181, 88, 0.18);
 }
 
 .cc-lucky:disabled {
@@ -171,13 +171,13 @@
   border-radius: 3px;
   font-family: var(--font-code);
   font-size: 11px;
-  color: rgba(244, 114, 182, 0.95);
+  color: rgba(233, 160, 107, 0.95);
 }
 
 .cc-free-toggle input[type='checkbox'] {
   width: 14px;
   height: 14px;
-  accent-color: #3b82f6;
+  accent-color: var(--accent-primary);
   cursor: pointer;
 }
 
@@ -188,7 +188,7 @@
 
 .cc-warn {
   font-size: 0.75rem;
-  color: rgba(244, 114, 182, 0.85);
+  color: rgba(233, 160, 107, 0.85);
   margin-top: 2px;
 }
 
@@ -197,16 +197,16 @@
   flex-direction: column;
   gap: 6px;
   padding: 12px;
-  border-radius: 10px;
-  background: rgba(251, 191, 36, 0.05);
-  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 6px;
+  background: rgba(232, 181, 88, 0.05);
+  border: 1px solid rgba(232, 181, 88, 0.2);
 }
 
 .cc-chair-label {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.95rem;
-  color: #fbbf24;
+  color: var(--accent-chairman);
   letter-spacing: 0.01em;
 }
 
@@ -218,18 +218,19 @@
 
 .cc-save {
   padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(59, 130, 246, 0.5);
-  background: rgba(59, 130, 246, 0.15);
-  color: #f3f4f6;
+  border-radius: 3px;
+  border: 1px solid var(--accent-primary-deep);
+  background: var(--accent-primary);
+  color: #1a130c;
   font-family: var(--font-ui);
   font-size: 0.85rem;
+  font-weight: 700;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
 .cc-save:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.3);
+  background: var(--accent-bright);
 }
 
 .cc-save:disabled {
@@ -239,12 +240,12 @@
 
 .cc-saved {
   font-size: 0.8rem;
-  color: rgba(74, 222, 128, 0.9);
+  color: rgba(163, 181, 109, 0.9);
 }
 
 .cc-error {
   font-size: 0.8rem;
-  color: rgba(244, 114, 182, 0.9);
+  color: rgba(233, 160, 107, 0.9);
 }
 
 .cc-loading {

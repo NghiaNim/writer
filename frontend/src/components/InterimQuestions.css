@@ -2,12 +2,12 @@
    while the council is drafting. Compact, calm, NOT a modal. */
 
 .interim-questions {
-    background: rgba(15, 23, 42, 0.55);
-    border: 1px solid rgba(251, 191, 36, 0.28);
-    border-radius: 12px;
+    background: rgba(26, 19, 12, 0.55);
+    border: 1px solid rgba(232, 181, 88, 0.28);
+    border-radius: 6px;
     padding: 18px 20px;
     margin: 12px 0 24px;
-    color: #e2e8f0;
+    color: #e8dcc6;
     font-family: var(--font-ui, system-ui, sans-serif);
     position: relative;
     overflow: hidden;
@@ -20,7 +20,7 @@
     top: 0;
     bottom: 0;
     width: 3px;
-    background: linear-gradient(180deg, rgba(251, 191, 36, 0.7), rgba(251, 191, 36, 0));
+    background: linear-gradient(180deg, rgba(232, 181, 88, 0.7), rgba(232, 181, 88, 0));
 }
 
 .interim-questions__head {
@@ -30,7 +30,7 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.18em;
-    color: #fcd34d;
+    color: #f6e3bd;
     margin-bottom: 12px;
 }
 
@@ -38,15 +38,15 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #fbbf24;
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6);
+    background: var(--accent-chairman, #e8b558);
+    box-shadow: 0 0 0 0 rgba(232, 181, 88, 0.6);
     animation: interim-pulse 1.8s infinite;
 }
 
 @keyframes interim-pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.55); }
-    70%  { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+    0%   { box-shadow: 0 0 0 0 rgba(232, 181, 88, 0.55); }
+    70%  { box-shadow: 0 0 0 10px rgba(232, 181, 88, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(232, 181, 88, 0); }
 }
 
 .interim-questions__title {
@@ -55,24 +55,24 @@
 
 .interim-questions__count {
     margin-left: auto;
-    color: #94a3b8;
+    color: var(--text-secondary, #b9a988);
     font-weight: 500;
 }
 
 .interim-questions__q {
-    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-family: var(--font-content, Georgia, serif);
     font-size: 17px;
     line-height: 1.4;
-    color: #f1f5f9;
+    color: #f6efe0;
     margin: 0 0 12px;
 }
 
 .interim-questions__input {
     width: 100%;
-    background: rgba(2, 6, 23, 0.65);
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    border-radius: 8px;
-    color: #e2e8f0;
+    background: rgba(11, 8, 5, 0.65);
+    border: 1px solid rgba(185, 169, 136, 0.25);
+    border-radius: 6px;
+    color: #e8dcc6;
     padding: 10px 12px;
     font-family: var(--font-ui, system-ui, sans-serif);
     font-size: 14px;
@@ -84,8 +84,8 @@
 
 .interim-questions__input:focus {
     outline: none;
-    border-color: rgba(251, 191, 36, 0.55);
-    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.12);
+    border-color: rgba(232, 181, 88, 0.55);
+    box-shadow: 0 0 0 3px rgba(232, 181, 88, 0.12);
 }
 
 .interim-questions__actions {
@@ -98,9 +98,9 @@
 .interim-questions__skip,
 .interim-questions__submit {
     background: transparent;
-    border: 1px solid rgba(148, 163, 184, 0.35);
-    color: #cbd5e1;
-    border-radius: 8px;
+    border: 1px solid rgba(185, 169, 136, 0.35);
+    color: #d4c5a5;
+    border-radius: 3px;
     padding: 6px 14px;
     font-size: 12px;
     font-family: inherit;
@@ -111,18 +111,18 @@
 }
 
 .interim-questions__skip:hover {
-    border-color: rgba(148, 163, 184, 0.6);
+    border-color: rgba(185, 169, 136, 0.6);
 }
 
 .interim-questions__submit {
-    background: rgba(251, 191, 36, 0.15);
-    border-color: rgba(251, 191, 36, 0.55);
-    color: #fde68a;
+    background: rgba(232, 181, 88, 0.15);
+    border-color: rgba(232, 181, 88, 0.55);
+    color: #f6e3bd;
     font-weight: 600;
 }
 
 .interim-questions__submit:hover:not(:disabled) {
-    background: rgba(251, 191, 36, 0.25);
+    background: rgba(232, 181, 88, 0.25);
 }
 
 .interim-questions__submit:disabled {
@@ -132,7 +132,7 @@
 
 .interim-questions__done {
     font-size: 13px;
-    color: #94a3b8;
+    color: var(--text-secondary, #b9a988);
     font-style: italic;
     margin: 0;
 }
@@ -141,12 +141,12 @@
     list-style: none;
     padding: 12px 0 0;
     margin: 12px 0 0;
-    border-top: 1px solid rgba(148, 163, 184, 0.15);
+    border-top: 1px solid rgba(185, 169, 136, 0.15);
     display: flex;
     flex-direction: column;
     gap: 8px;
     font-size: 12px;
-    color: #94a3b8;
+    color: var(--text-secondary, #b9a988);
 }
 
 .interim-questions__history-item {
@@ -156,11 +156,11 @@
 }
 
 .interim-questions__history-q {
-    color: #cbd5e1;
+    color: #d4c5a5;
 }
 
 .interim-questions__history-a {
-    color: #94a3b8;
+    color: var(--text-secondary, #b9a988);
     font-style: italic;
 }
 
@@ -171,14 +171,14 @@
 .interim-questions__heard {
     margin-top: 14px;
     padding-top: 12px;
-    border-top: 1px solid rgba(148, 163, 184, 0.15);
+    border-top: 1px solid rgba(185, 169, 136, 0.15);
 }
 
 .interim-questions__heard-title {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: #94a3b8;
+    color: var(--text-secondary, #b9a988);
     margin-bottom: 8px;
 }
 
@@ -196,7 +196,7 @@
     padding-left: 14px;
     font-size: 13px;
     line-height: 1.45;
-    color: #cbd5e1;
+    color: #d4c5a5;
 }
 
 .interim-questions__heard-list > li.interim-questions__heard-item::before {
@@ -204,19 +204,19 @@
     position: absolute;
     left: 0;
     top: 0;
-    color: #fbbf24;
+    color: var(--accent-chairman, #e8b558);
 }
 
 .interim-questions__heard-q {
     display: block;
-    color: #94a3b8;
+    color: var(--text-secondary, #b9a988);
     font-style: italic;
     margin-bottom: 6px;
 }
 
 .interim-questions__heard-a {
     display: block;
-    color: #e2e8f0;
+    color: #e8dcc6;
 }
 
 /* Structured bullets — second-level list, no marker, indented from the
@@ -233,7 +233,7 @@
 .interim-questions__heard-bullets > li {
     position: relative;
     padding-left: 14px;
-    color: #e2e8f0;
+    color: #e8dcc6;
     font-size: 13px;
     line-height: 1.5;
 }
@@ -243,7 +243,7 @@
     position: absolute;
     left: 0;
     top: 0;
-    color: rgba(251, 191, 36, 0.6);
+    color: rgba(232, 181, 88, 0.6);
     font-weight: 700;
 }
 
@@ -260,20 +260,20 @@
     line-height: 1.4;
     padding: 2px 8px;
     border-radius: 999px;
-    border: 1px solid rgba(148, 163, 184, 0.28);
-    background: rgba(15, 23, 42, 0.7);
-    color: #cbd5e1;
+    border: 1px solid rgba(185, 169, 136, 0.28);
+    background: rgba(26, 19, 12, 0.7);
+    color: #d4c5a5;
     letter-spacing: 0.02em;
     white-space: nowrap;
 }
 
-.heard-chip--person   { border-color: rgba(167, 139, 250, 0.45); color: #c4b5fd; }
-.heard-chip--place    { border-color: rgba(74, 222, 128, 0.45);  color: #86efac; }
-.heard-chip--date     { border-color: rgba(96, 165, 250, 0.45);  color: #93c5fd; }
-.heard-chip--number   { border-color: rgba(251, 191, 36, 0.45);  color: #fcd34d; }
-.heard-chip--org      { border-color: rgba(244, 114, 182, 0.45); color: #f9a8d4; }
-.heard-chip--work     { border-color: rgba(56, 189, 248, 0.45);  color: #7dd3fc; }
-.heard-chip--other    { border-color: rgba(148, 163, 184, 0.35); color: #cbd5e1; }
+.heard-chip--person   { border-color: rgba(192, 133, 82, 0.45);  color: #d8a878; }
+.heard-chip--place    { border-color: rgba(163, 181, 109, 0.45); color: #c4d29a; }
+.heard-chip--date     { border-color: rgba(233, 194, 133, 0.45); color: var(--accent-bright, #e9c285); }
+.heard-chip--number   { border-color: rgba(232, 181, 88, 0.45);  color: #f6e3bd; }
+.heard-chip--org      { border-color: rgba(233, 160, 107, 0.45); color: #e9a06b; }
+.heard-chip--work     { border-color: rgba(125, 171, 156, 0.45); color: #a8cabf; }
+.heard-chip--other    { border-color: rgba(185, 169, 136, 0.35); color: #d4c5a5; }
 
 /* Inferred + related-facts sub-sections share label styling but each
    gets its own accent strip to distinguish "we guessed" from "we
@@ -283,18 +283,18 @@
     margin: 6px 0 8px;
     padding: 6px 10px 6px 10px;
     border-radius: 6px;
-    background: rgba(15, 23, 42, 0.55);
-    border-left: 2px solid rgba(148, 163, 184, 0.3);
+    background: rgba(26, 19, 12, 0.55);
+    border-left: 2px solid rgba(185, 169, 136, 0.3);
     font-size: 12.5px;
     line-height: 1.5;
 }
 
 .interim-questions__heard-inferred {
-    border-left-color: rgba(251, 191, 36, 0.55);
+    border-left-color: rgba(232, 181, 88, 0.55);
 }
 
 .interim-questions__heard-related {
-    border-left-color: rgba(96, 165, 250, 0.55);
+    border-left-color: rgba(125, 171, 156, 0.55);
 }
 
 .heard-section-label {
@@ -302,17 +302,17 @@
     font-size: 10.5px;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: #94a3b8;
+    color: var(--text-secondary, #b9a988);
     margin-bottom: 4px;
     font-weight: 600;
 }
 
 .interim-questions__heard-inferred .heard-section-label {
-    color: #fcd34d;
+    color: #f6e3bd;
 }
 
 .interim-questions__heard-related .heard-section-label {
-    color: #93c5fd;
+    color: #a8cabf;
 }
 
 .interim-questions__heard-inferred ul,
@@ -327,13 +327,13 @@
 
 .interim-questions__heard-inferred li,
 .interim-questions__heard-related li {
-    color: #cbd5e1;
+    color: #d4c5a5;
     font-style: italic;
 }
 
 .interim-questions__heard-loading {
     display: block;
-    color: #94a3b8;
+    color: var(--text-secondary, #b9a988);
     font-style: italic;
     font-size: 12.5px;
     position: relative;
@@ -349,14 +349,14 @@
     height: 8px;
     margin-top: -4px;
     border-radius: 50%;
-    background: rgba(251, 191, 36, 0.55);
+    background: rgba(232, 181, 88, 0.55);
     animation: interim-pulse 1.4s infinite;
 }
 
 .interim-questions__skipped-note {
     margin: 10px 0 0;
     font-size: 11px;
-    color: #94a3b8;
+    color: var(--text-secondary, #b9a988);
     text-transform: uppercase;
     letter-spacing: 0.1em;
 }
@@ -371,7 +371,7 @@
 .interim-questions__placeholder-body {
     margin: 10px 0 0;
     font-size: 13.5px;
-    color: #cbd5e1;
+    color: #d4c5a5;
     line-height: 1.55;
 }
 
@@ -383,11 +383,11 @@
     font-weight: 700;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: #fde68a;
+    color: #f6e3bd;
     padding: 3px 8px;
-    border: 1px solid rgba(251, 191, 36, 0.35);
+    border: 1px solid rgba(232, 181, 88, 0.35);
     border-radius: 999px;
-    background: rgba(251, 191, 36, 0.08);
+    background: rgba(232, 181, 88, 0.08);
 }
 
 /* Lead line — calm, one sentence about what to expect. Heavier than the
@@ -396,8 +396,8 @@
     margin: 10px 0 8px;
     font-size: 13.5px;
     line-height: 1.55;
-    color: #cbd5e1;
-    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    color: #d4c5a5;
+    font-family: var(--font-content, Georgia, serif);
     font-style: italic;
 }
 
@@ -410,9 +410,9 @@
     gap: 8px;
     margin: 0;
     padding: 8px 10px;
-    border-radius: 8px;
-    background: rgba(2, 6, 23, 0.45);
-    border-left: 2px solid rgba(251, 191, 36, 0.4);
+    border-radius: 6px;
+    background: rgba(11, 8, 5, 0.45);
+    border-left: 2px solid rgba(232, 181, 88, 0.4);
 }
 
 .interim-questions__placeholder-hint-prompt {
@@ -420,14 +420,14 @@
     font-weight: 700;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: #fbbf24;
+    color: var(--accent-chairman, #e8b558);
     flex-shrink: 0;
 }
 
 .interim-questions__placeholder-hint-text {
     font-size: 13px;
     line-height: 1.45;
-    color: #e2e8f0;
+    color: #e8dcc6;
     animation: interim-hint-in 380ms ease-out;
 }
 
@@ -440,30 +440,30 @@
    border + a gold inner glow so the user notices this is the last
    shape-the-essay moment. */
 .interim-questions--chairman {
-    border-color: rgba(251, 191, 36, 0.55);
+    border-color: rgba(232, 181, 88, 0.55);
     background:
-        radial-gradient(120% 80% at 0% 0%, rgba(251, 191, 36, 0.08), transparent 60%),
-        rgba(15, 23, 42, 0.65);
-    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.18) inset;
+        radial-gradient(120% 80% at 0% 0%, rgba(232, 181, 88, 0.08), transparent 60%),
+        rgba(26, 19, 12, 0.65);
+    box-shadow: 0 0 0 1px var(--accent-chairman-dim, rgba(232, 181, 88, 0.18)) inset;
 }
 
 .interim-questions--chairman::before {
-    background: linear-gradient(180deg, rgba(251, 191, 36, 1), rgba(251, 191, 36, 0.2));
+    background: linear-gradient(180deg, var(--accent-chairman, #e8b558), rgba(232, 181, 88, 0.2));
     width: 4px;
 }
 
 .interim-questions--chairman .interim-questions__title {
-    color: #fde68a;
+    color: #f6e3bd;
     letter-spacing: 0.12em;
 }
 
 .interim-questions__chairman-note {
     margin: 0 0 10px;
     font-size: 12px;
-    color: #fcd34d;
+    color: #f6e3bd;
     line-height: 1.5;
-    background: rgba(251, 191, 36, 0.06);
-    border-left: 2px solid rgba(251, 191, 36, 0.45);
+    background: rgba(232, 181, 88, 0.06);
+    border-left: 2px solid rgba(232, 181, 88, 0.45);
     padding: 8px 10px;
     border-radius: 4px;
 }

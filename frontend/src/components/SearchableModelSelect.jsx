@@ -80,24 +80,24 @@ export default function SearchableModelSelect({
     }
   }
 
-  // Custom styles to match the dark theme
+  // Custom styles to match the Escher-coffee theme
   const customStyles = {
     control: (base, state) => ({
       ...base,
-      backgroundColor: 'rgba(30, 41, 59, 0.8)',
-      borderColor: state.isFocused ? '#3b82f6' : 'rgba(148, 163, 184, 0.2)',
-      borderRadius: '8px',
+      backgroundColor: 'rgba(36, 26, 16, 0.8)',
+      borderColor: state.isFocused ? '#d4913c' : 'rgba(212, 145, 60, 0.2)',
+      borderRadius: '4px',
       minHeight: '38px',
-      boxShadow: state.isFocused ? '0 0 0 2px rgba(59, 130, 246, 0.3)' : 'none',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(212, 145, 60, 0.3)' : 'none',
       '&:hover': {
-        borderColor: '#3b82f6',
+        borderColor: '#d4913c',
       },
     }),
     menu: (base) => ({
       ...base,
-      backgroundColor: 'rgba(30, 41, 59, 0.98)',
-      borderRadius: '8px',
-      border: '1px solid rgba(148, 163, 184, 0.2)',
+      backgroundColor: 'rgba(26, 19, 12, 0.98)',
+      borderRadius: '4px',
+      border: '1px solid rgba(212, 145, 60, 0.2)',
       boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
       zIndex: 100,
     }),
@@ -113,7 +113,7 @@ export default function SearchableModelSelect({
     }),
     groupHeading: (base) => ({
       ...base,
-      color: '#94a3b8',
+      color: '#b9a988',
       fontSize: '11px',
       fontWeight: '600',
       textTransform: 'uppercase',
@@ -124,31 +124,31 @@ export default function SearchableModelSelect({
     option: (base, state) => ({
       ...base,
       backgroundColor: state.isSelected
-        ? 'rgba(59, 130, 246, 0.3)'
+        ? 'rgba(212, 145, 60, 0.3)'
         : state.isFocused
-          ? 'rgba(59, 130, 246, 0.15)'
+          ? 'rgba(212, 145, 60, 0.15)'
           : 'transparent',
-      color: state.isSelected ? '#ffffff' : '#e2e8f0',
+      color: state.isSelected ? '#fdf6e9' : '#e8dcc6',
       padding: '8px 12px',
-      borderRadius: '4px',
+      borderRadius: '3px',
       cursor: 'pointer',
       fontSize: '13px',
       '&:active': {
-        backgroundColor: 'rgba(59, 130, 246, 0.4)',
+        backgroundColor: 'rgba(212, 145, 60, 0.4)',
       },
     }),
     singleValue: (base) => ({
       ...base,
-      color: '#e2e8f0',
+      color: '#e8dcc6',
       fontSize: '13px',
     }),
     input: (base) => ({
       ...base,
-      color: '#e2e8f0',
+      color: '#e8dcc6',
     }),
     placeholder: (base) => ({
       ...base,
-      color: '#64748b',
+      color: '#82735a',
       fontSize: '13px',
     }),
     indicatorSeparator: () => ({
@@ -156,28 +156,28 @@ export default function SearchableModelSelect({
     }),
     dropdownIndicator: (base) => ({
       ...base,
-      color: '#64748b',
+      color: '#82735a',
       padding: '6px',
       '&:hover': {
-        color: '#94a3b8',
+        color: '#b9a988',
       },
     }),
     clearIndicator: (base) => ({
       ...base,
-      color: '#64748b',
+      color: '#82735a',
       padding: '6px',
       '&:hover': {
-        color: '#f87171',
+        color: '#d98c70',
       },
     }),
     noOptionsMessage: (base) => ({
       ...base,
-      color: '#64748b',
+      color: '#82735a',
       fontSize: '13px',
     }),
     loadingMessage: (base) => ({
       ...base,
-      color: '#64748b',
+      color: '#82735a',
     }),
   };
 

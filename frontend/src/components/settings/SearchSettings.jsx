@@ -130,7 +130,7 @@ export default function SearchSettings({
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                     className="api-key-link"
-                                    style={{ marginTop: '8px', display: 'inline-block', fontSize: '12px', color: '#60a5fa' }}
+                                    style={{ marginTop: '8px', display: 'inline-block', fontSize: '12px', color: '#e9c285' }}
                                 >
                                     Get API key at serper.dev →
                                 </a>

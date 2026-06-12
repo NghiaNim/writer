@@ -4,8 +4,8 @@
   gap: 8px;
   padding: 16px 20px;
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-glass);
-  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   margin: 16px 0;
 }
 
@@ -23,7 +23,7 @@
   padding: 8px 14px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
   font-family: var(--font-ui);
   transition: border-color 0.2s ease, opacity 0.2s ease, background 0.2s ease;
   min-width: 0;
@@ -34,33 +34,33 @@
 }
 
 .cchip.working {
-  border-color: rgba(59, 130, 246, 0.5);
-  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(212, 145, 60, 0.5);
+  background: rgba(212, 145, 60, 0.08);
 }
 
 .cchip.reviewing {
-  border-color: rgba(168, 85, 247, 0.5);
-  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(201, 111, 74, 0.5);
+  background: rgba(201, 111, 74, 0.08);
 }
 
 .cchip.done {
-  border-color: rgba(74, 222, 128, 0.45);
-  background: rgba(74, 222, 128, 0.07);
+  border-color: rgba(163, 181, 109, 0.45);
+  background: rgba(163, 181, 109, 0.07);
 }
 
 .cchip.chairman {
-  border-color: rgba(251, 191, 36, 0.4);
-  background: rgba(251, 191, 36, 0.06);
+  border-color: rgba(232, 181, 88, 0.4);
+  background: rgba(232, 181, 88, 0.06);
 }
 
 .cchip.chairman.working {
-  border-color: rgba(251, 191, 36, 0.7);
-  background: rgba(251, 191, 36, 0.14);
+  border-color: rgba(232, 181, 88, 0.7);
+  background: rgba(232, 181, 88, 0.14);
 }
 
 .cchip.chairman.done {
-  border-color: rgba(74, 222, 128, 0.5);
-  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(163, 181, 109, 0.5);
+  background: rgba(163, 181, 109, 0.1);
 }
 
 .cchip-pulse {
@@ -72,22 +72,22 @@
 }
 
 .cchip.working .cchip-pulse {
-  background: rgba(59, 130, 246, 0.95);
+  background: rgba(212, 145, 60, 0.95);
   animation: cchip-pulse 1.4s ease-in-out infinite;
 }
 
 .cchip.reviewing .cchip-pulse {
-  background: rgba(168, 85, 247, 0.95);
+  background: rgba(201, 111, 74, 0.95);
   animation: cchip-pulse 1.4s ease-in-out infinite;
 }
 
 .cchip.chairman.working .cchip-pulse {
-  background: rgba(251, 191, 36, 0.95);
+  background: rgba(232, 181, 88, 0.95);
   animation: cchip-pulse 1.4s ease-in-out infinite;
 }
 
 .cchip.done .cchip-pulse {
-  background: rgba(74, 222, 128, 0.95);
+  background: rgba(163, 181, 109, 0.95);
 }
 
 @keyframes cchip-pulse {
@@ -140,19 +140,19 @@
 }
 
 .cchip.working .cchip-status {
-  color: rgba(59, 130, 246, 0.95);
+  color: rgba(212, 145, 60, 0.95);
 }
 
 .cchip.reviewing .cchip-status {
-  color: rgba(168, 85, 247, 0.95);
+  color: rgba(201, 111, 74, 0.95);
 }
 
 .cchip.done .cchip-status {
-  color: rgba(74, 222, 128, 0.95);
+  color: rgba(163, 181, 109, 0.95);
 }
 
 .cchip.chairman.working .cchip-status {
-  color: rgba(251, 191, 36, 1);
+  color: rgba(232, 181, 88, 1);
 }
 
 .cchips-meta {

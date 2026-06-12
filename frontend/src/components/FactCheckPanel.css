@@ -3,12 +3,12 @@
    as "needs your attention" without alarming red. */
 
 .fact-check-panel {
-    background: rgba(15, 23, 42, 0.55);
-    border: 1px solid rgba(245, 158, 11, 0.28);
-    border-radius: 12px;
+    background: rgba(26, 19, 12, 0.55);
+    border: 1px solid rgba(212, 145, 60, 0.28);
+    border-radius: 6px;
     padding: 16px 18px;
     margin: 12px 0 20px;
-    color: #e2e8f0;
+    color: #e8dcc6;
     font-family: var(--font-ui, system-ui, sans-serif);
     position: relative;
     overflow: hidden;
@@ -21,7 +21,7 @@
     top: 0;
     bottom: 0;
     width: 3px;
-    background: linear-gradient(180deg, rgba(245, 158, 11, 0.7), rgba(245, 158, 11, 0));
+    background: linear-gradient(180deg, rgba(212, 145, 60, 0.7), rgba(212, 145, 60, 0));
 }
 
 .fact-check-head {
@@ -33,9 +33,9 @@
 
 .fact-check-fix-all {
     margin-left: auto;
-    background: rgba(245, 158, 11, 0.15);
-    border: 1px solid rgba(245, 158, 11, 0.35);
-    color: #fcd34d;
+    background: rgba(212, 145, 60, 0.15);
+    border: 1px solid rgba(212, 145, 60, 0.35);
+    color: #f6e3bd;
     border-radius: 999px;
     padding: 4px 14px;
     font-family: var(--font-ui, system-ui, sans-serif);
@@ -47,8 +47,8 @@
 }
 
 .fact-check-fix-all:hover:not(:disabled) {
-    background: rgba(245, 158, 11, 0.25);
-    border-color: rgba(245, 158, 11, 0.55);
+    background: rgba(212, 145, 60, 0.25);
+    border-color: rgba(212, 145, 60, 0.55);
 }
 
 .fact-check-fix-all:disabled {
@@ -63,8 +63,8 @@
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: rgba(245, 158, 11, 0.2);
-    color: #fbbf24;
+    background: rgba(212, 145, 60, 0.2);
+    color: var(--accent-chairman, #e8b558);
     font-weight: 700;
     font-size: 13px;
     line-height: 1;
@@ -74,27 +74,27 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: rgba(245, 158, 11, 0.7);
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55);
+    background: rgba(212, 145, 60, 0.7);
+    box-shadow: 0 0 0 0 rgba(212, 145, 60, 0.55);
     animation: fact-check-pulse 1.6s infinite;
 }
 
 @keyframes fact-check-pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55); }
-    70%  { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+    0%   { box-shadow: 0 0 0 0 rgba(212, 145, 60, 0.55); }
+    70%  { box-shadow: 0 0 0 10px rgba(212, 145, 60, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(212, 145, 60, 0); }
 }
 
 .fact-check-title {
     font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: #fcd34d;
+    color: #f6e3bd;
     font-weight: 700;
 }
 
 .fact-check-panel--running .fact-check-title {
-    color: #94a3b8;
+    color: var(--text-secondary, #b9a988);
     text-transform: none;
     letter-spacing: normal;
     font-weight: 500;
@@ -105,7 +105,7 @@
     margin: 0 0 12px 0;
     font-size: 13px;
     line-height: 1.5;
-    color: #cbd5e1;
+    color: #d4c5a5;
 }
 
 .fact-check-list {
@@ -118,9 +118,9 @@
 }
 
 .fact-check-flag {
-    background: rgba(2, 6, 23, 0.55);
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 10px;
+    background: rgba(11, 8, 5, 0.55);
+    border: 1px solid rgba(185, 169, 136, 0.18);
+    border-radius: 6px;
     padding: 10px 12px;
 }
 
@@ -148,21 +148,21 @@
 }
 
 .fact-check-tag--contradicts {
-    background: rgba(239, 68, 68, 0.18);
-    color: #fecaca;
-    border: 1px solid rgba(239, 68, 68, 0.4);
+    background: rgba(205, 106, 74, 0.18);
+    color: #e5a18d;
+    border: 1px solid rgba(205, 106, 74, 0.4);
 }
 
 .fact-check-tag--unsupported {
-    background: rgba(245, 158, 11, 0.18);
-    color: #fde68a;
-    border: 1px solid rgba(245, 158, 11, 0.4);
+    background: rgba(212, 145, 60, 0.18);
+    color: #f6e3bd;
+    border: 1px solid rgba(212, 145, 60, 0.4);
 }
 
 .fact-check-dismiss {
     background: transparent;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    color: #94a3b8;
+    border: 1px solid rgba(185, 169, 136, 0.25);
+    color: var(--text-secondary, #b9a988);
     border-radius: 999px;
     padding: 3px 10px;
     font-size: 11px;
@@ -174,9 +174,9 @@
 }
 
 .fact-check-dismiss:hover:not(:disabled) {
-    background: rgba(148, 163, 184, 0.12);
-    color: #cbd5e1;
-    border-color: rgba(148, 163, 184, 0.55);
+    background: rgba(185, 169, 136, 0.12);
+    color: #d4c5a5;
+    border-color: rgba(185, 169, 136, 0.55);
 }
 
 .fact-check-flag-actions {
@@ -190,9 +190,9 @@
    the recommended action — gold accent matches the chairman/council
    theme used elsewhere. */
 .fact-check-fix {
-    background: rgba(251, 191, 36, 0.12);
-    border: 1px solid rgba(251, 191, 36, 0.45);
-    color: #fbbf24;
+    background: rgba(232, 181, 88, 0.12);
+    border: 1px solid rgba(232, 181, 88, 0.45);
+    color: var(--accent-chairman, #e8b558);
     border-radius: 999px;
     padding: 3px 12px;
     font-size: 11px;
@@ -205,8 +205,8 @@
 }
 
 .fact-check-fix:hover:not(:disabled) {
-    background: rgba(251, 191, 36, 0.2);
-    border-color: rgba(251, 191, 36, 0.7);
+    background: rgba(232, 181, 88, 0.2);
+    border-color: rgba(232, 181, 88, 0.7);
     transform: translateY(-1px);
 }
 
@@ -224,20 +224,20 @@
 
 @keyframes fact-check-fix-pulse {
     0%, 100% {
-        background: rgba(251, 191, 36, 0.04);
+        background: rgba(232, 181, 88, 0.04);
     }
     50% {
-        background: rgba(251, 191, 36, 0.1);
+        background: rgba(232, 181, 88, 0.1);
     }
 }
 
 .fact-check-quote {
     margin: 0 0 6px 0;
     padding: 6px 10px;
-    background: rgba(15, 23, 42, 0.7);
-    border-left: 2px solid rgba(148, 163, 184, 0.4);
-    color: #e2e8f0;
-    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    background: rgba(26, 19, 12, 0.7);
+    border-left: 2px solid rgba(185, 169, 136, 0.4);
+    color: #e8dcc6;
+    font-family: var(--font-content, Georgia, serif);
     font-size: 13.5px;
     line-height: 1.5;
     font-style: italic;
@@ -246,5 +246,5 @@
 .fact-check-note {
     font-size: 12.5px;
     line-height: 1.5;
-    color: #cbd5e1;
+    color: #d4c5a5;
 }

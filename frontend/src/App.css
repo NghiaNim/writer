@@ -19,14 +19,14 @@
   align-items: center;
   gap: 8px;
   padding: 6px 8px 6px 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-glass);
+  background: rgba(26, 19, 12, 0.72);
+  border: 1px solid var(--border-color);
   border-radius: 999px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   font-family: var(--font-ui);
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--coffee-cream);
   box-shadow: var(--shadow-soft);
 }
 
@@ -60,9 +60,9 @@
 }
 
 .auth-chip-logout {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
-  border: 1px solid var(--border-glass);
+  background: var(--coffee-amber-soft);
+  color: var(--coffee-crema);
+  border: 1px solid var(--coffee-amber-dim);
   border-radius: 999px;
   padding: 4px 10px;
   font-family: var(--font-ui);
@@ -73,8 +73,8 @@
 }
 
 .auth-chip-logout:hover {
-  background: rgba(248, 113, 113, 0.12);
-  color: #fca5a5;
+  background: rgba(212, 145, 60, 0.18);
+  color: var(--coffee-crema-bright);
 }
 
 @media (max-width: 640px) {
@@ -97,7 +97,7 @@
   z-index: 100;
   width: 44px;
   height: 44px;
-  background: rgba(30, 41, 59, 0.9);
+  background: rgba(36, 26, 16, 0.9);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border-glass);
   border-radius: 10px;
@@ -108,8 +108,8 @@
 }
 
 .mobile-menu-btn:hover {
-  background: rgba(59, 130, 246, 0.2);
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+  background: var(--coffee-amber-soft);
+  box-shadow: 0 0 12px var(--coffee-amber-dim);
 }
 
 .hamburger-icon {
@@ -146,27 +146,32 @@
   }
 }
 
-/* Ensure modals sit on top of the glass UI */
+/* Ensure modals sit on top of the woodcut UI */
 .settings-overlay {
-  background: rgba(0, 0, 0, 0.7); /* Darker overlay for contrast */
+  background: rgba(5, 3, 1, 0.72);
   backdrop-filter: blur(4px);
 }
 
 .settings-modal {
-  background: #0f172a; /* Dark solid background for settings to avoid visual chaos */
-  border: 1px solid var(--border-glass);
+  background: var(--coffee-espresso);
+  border: 1px solid var(--border-strong);
   color: var(--text-primary);
-  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  box-shadow:
+    inset 0 0 0 4px rgba(11, 8, 5, 0.5),
+    inset 0 0 0 5px var(--border-color),
+    0 20px 50px rgba(0, 0, 0, 0.65);
 }
 
-/* Adjust Settings Styles for Dark Mode Compatibility */
+/* Settings frame chrome */
 .settings-header {
-  background: #0f172a;
+  background: var(--coffee-espresso);
   border-bottom: 1px solid var(--border-color);
 }
 
 .settings-header h2 {
   color: var(--text-primary);
+  font-family: var(--font-display);
+  font-weight: 600;
 }
 
 .close-button {
@@ -177,11 +182,11 @@
 }
 
 .settings-body {
-  background: #0f172a;
+  background: var(--coffee-espresso);
 }
 
 .settings-sidebar {
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(11, 8, 5, 0.55);
   border-right: 1px solid var(--border-color);
 }
 
@@ -189,16 +194,21 @@
   color: var(--text-secondary);
 }
 .sidebar-nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(212, 145, 60, 0.06);
   color: var(--text-primary);
 }
 .sidebar-nav-item.active {
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--accent-primary);
+  background: var(--coffee-amber-soft);
+  color: var(--coffee-crema-bright);
+  box-shadow: inset 2px 0 0 var(--accent-primary);
 }
 
 .settings-main-panel {
-  background: #0f172a;
+  background: var(--coffee-espresso);
+  /* Faint tumbling-blocks watermark, fading out toward the bottom so
+     dense form sections stay clean. */
+  background-image: var(--tess-cubes-line), linear-gradient(180deg, var(--coffee-espresso), var(--coffee-espresso));
+  background-size: 96px 144px, auto;
 }
 
 .settings-section h3 {
@@ -215,16 +225,16 @@
 .settings-modal input[type="password"],
 .settings-modal textarea,
 .settings-modal select {
-  background: #1e293b;
+  background: var(--coffee-roast);
   border: 1px solid var(--border-color);
-  color: var(--text-primary);
+  color: var(--coffee-cream);
 }
 
 .settings-modal input:focus,
 .settings-modal textarea:focus,
 .settings-modal select:focus {
   border-color: var(--accent-primary);
-  background: #1e293b;
+  background: var(--coffee-roast);
 }
 
 /* Cards in Settings */
@@ -233,12 +243,12 @@
   background: transparent;
 }
 .provider-option-container:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(212, 145, 60, 0.04);
 }
 .provider-option-container.selected {
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--coffee-amber-soft);
   border-color: var(--accent-primary);
-  box-shadow: none;
+  box-shadow: 0 0 0 1px var(--accent-primary);
 }
 .provider-name {
   color: var(--text-primary);
@@ -248,7 +258,7 @@
 }
 
 .council-member-row {
-  background: #1e293b;
+  background: var(--coffee-roast);
   border-color: var(--border-color);
 }
 .member-label {
@@ -256,7 +266,7 @@
 }
 
 .api-key-section, .hybrid-settings-card, .full-content-section {
-  background: #1e293b; /* Card bg in settings */
+  background: var(--coffee-roast);
   border-color: var(--border-color);
 }
 
@@ -265,7 +275,7 @@
 }
 
 .settings-footer {
-  background: #0f172a;
+  background: var(--coffee-espresso);
   border-top-color: var(--border-color);
 }
 
@@ -275,89 +285,4 @@
 
 .free-filter-label {
   color: var(--text-primary);
-}
-
-/* ============================================================
- * Coffee variant — global chrome (auth chip, mobile menu).
- * Gated by `.app--coffee` so flipping the tunable off restores
- * the original look. Component-level surfaces (Login, Sidebar,
- * EssayFlow) have their own modifier classes already.
- * ============================================================ */
-
-.app--coffee .auth-chip {
-  background: rgba(34, 22, 14, 0.72);
-  border-color: rgba(217, 119, 6, 0.18);
-  color: var(--coffee-cream);
-}
-
-.app--coffee .auth-chip-logout {
-  background: var(--coffee-amber-soft);
-  border-color: var(--coffee-amber-dim);
-  color: var(--coffee-crema);
-}
-
-.app--coffee .auth-chip-logout:hover {
-  background: rgba(217, 119, 6, 0.18);
-  color: var(--coffee-crema-bright);
-}
-
-.app--coffee .mobile-menu-btn:hover {
-  background: var(--coffee-amber-soft);
-  box-shadow: 0 0 12px var(--coffee-amber-dim);
-}
-
-/* Settings modal — warm the global frame declarations that live
-   in App.css. Component-internal overrides (tabs, provider cards,
-   buttons, slider thumb) live in Settings.css to stay near their
-   source rules. */
-.app--coffee .settings-modal {
-  background: var(--coffee-espresso);
-  border-color: rgba(217, 119, 6, 0.18);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
-}
-
-.app--coffee .settings-header,
-.app--coffee .settings-body,
-.app--coffee .settings-main-panel,
-.app--coffee .settings-footer {
-  background: var(--coffee-espresso);
-}
-
-.app--coffee .settings-sidebar {
-  background: rgba(34, 22, 14, 0.55);
-}
-
-.app--coffee .sidebar-nav-item.active {
-  background: var(--coffee-amber-soft);
-  color: var(--coffee-crema-bright);
-}
-
-.app--coffee .settings-modal input[type="text"],
-.app--coffee .settings-modal input[type="password"],
-.app--coffee .settings-modal textarea,
-.app--coffee .settings-modal select {
-  background: var(--coffee-roast);
-  color: var(--coffee-cream);
-  border-color: rgba(217, 119, 6, 0.18);
-}
-
-.app--coffee .settings-modal input:focus,
-.app--coffee .settings-modal textarea:focus,
-.app--coffee .settings-modal select:focus {
-  border-color: var(--coffee-amber);
-  background: var(--coffee-roast);
-}
-
-.app--coffee .provider-option-container.selected {
-  background: var(--coffee-amber-soft);
-  border-color: var(--coffee-amber);
-  box-shadow: 0 0 0 1px var(--coffee-amber);
-}
-
-.app--coffee .council-member-row,
-.app--coffee .api-key-section,
-.app--coffee .hybrid-settings-card,
-.app--coffee .full-content-section {
-  background: var(--coffee-roast);
-  border-color: rgba(217, 119, 6, 0.18);
 }

@@ -1619,7 +1619,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               fallback={
                 <div
                   className="settings-section-loading"
-                  style={{ padding: '32px 8px', color: 'var(--text-muted, #94a3b8)' }}
+                  style={{ padding: '32px 8px', color: 'var(--text-muted, #82735a)' }}
                 >
                   Loading…
                 </div>

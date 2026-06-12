@@ -258,7 +258,7 @@ export default function ProviderSettings({
             {/* Custom OpenAI-compatible Endpoint */}
             <div className="subsection" style={{ marginTop: '24px' }}>
                 <h4>Custom OpenAI-Compatible Endpoint</h4>
-                <p className="subsection-description" style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '16px' }}>
+                <p className="subsection-description" style={{ fontSize: '13px', color: '#b9a988', marginBottom: '16px' }}>
                     Connect to any OpenAI-compatible API (Together AI, Fireworks, vLLM, LM Studio, etc.)
                 </p>
                 <form className="api-key-section" onSubmit={e => e.preventDefault()}>

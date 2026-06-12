@@ -1,3 +1,11 @@
+/* ============================================================
+ * Login — walking into the print room after hours.
+ *
+ * The old "coffee variant" (.login-screen--coffee) has been folded
+ * into the base rules: the Escher-coffee theme is now the only
+ * theme, so the modifier class in JSX is inert.
+ * ============================================================ */
+
 .login-screen {
     min-height: 100vh;
     min-height: 100dvh;
@@ -7,26 +15,89 @@
     padding: 16px;
     box-sizing: border-box;
     overflow-y: auto;
+    position: relative;
+    background:
+        radial-gradient(ellipse 110% 60% at 50% -10%, var(--coffee-crema-glow) 0%, transparent 60%);
+}
+
+/* The metamorphosis field — the whole background is one Escher
+   transformation, read bottom-to-top: checkerboard → chamfered
+   tiles → hexagons → beans (figure-ground reversed) → winged
+   beans → birds dissolving into the lamp glow. Rendered by
+   EscherField.jsx; only the motion lives here. */
+.escher-field {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    /* Fade the top edge so birds dissolve into the lamp, and ease
+       the bottom corner so the checkerboard doesn't hard-crop. */
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.95) 16%, #000 40%, #000 96%, rgba(0, 0, 0, 0.7) 100%);
+    mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.95) 16%, #000 40%, #000 96%, rgba(0, 0, 0, 0.7) 100%);
+}
+
+/* Birds ride a slow private thermal: drift up and sideways, fade,
+   and circle back. Duration and delay are set per-bird inline from
+   the cell hash, so the flock never moves in lockstep. */
+.ef-bird {
+    animation-name: ef-fly;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    will-change: transform, opacity;
+}
+
+@keyframes ef-fly {
+    0% {
+        transform: translate(0, 0);
+    }
+    45% {
+        transform: translate(9px, -26px);
+    }
+    70% {
+        transform: translate(-5px, -40px);
+        opacity: 0.55;
+    }
+    100% {
+        transform: translate(0, 0);
+    }
+}
+
+/* The transformation belt breathes — rows mid-metamorphosis carry a
+   faint lamplight shimmer so the change feels in-progress. */
+@media (prefers-reduced-motion: reduce) {
+    .ef-bird {
+        animation: none;
+    }
 }
 
 .login-card {
     width: 100%;
-    max-width: 420px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-glass);
-    border-radius: 16px;
-    padding: 36px 32px 28px;
-    box-shadow: var(--shadow-glass);
+    max-width: 460px;
+    /* Slightly more opaque than --bg-card: the card must hold its
+       own against the metamorphosis field behind it. */
+    background: rgba(22, 16, 10, 0.88);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    padding: 44px 36px 32px;
+    /* Double-ruled woodcut frame: heavy rule, gutter, hairline. */
+    box-shadow:
+        inset 0 0 0 5px rgba(11, 8, 5, 0.6),
+        inset 0 0 0 6px var(--border-color),
+        0 12px 40px rgba(0, 0, 0, 0.5),
+        0 0 60px var(--coffee-crema-glow);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    animation: login-fade-in 0.45s ease-out both;
+    animation: login-fade-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
     margin: auto;
+    position: relative;
+    z-index: 1;
 }
 
 @keyframes login-fade-in {
     from {
         opacity: 0;
-        transform: translateY(8px);
+        transform: translateY(10px);
     }
     to {
         opacity: 1;
@@ -36,48 +107,64 @@
 
 .login-header {
     text-align: center;
-    margin-bottom: 24px;
+    margin-bottom: 10px;
 }
 
 .login-title {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
     font-family: var(--font-display);
-    font-size: 32px;
-    font-weight: 700;
-    margin: 0 0 6px 0;
-    background: linear-gradient(180deg, #f0f4f8 0%, #c7d2fe 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    letter-spacing: -0.01em;
+    font-size: 40px;
+    font-weight: 600;
+    font-variation-settings: 'opsz' 100;
+    margin: 0 0 8px 0;
+    color: var(--coffee-crema-bright);
+    letter-spacing: -0.015em;
+    text-shadow: 0 2px 24px rgba(232, 181, 88, 0.25);
 }
 
 .login-subtitle {
-    color: var(--text-secondary);
-    font-size: 14px;
-    margin: 0;
+    color: var(--coffee-cream);
+    opacity: 0.72;
+    font-family: var(--font-content);
+    font-style: italic;
+    font-size: 15.5px;
+    line-height: 1.5;
+    max-width: 320px;
+    margin: 4px auto 0;
+}
+
+/* The metamorphosis band sits between the masthead and the form,
+   like a printer's ornament on a title page. */
+.login-band {
+    display: block;
+    margin: 6px auto 18px;
+    opacity: 0.9;
 }
 
 .login-tabs {
     display: flex;
-    background: rgba(0, 0, 0, 0.25);
-    border: 1px solid var(--border-glass);
-    border-radius: 10px;
-    padding: 4px;
-    margin-bottom: 22px;
+    border-bottom: 1px solid var(--border-strong);
+    margin-bottom: 24px;
 }
 
 .login-tab {
     flex: 1;
     background: transparent;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     border: none;
-    padding: 9px 12px;
-    border-radius: 7px;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 10px 12px;
     font-family: var(--font-ui);
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 .login-tab:hover {
@@ -85,9 +172,8 @@
 }
 
 .login-tab.is-active {
-    background: var(--accent-primary);
-    color: white;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+    color: var(--coffee-crema);
+    border-bottom-color: var(--accent-primary);
 }
 
 .login-form {
@@ -103,9 +189,9 @@
 }
 
 .login-label {
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
     color: var(--text-secondary);
     text-transform: uppercase;
 }
@@ -113,13 +199,13 @@
 .login-field input {
     width: 100%;
     box-sizing: border-box;
-    padding: 11px 13px;
-    background: rgba(0, 0, 0, 0.28);
+    padding: 12px 14px;
+    background: rgba(11, 8, 5, 0.55);
     border: 1px solid var(--border-glass);
-    border-radius: 8px;
+    border-radius: 3px;
     color: var(--text-primary);
     font-family: var(--font-ui);
-    font-size: 14px;
+    font-size: 15px;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -138,27 +224,32 @@
     cursor: not-allowed;
 }
 
+/* Submit = the ink stamp: solid amber, espresso lettering. */
 .login-submit {
     margin-top: 6px;
     width: 100%;
-    padding: 12px 16px;
+    padding: 13px 16px;
     background: var(--accent-primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
+    color: #1a130c;
+    border: 1px solid var(--accent-primary-deep);
+    border-radius: 3px;
     font-family: var(--font-ui);
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
     cursor: pointer;
-    transition: background 0.15s ease, transform 0.1s ease;
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
 }
 
 .login-submit:hover:not(:disabled) {
-    background: #2563eb;
+    background: var(--accent-bright);
 }
 
 .login-submit:active:not(:disabled) {
     transform: translateY(1px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
 }
 
 .login-submit:disabled {
@@ -168,11 +259,11 @@
 
 .login-google {
     width: 100%;
-    padding: 11px 16px;
-    background: rgba(255, 255, 255, 0.04);
+    padding: 12px 16px;
+    background: transparent;
     color: var(--text-primary);
     border: 1px solid var(--border-glass);
-    border-radius: 8px;
+    border-radius: 3px;
     font-family: var(--font-ui);
     font-size: 14px;
     font-weight: 600;
@@ -181,8 +272,8 @@
 }
 
 .login-google:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: var(--accent-primary);
+    border-color: var(--border-strong);
+    background: var(--coffee-amber-soft);
 }
 
 .login-google:disabled {
@@ -191,11 +282,11 @@
 }
 
 .login-error {
-    background: rgba(248, 113, 113, 0.08);
-    color: #fca5a5;
-    border: 1px solid rgba(248, 113, 113, 0.25);
+    background: rgba(205, 106, 74, 0.1);
+    color: #e5a18d;
+    border: 1px solid rgba(205, 106, 74, 0.32);
     padding: 9px 12px;
-    border-radius: 8px;
+    border-radius: 3px;
     font-size: 13px;
     line-height: 1.45;
     white-space: pre-wrap;
@@ -214,30 +305,30 @@
 .login-status {
     margin: 0 0 12px;
     padding: 8px 12px;
-    border-radius: 8px;
+    border-radius: 3px;
     font-size: 12px;
     line-height: 1.4;
     text-align: center;
 }
 
 .login-status.pending {
-    background: rgba(251, 191, 36, 0.08);
-    color: #fcd34d;
-    border: 1px solid rgba(251, 191, 36, 0.25);
+    background: rgba(232, 181, 88, 0.08);
+    color: var(--coffee-crema);
+    border: 1px solid rgba(232, 181, 88, 0.28);
 }
 
 .login-status.down {
-    background: rgba(248, 113, 113, 0.08);
-    color: #fca5a5;
-    border: 1px solid rgba(248, 113, 113, 0.25);
+    background: rgba(205, 106, 74, 0.1);
+    color: #e5a18d;
+    border: 1px solid rgba(205, 106, 74, 0.32);
 }
 
 .login-info {
-    background: rgba(34, 197, 94, 0.08);
-    color: #86efac;
-    border: 1px solid rgba(34, 197, 94, 0.25);
+    background: rgba(163, 181, 109, 0.1);
+    color: #c4d29a;
+    border: 1px solid rgba(163, 181, 109, 0.3);
     padding: 9px 12px;
-    border-radius: 8px;
+    border-radius: 3px;
     font-size: 13px;
     line-height: 1.4;
 }
@@ -245,7 +336,7 @@
 .login-footer {
     margin-top: 22px;
     text-align: center;
-    font-size: 13px;
+    font-size: 14px;
     color: var(--text-secondary);
 }
 
@@ -257,7 +348,7 @@
     background: none;
     border: none;
     padding: 0;
-    color: var(--accent-primary);
+    color: var(--coffee-crema);
     font-family: inherit;
     font-size: inherit;
     font-weight: 600;
@@ -267,127 +358,12 @@
 }
 
 .login-link:hover:not(:disabled) {
-    color: #60a5fa;
+    color: var(--coffee-crema-bright);
 }
 
 .login-link:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-}
-
-/* ============================================================
- * Coffee theme — the default Login look (was previously gated
- * behind a `coffeeGreetingV1` tunable; that's been retired and
- * the modifier class is now applied unconditionally in JSX).
- *
- * Same DOM, same layout. Warm crema/amber vocabulary anchored
- * to the "Today's pour" card on EssayFlow Step 3. Goal: a
- * logged-out user opening the app should feel like they walked
- * into a cafe, not a dashboard.
- * ============================================================ */
-
-.login-screen--coffee {
-    background:
-        radial-gradient(ellipse 110% 60% at 50% -10%, var(--coffee-crema-glow) 0%, transparent 60%);
-}
-
-.login-screen--coffee .login-card {
-    border-color: rgba(217, 119, 6, 0.18);
-    box-shadow:
-        0 12px 40px rgba(0, 0, 0, 0.45),
-        0 0 60px var(--coffee-crema-glow);
-}
-
-.login-screen--coffee .login-title {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    background: linear-gradient(180deg, var(--coffee-crema-bright) 0%, var(--coffee-crema) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-}
-
-.login-screen--coffee .login-title-bean {
-    --bean-size: 18px;
-    margin-top: 2px;
-}
-
-.login-screen--coffee .login-subtitle {
-    color: var(--coffee-cream);
-    opacity: 0.75;
-}
-
-.login-screen--coffee .login-tab.is-active {
-    background: var(--coffee-amber);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset,
-        0 0 12px var(--coffee-amber-dim);
-}
-
-.login-screen--coffee .login-field input:focus {
-    border-color: var(--coffee-amber);
-    box-shadow: 0 0 0 3px var(--coffee-amber-dim);
-}
-
-.login-screen--coffee .login-submit {
-    background: var(--coffee-amber);
-}
-
-.login-screen--coffee .login-submit:hover:not(:disabled) {
-    background: var(--coffee-amber-deep);
-}
-
-.login-screen--coffee .login-google:hover:not(:disabled) {
-    border-color: rgba(217, 119, 6, 0.45);
-    background: var(--coffee-amber-soft);
-}
-
-.login-screen--coffee .login-link {
-    color: var(--coffee-crema);
-}
-
-.login-screen--coffee .login-link:hover:not(:disabled) {
-    color: var(--coffee-crema-bright);
-}
-
-/* Typography bumps inside coffee mode — bigger and calmer.
-   Brand moment on Login should feel like an arrival, not a form. */
-.login-screen--coffee .login-card {
-    max-width: 460px;
-    padding: 44px 36px 32px;
-}
-
-.login-screen--coffee .login-title {
-    font-size: 38px;
-    letter-spacing: -0.015em;
-}
-
-.login-screen--coffee .login-subtitle {
-    font-size: 16px;
-    line-height: 1.5;
-    max-width: 320px;
-    margin: 4px auto 0;
-}
-
-.login-screen--coffee .login-label {
-    font-size: 11.5px;
-    letter-spacing: 0.14em;
-}
-
-.login-screen--coffee .login-field input {
-    font-size: 15px;
-    padding: 12px 14px;
-}
-
-.login-screen--coffee .login-submit,
-.login-screen--coffee .login-google {
-    font-size: 15px;
-    padding: 13px 16px;
-}
-
-.login-screen--coffee .login-footer {
-    font-size: 14px;
 }
 
 /* ── Responsive: small screens ──────────────────────────────────── */
@@ -398,12 +374,12 @@
     }
 
     .login-card {
+        max-width: 100%;
         padding: 28px 20px 22px;
-        border-radius: 14px;
     }
 
     .login-title {
-        font-size: 26px !important;
+        font-size: 28px !important;
     }
 
     .login-subtitle {
@@ -411,7 +387,11 @@
     }
 
     .login-header {
-        margin-bottom: 18px;
+        margin-bottom: 6px;
+    }
+
+    .login-band {
+        margin: 4px auto 12px;
     }
 
     .login-tabs {
@@ -426,16 +406,7 @@
     .login-submit,
     .login-google {
         padding: 11px 14px;
-        font-size: 14px !important;
-    }
-
-    .login-screen--coffee .login-card {
-        max-width: 100%;
-        padding: 28px 20px 22px;
-    }
-
-    .login-screen--coffee .login-title-bean {
-        --bean-size: 14px;
+        font-size: 12.5px !important;
     }
 
     .login-footer {
@@ -451,15 +422,14 @@
     }
 
     .login-header {
-        margin-bottom: 14px;
+        margin-bottom: 6px;
+    }
+
+    .login-band {
+        margin: 2px auto 10px;
     }
 
     .login-card {
-        padding-top: 24px;
-        padding-bottom: 20px;
-    }
-
-    .login-screen--coffee .login-card {
         padding-top: 24px;
         padding-bottom: 20px;
     }

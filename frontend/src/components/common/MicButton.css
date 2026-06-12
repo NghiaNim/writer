@@ -12,12 +12,12 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  /* Brighter idle state — was rgba(30,41,59,0.7) which read as
-     "almost invisible" on the dark chamber background. Subtle blue tint
+  /* Brighter idle state — the old near-black slate tint read as
+     "almost invisible" on the dark chamber background. Subtle amber tint
      so users actually notice the affordance without it shouting. */
-  background: rgba(59, 130, 246, 0.10);
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  color: #93c5fd;
+  background: rgba(212, 145, 60, 0.10);
+  border: 1px solid rgba(212, 145, 60, 0.35);
+  color: var(--accent-bright, #e9c285);
   border-radius: 999px;
   cursor: pointer;
   font-family: var(--font-ui);
@@ -70,11 +70,11 @@
 }
 
 .mic-button:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.18);
-  color: #bfdbfe;
-  border-color: rgba(59, 130, 246, 0.55);
+  background: rgba(212, 145, 60, 0.18);
+  color: #f6e3bd;
+  border-color: rgba(212, 145, 60, 0.55);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.18);
+  box-shadow: 0 4px 12px rgba(212, 145, 60, 0.18);
 }
 
 .mic-button:disabled {
@@ -83,25 +83,25 @@
 }
 
 .mic-button--listening {
-  background: rgba(239, 68, 68, 0.18);
-  border-color: rgba(239, 68, 68, 0.6);
-  color: #fee2e2;
-  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+  background: rgba(205, 106, 74, 0.18);
+  border-color: rgba(205, 106, 74, 0.6);
+  color: #f3ded2;
+  box-shadow: 0 0 0 4px rgba(205, 106, 74, 0.15);
   animation: mic-listening-pulse 1.6s ease-in-out infinite;
 }
 
 .mic-button--listening:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.28);
+  background: rgba(205, 106, 74, 0.28);
   color: #ffffff;
 }
 
 @keyframes mic-listening-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+    box-shadow: 0 0 0 4px rgba(205, 106, 74, 0.15);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0.05);
+    box-shadow: 0 0 0 8px rgba(205, 106, 74, 0.05);
   }
 }
 
@@ -153,10 +153,10 @@
   right: 0;
   max-width: 320px;
   padding: 6px 10px;
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(99, 102, 241, 0.4);
-  border-radius: 8px;
-  color: #cbd5e1;
+  background: rgba(26, 19, 12, 0.95);
+  border: 1px solid rgba(192, 133, 82, 0.4);
+  border-radius: 6px;
+  color: #d4c5a5;
   font-family: var(--font-ui);
   font-size: 12px;
   font-style: italic;
@@ -172,19 +172,19 @@
   right: 0;
   max-width: 320px;
   padding: 6px 10px;
-  background: rgba(239, 68, 68, 0.18);
-  border: 1px solid rgba(239, 68, 68, 0.45);
-  border-radius: 8px;
-  color: #fecaca;
+  background: rgba(205, 106, 74, 0.18);
+  border: 1px solid rgba(205, 106, 74, 0.45);
+  border-radius: 6px;
+  color: #e5a18d;
   font-family: var(--font-ui);
   font-size: 12px;
   z-index: 30;
 }
 
 /* ============================================================
- * Coffee variant — replaces the cool blue idle/hover tint with
- * the warm amber language. Listening state stays red (it reads
- * as "recording" universally; don't repaint it).
+ * Coffee variant — the base styles above are already amber, so
+ * this block just deepens the tint slightly. Listening state
+ * stays brick red (it reads as "recording" universally).
  * Gated by `.app--coffee` so the toggle remains a clean revert.
  * ============================================================ */
 
@@ -195,13 +195,13 @@
 }
 
 .app--coffee .mic-button:hover:not(:disabled) {
-  background: rgba(217, 119, 6, 0.18);
+  background: rgba(212, 145, 60, 0.18);
   border-color: var(--coffee-amber);
   color: var(--coffee-crema-bright);
   box-shadow: 0 4px 12px var(--coffee-amber-dim);
 }
 
 .app--coffee .mic-button-interim {
-  border-color: rgba(217, 119, 6, 0.45);
+  border-color: rgba(212, 145, 60, 0.45);
   color: var(--coffee-cream);
 }

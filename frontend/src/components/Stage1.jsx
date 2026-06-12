@@ -83,7 +83,7 @@ export default function Stage1({ responses, startTime, endTime }) {
       <div className="tab-content glass-panel">
         <div className="model-header">
           <div className="model-identity">
-            <span className="model-avatar" style={{ backgroundColor: hasError ? '#ef4444' : currentVisuals.color }}>
+            <span className="model-avatar" style={{ backgroundColor: hasError ? '#cd6a4a' : currentVisuals.color }}>
               {currentVisuals.icon}
             </span>
             <div className="model-info">

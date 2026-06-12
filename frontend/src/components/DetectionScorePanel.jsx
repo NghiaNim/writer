@@ -214,7 +214,7 @@ export default function DetectionScorePanel({
                 </div>
             )}
             {optimizeProgress?.status === 'error' && (
-                <div className="detection-result" style={{ borderColor: 'rgba(248, 113, 113, 0.2)', background: 'rgba(248, 113, 113, 0.06)' }}>
+                <div className="detection-result" style={{ borderColor: 'rgba(205, 106, 74, 0.2)', background: 'rgba(205, 106, 74, 0.06)' }}>
                     <span>Could not optimize: {optimizeProgress.error}</span>
                 </div>
             )}

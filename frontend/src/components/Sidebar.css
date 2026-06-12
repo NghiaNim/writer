@@ -21,7 +21,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  /* Print-shop masthead: heavy rule + hairline beneath */
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: 0 3px 0 -2px var(--border-color);
 }
 
 .sidebar-title-wrapper {
@@ -94,13 +96,13 @@
 }
 
 .icon-button {
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  color: #60a5fa;
+  background: rgba(212, 145, 60, 0.1);
+  border: 1px solid rgba(212, 145, 60, 0.3);
+  color: var(--accent-bright);
   width: 36px;
   height: 36px;
   flex-shrink: 0;
-  border-radius: 10px;
+  border-radius: 3px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -110,10 +112,10 @@
 }
 
 .icon-button:hover {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: #3b82f6;
-  color: #93c5fd;
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+  background: rgba(212, 145, 60, 0.2);
+  border-color: var(--accent-primary);
+  color: var(--accent-bright);
+  box-shadow: 0 0 12px rgba(212, 145, 60, 0.3);
 }
 
 .icon-button:disabled {
@@ -129,27 +131,31 @@
 
 .new-council-btn {
   width: 100%;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  color: white;
+  /* Ink-stamp CTA: solid amber block, espresso ink lettering */
+  background: var(--accent-primary);
+  border: 1px solid var(--accent-primary-deep);
+  color: #1a130c;
   padding: 14px 20px;
-  border-radius: 14px;
+  border-radius: 3px;
   font-family: var(--font-ui);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 4px 16px rgba(212, 145, 60, 0.25);
 }
 
 .new-council-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.35);
-  border-color: rgba(59, 130, 246, 0.6);
+  background: var(--accent-bright);
+  box-shadow: 0 8px 24px rgba(212, 145, 60, 0.35);
+  border-color: rgba(212, 145, 60, 0.6);
 }
 
 .new-council-btn:disabled {
@@ -175,7 +181,7 @@
 .search-input {
   width: 100%;
   padding: 10px 32px 10px 12px;
-  background: rgba(30, 41, 59, 0.5);
+  background: rgba(36, 26, 16, 0.5);
   border: 1px solid var(--border-glass);
   border-radius: 8px;
   color: var(--text-primary);
@@ -192,7 +198,7 @@
 .search-input:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 2px rgba(212, 145, 60, 0.15);
 }
 
 .search-clear {
@@ -267,13 +273,13 @@
 }
 
 .sidebar-tab--active {
-  background: rgba(251, 191, 36, 0.12);
-  color: var(--accent, #fbbf24);
+  background: rgba(232, 181, 88, 0.12);
+  color: var(--accent, var(--accent-chairman));
 }
 
 .sidebar-tab--active:hover {
-  background: rgba(251, 191, 36, 0.18);
-  color: var(--accent, #fbbf24);
+  background: rgba(232, 181, 88, 0.18);
+  color: var(--accent, var(--accent-chairman));
 }
 
 .sidebar-tab-icon {
@@ -293,7 +299,7 @@
 }
 
 .sidebar-tab--active .sidebar-tab-count {
-  background: rgba(251, 191, 36, 0.2);
+  background: rgba(232, 181, 88, 0.2);
 }
 
 /* Per-item leading icon. Used by both drafts (✏️) and essays (☕) so
@@ -318,8 +324,8 @@
   border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.06));
   background: linear-gradient(
     180deg,
-    rgba(251, 191, 36, 0.025) 0%,
-    rgba(251, 191, 36, 0) 100%
+    rgba(232, 181, 88, 0.025) 0%,
+    rgba(232, 181, 88, 0) 100%
   );
   display: flex;
   flex-direction: column;
@@ -411,8 +417,8 @@
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: rgba(251, 191, 36, 0.15);
-  color: var(--accent, #fbbf24);
+  background: rgba(232, 181, 88, 0.15);
+  color: var(--accent, var(--accent-chairman));
   letter-spacing: 0;
   text-transform: none;
   font-weight: 600;
@@ -426,7 +432,7 @@
   /* Gold left edge marks this card as "in-progress" — pairs with the
      warm wash on .sidebar-drafts and the ✏️ icon to reinforce the
      zone identity. */
-  border-left: 3px solid rgba(251, 191, 36, 0.55);
+  border-left: 3px solid rgba(232, 181, 88, 0.55);
   background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
@@ -444,12 +450,12 @@
    treatment on .conversation-item — accent border + slightly brighter
    background so they always know which row they're in. */
 .sidebar-draft-item--active {
-  border-color: var(--accent, #fbbf24);
-  background: rgba(251, 191, 36, 0.06);
+  border-color: var(--accent, var(--accent-chairman));
+  background: rgba(232, 181, 88, 0.06);
 }
 
 .sidebar-draft-item--active:hover {
-  background: rgba(251, 191, 36, 0.1);
+  background: rgba(232, 181, 88, 0.1);
 }
 
 .sidebar-draft-title {
@@ -471,7 +477,7 @@
 }
 
 .sidebar-draft-step {
-  color: var(--accent, #fbbf24);
+  color: var(--accent, var(--accent-chairman));
   font-weight: 500;
 }
 
@@ -513,7 +519,7 @@
 
 .sidebar-resizer:hover .sidebar-resizer-handle,
 .sidebar-resizer:active .sidebar-resizer-handle {
-  background: rgba(251, 191, 36, 0.5);
+  background: rgba(232, 181, 88, 0.5);
 }
 
 .sidebar-resizer-handle {
@@ -618,25 +624,51 @@
 }
 
 .conversation-item {
-  background: rgba(30, 41, 59, 0.35);
+  background: rgba(36, 26, 16, 0.35);
   backdrop-filter: blur(10px);
   border: 1px solid var(--border-glass);
-  border-radius: 12px;
+  border-radius: 6px;
   padding: 14px 16px;
   cursor: pointer;
   transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Every essay is made of the same tumbling blocks as the rest of the
+   print room — the lattice surfaces when the card wakes up. */
+.conversation-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--tess-cubes-line);
+  background-size: 48px 72px;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 .conversation-item:hover {
-  background: rgba(30, 41, 59, 0.55);
-  border-color: rgba(59, 130, 246, 0.25);
+  background: rgba(36, 26, 16, 0.55);
+  border-color: rgba(212, 145, 60, 0.25);
   transform: translateX(4px);
 }
 
+.conversation-item:hover::after,
+.conversation-item.active::after {
+  opacity: 0.7;
+}
+
 .conversation-item.active {
-  background: var(--accent-primary-dim);
-  border-color: rgba(59, 130, 246, 0.45);
-  box-shadow: 0 0 24px rgba(59, 130, 246, 0.18);
+  background: var(--coffee-amber-soft);
+  border-color: rgba(212, 145, 60, 0.45);
+  box-shadow: inset 2px 0 0 var(--accent-primary), 0 0 24px rgba(212, 145, 60, 0.18);
+  color: var(--coffee-crema-bright);
+}
+
+.conversation-item.active .conversation-title {
+  color: var(--coffee-crema-bright);
 }
 
 .sidebar-empty-state {
@@ -651,7 +683,7 @@
   font-family: var(--font-ui);
   font-size: 14px;
   font-weight: 600;
-  color: #cbd5e1;
+  color: #d4c5a5;
   margin-bottom: 6px;
 }
 
@@ -662,15 +694,15 @@
 }
 
 .sidebar-empty-state-hint strong {
-  color: #93c5fd;
+  color: var(--accent-bright);
   font-weight: 600;
 }
 
 .conversation-title {
   font-size: 14px;
   font-weight: 500;
-  color: #e2e8f0;
-  /* Force slate-200 */
+  color: #e8dcc6;
+  /* Force warm parchment */
   margin-bottom: 4px;
   display: flex;
   align-items: flex-start;
@@ -700,20 +732,20 @@
   height: 8px;
   margin-top: 6px;
   border-radius: 50%;
-  background: #fbbf24;
+  background: var(--accent-chairman);
   flex-shrink: 0;
-  box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6);
+  box-shadow: 0 0 0 0 rgba(232, 181, 88, 0.6);
   animation: conv-pulse 1.6s infinite;
 }
 
 @keyframes conv-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.55); }
-  70%  { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(232, 181, 88, 0.55); }
+  70%  { box-shadow: 0 0 0 8px rgba(232, 181, 88, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(232, 181, 88, 0); }
 }
 
 .conversation-item.streaming {
-  border-color: rgba(251, 191, 36, 0.3);
+  border-color: rgba(232, 181, 88, 0.3);
 }
 
 .conversation-meta {
@@ -742,8 +774,8 @@
 }
 
 .delete-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  background: rgba(205, 106, 74, 0.2);
+  color: #cd6a4a;
 }
 
 .delete-confirm {
@@ -764,28 +796,28 @@
 }
 
 .confirm-yes-btn {
-  color: #10b981;
+  color: var(--accent-success);
 }
 
 .confirm-yes-btn:hover {
-  background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
+  background: rgba(163, 181, 109, 0.2);
+  color: var(--accent-success);
 }
 
 .confirm-no-btn {
-  color: #ef4444;
+  color: #cd6a4a;
 }
 
 .confirm-no-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  background: rgba(205, 106, 74, 0.2);
+  color: #cd6a4a;
 }
 
 /* Stop Generation Button */
 .stop-generation-btn.small {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  color: #f87171;
+  background: rgba(205, 106, 74, 0.15);
+  border: 1px solid rgba(205, 106, 74, 0.4);
+  color: #d98c70;
   padding: 3px 10px;
   font-size: 11px;
   font-weight: 600;
@@ -800,10 +832,10 @@
 }
 
 .stop-generation-btn.small:hover {
-  background: rgba(239, 68, 68, 0.25);
-  border-color: #ef4444;
-  color: #fca5a5;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+  background: rgba(205, 106, 74, 0.25);
+  border-color: #cd6a4a;
+  color: #e5a18d;
+  box-shadow: 0 0 8px rgba(205, 106, 74, 0.3);
 }
 
 /* Sidebar close button (mobile only) */
@@ -816,7 +848,7 @@
   height: 36px;
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid var(--border-glass);
-  border-radius: 8px;
+  border-radius: 3px;
   color: var(--text-primary);
   font-size: 24px;
   line-height: 1;
@@ -828,8 +860,8 @@
 }
 
 .sidebar-close-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  background: rgba(205, 106, 74, 0.2);
+  color: #d98c70;
 }
 
 /* Sidebar backdrop (mobile only) */
@@ -901,7 +933,7 @@
 }
 
 .sidebar--coffee .icon-button:hover {
-    background: rgba(217, 119, 6, 0.16);
+    background: rgba(212, 145, 60, 0.16);
     border-color: var(--coffee-amber);
     color: var(--coffee-crema-bright);
     box-shadow: 0 0 12px var(--coffee-amber-dim);
@@ -922,24 +954,22 @@
     font-weight: 600;
 }
 
-/* New Discussion button — keep the label, warm the chrome. */
+/* New Discussion button — ink-stamp treatment, matching the base. */
 .sidebar--coffee .new-council-btn {
-    background:
-        linear-gradient(135deg, rgba(217, 119, 6, 0.18) 0%, rgba(180, 83, 9, 0.10) 100%);
-    border: 1px dashed var(--coffee-amber-dim);
-    color: var(--coffee-crema-bright);
+    background: var(--accent-primary);
+    border: 1px solid var(--accent-primary-deep);
+    color: var(--coffee-espresso);
     box-shadow:
         0 4px 16px rgba(0, 0, 0, 0.25),
         0 0 24px var(--coffee-crema-glow);
 }
 
 .sidebar--coffee .new-council-btn:hover:not(:disabled) {
-    background:
-        linear-gradient(135deg, rgba(217, 119, 6, 0.28) 0%, rgba(180, 83, 9, 0.18) 100%);
-    border-color: var(--coffee-amber);
+    background: var(--accent-bright);
+    border-color: var(--accent-bright);
     box-shadow:
         0 8px 24px rgba(0, 0, 0, 0.3),
-        0 0 32px rgba(245, 180, 98, 0.25);
+        0 0 32px var(--coffee-crema-glow);
 }
 
 /* Search input — warmer focus glow. Layout untouched. */
@@ -950,13 +980,13 @@
 
 /* Active conversation tint — replace cool indigo with warm amber. */
 .sidebar--coffee .conversation-item:hover {
-    border-color: rgba(217, 119, 6, 0.25);
+    border-color: rgba(212, 145, 60, 0.25);
 }
 
 .sidebar--coffee .conversation-item.active {
     background: var(--coffee-amber-soft);
-    border-color: rgba(217, 119, 6, 0.45);
-    box-shadow: 0 0 24px var(--coffee-crema-glow);
+    border-color: rgba(212, 145, 60, 0.45);
+    box-shadow: inset 2px 0 0 var(--accent-primary), 0 0 24px var(--coffee-crema-glow);
 }
 
 /* Empty-state strong text — match the coffee CTA tint. */

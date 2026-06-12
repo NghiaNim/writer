@@ -28,7 +28,7 @@
     max-width: 720px;
     background: var(--bg-card);
     border: 1px solid var(--border-glass);
-    border-radius: 16px;
+    border-radius: 6px;
     padding: 40px 36px;
     box-shadow: var(--shadow-glass);
     backdrop-filter: blur(24px);
@@ -85,9 +85,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 8px;
-    background: rgba(148, 163, 184, 0.06);
+    border: 1px solid rgba(185, 169, 136, 0.2);
+    border-radius: 3px;
+    background: rgba(185, 169, 136, 0.06);
     color: var(--text-secondary);
     font-size: 16px;
     cursor: pointer;
@@ -96,8 +96,8 @@
 }
 
 .essay-flow-back-btn:hover:not(:disabled) {
-    background: rgba(148, 163, 184, 0.14);
-    border-color: rgba(148, 163, 184, 0.35);
+    background: rgba(185, 169, 136, 0.14);
+    border-color: rgba(185, 169, 136, 0.35);
     color: var(--text-primary);
 }
 
@@ -117,8 +117,8 @@
     gap: 6px;
     align-self: flex-start;
     padding: 5px 12px;
-    background: rgba(59, 130, 246, 0.08);
-    border: 1px solid rgba(59, 130, 246, 0.18);
+    background: rgba(212, 145, 60, 0.08);
+    border: 1px solid rgba(212, 145, 60, 0.18);
     border-radius: 999px;
     font-size: 12px;
     color: var(--text-secondary);
@@ -138,7 +138,7 @@
    directional mark, not a UI element — quiet crema-dim. */
 .essay-flow-topic-chip-arrow {
     margin: 0 8px;
-    color: rgba(245, 180, 98, 0.55);
+    color: rgba(232, 181, 88, 0.55);
     font-weight: 400;
     white-space: nowrap;
 }
@@ -214,7 +214,7 @@
 }
 
 .essay-flow-topic-kind-required {
-    color: var(--accent, #fbbf24);
+    color: var(--accent, var(--accent-chairman));
     margin-left: 2px;
 }
 
@@ -277,17 +277,17 @@
    generation. Pulses gold to nudge the user toward regenerating
    without forcing it. */
 .essay-flow-regenerate--dirty {
-    color: var(--accent, #fbbf24);
-    border-color: rgba(251, 191, 36, 0.4);
+    color: var(--accent, var(--accent-chairman));
+    border-color: rgba(232, 181, 88, 0.4);
     animation: essay-flow-regenerate-pulse 2.4s ease-in-out infinite;
 }
 
 @keyframes essay-flow-regenerate-pulse {
     0%, 100% {
-        box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+        box-shadow: 0 0 0 0 rgba(232, 181, 88, 0);
     }
     50% {
-        box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.08);
+        box-shadow: 0 0 0 4px rgba(232, 181, 88, 0.08);
     }
 }
 
@@ -299,7 +299,7 @@
     margin-top: 12px;
     padding: 16px;
     border: 1px solid var(--border, rgba(255, 255, 255, 0.06));
-    border-radius: 10px;
+    border-radius: 6px;
     background: rgba(255, 255, 255, 0.015);
     display: flex;
     flex-direction: column;
@@ -348,7 +348,7 @@
     margin: 0 0 12px 0;
     padding: 10px 14px;
     border: 1px dashed var(--border, rgba(255, 255, 255, 0.08));
-    border-radius: 10px;
+    border-radius: 6px;
     background: rgba(255, 255, 255, 0.02);
     font-size: 13px;
     color: var(--text-secondary);
@@ -394,7 +394,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: #93c5fd;
+    color: var(--accent-bright);
 }
 
 .essay-flow-field-hint {
@@ -416,9 +416,9 @@
 }
 
 .essay-flow-chip {
-    background: rgba(15, 23, 42, 0.55);
-    border: 1px solid rgba(148, 163, 184, 0.3);
-    color: #cbd5e1;
+    background: rgba(26, 19, 12, 0.55);
+    border: 1px solid rgba(185, 169, 136, 0.3);
+    color: #d4c5a5;
     border-radius: 999px;
     padding: 5px 12px;
     font-family: var(--font-ui);
@@ -430,16 +430,16 @@
 }
 
 .essay-flow-chip:hover:not(:disabled) {
-    background: rgba(59, 130, 246, 0.12);
-    border-color: rgba(59, 130, 246, 0.45);
-    color: #bfdbfe;
+    background: rgba(212, 145, 60, 0.12);
+    border-color: rgba(212, 145, 60, 0.45);
+    color: var(--accent-bright);
     transform: translateY(-1px);
 }
 
 .essay-flow-chip--active {
-    background: rgba(59, 130, 246, 0.22);
-    border-color: rgba(59, 130, 246, 0.7);
-    color: #dbeafe;
+    background: rgba(212, 145, 60, 0.22);
+    border-color: rgba(212, 145, 60, 0.7);
+    color: #f6e3bd;
     font-weight: 600;
 }
 
@@ -460,10 +460,10 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: var(--accent, #fbbf24);
+    color: var(--accent, var(--accent-chairman));
     margin: 0 0 14px 0;
     padding-bottom: 12px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    border-bottom: 1px solid rgba(185, 169, 136, 0.12);
 }
 
 .essay-flow-stepper-dots {
@@ -481,17 +481,17 @@
 }
 
 .essay-flow-stepper-dot--pending {
-    background: rgba(148, 163, 184, 0.22);
+    background: rgba(185, 169, 136, 0.22);
 }
 
 .essay-flow-stepper-dot--done {
-    background: rgba(59, 130, 246, 0.55);
+    background: rgba(212, 145, 60, 0.55);
 }
 
 .essay-flow-stepper-dot--active {
-    background: #60a5fa;
+    background: var(--accent-bright);
     transform: scale(1.4);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+    box-shadow: 0 0 0 3px rgba(212, 145, 60, 0.18);
 }
 
 .essay-flow-progress {
@@ -508,9 +508,9 @@
     width: 100%;
     box-sizing: border-box;
     padding: 14px 16px;
-    background: rgba(0, 0, 0, 0.28);
+    background: rgba(11, 8, 5, 0.55);
     border: 1px solid var(--border-glass);
-    border-radius: 10px;
+    border-radius: 6px;
     color: var(--text-primary);
     font-family: var(--font-ui);
     font-size: 15px;
@@ -557,19 +557,19 @@
 
 .essay-flow-primary {
     background: var(--accent-primary);
-    color: white;
+    color: #1a130c;
     border: none;
-    border-radius: 10px;
+    border-radius: 3px;
     padding: 12px 20px;
     font-family: var(--font-ui);
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition: background 0.15s ease, transform 0.1s ease;
 }
 
 .essay-flow-primary:hover:not(:disabled) {
-    background: #2563eb;
+    background: var(--accent-bright);
 }
 
 .essay-flow-primary:active:not(:disabled) {
@@ -618,17 +618,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 6px;
-    background: rgba(148, 163, 184, 0.06);
+    border: 1px solid rgba(185, 169, 136, 0.18);
+    border-radius: 3px;
+    background: rgba(185, 169, 136, 0.06);
     color: var(--text-secondary);
     cursor: pointer;
     transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .essay-flow-fullscreen-btn:hover {
-    background: rgba(148, 163, 184, 0.14);
-    border-color: rgba(148, 163, 184, 0.35);
+    background: rgba(185, 169, 136, 0.14);
+    border-color: rgba(185, 169, 136, 0.35);
     color: var(--text-primary);
 }
 
@@ -636,7 +636,7 @@
     position: fixed;
     inset: 0;
     z-index: 1000;
-    background: var(--bg-primary, #0f172a);
+    background: var(--bg-primary, #1a130c);
     overflow-y: auto;
     padding: 40px 60px 120px;
     margin: 0;
@@ -677,8 +677,8 @@
     position: sticky;
     bottom: 0;
     padding: 16px 0;
-    background: var(--bg-primary, #0f172a);
-    border-top: 1px solid rgba(148, 163, 184, 0.12);
+    background: var(--bg-primary, #1a130c);
+    border-top: 1px solid rgba(185, 169, 136, 0.12);
     max-width: 900px;
 }
 
@@ -701,9 +701,9 @@
 
 .essay-flow-error {
     padding: 9px 12px;
-    background: rgba(248, 113, 113, 0.08);
-    color: #fca5a5;
-    border: 1px solid rgba(248, 113, 113, 0.25);
+    background: rgba(205, 106, 74, 0.08);
+    color: #e5a18d;
+    border: 1px solid rgba(205, 106, 74, 0.25);
     border-radius: 8px;
     font-size: 13px;
     line-height: 1.4;
@@ -716,9 +716,9 @@
     gap: 12px;
     padding: 11px 12px;
     margin-bottom: 16px;
-    background: rgba(248, 113, 113, 0.08);
-    color: #fca5a5;
-    border: 1px solid rgba(248, 113, 113, 0.25);
+    background: rgba(205, 106, 74, 0.08);
+    color: #e5a18d;
+    border: 1px solid rgba(205, 106, 74, 0.25);
     border-radius: 8px;
     font-size: 13px;
     line-height: 1.45;
@@ -735,9 +735,9 @@
     align-items: center;
     column-gap: 8px;
     padding: 9px 12px;
-    background: rgba(251, 191, 36, 0.08);
-    color: #fde68a;
-    border: 1px solid rgba(251, 191, 36, 0.22);
+    background: rgba(232, 181, 88, 0.08);
+    color: #f6e3bd;
+    border: 1px solid rgba(232, 181, 88, 0.22);
     border-radius: 8px;
     font-size: 13px;
 }
@@ -812,14 +812,14 @@
 .essay-flow-memory-item {
     padding: 10px 12px;
     background: rgba(0, 0, 0, 0.18);
-    border: 1px solid rgba(251, 191, 36, 0.14);
+    border: 1px solid rgba(232, 181, 88, 0.14);
     border-radius: 6px;
-    color: #fde68a;
+    color: #f6e3bd;
 }
 
 .essay-flow-memory-item-topic {
     font-weight: 500;
-    color: #fef3c7;
+    color: #f6e3bd;
     word-break: break-word;
     line-height: 1.35;
 }
@@ -827,7 +827,7 @@
 .essay-flow-memory-item-summary {
     margin-top: 4px;
     font-size: 12.5px;
-    color: rgba(253, 230, 138, 0.78);
+    color: rgba(246, 227, 189, 0.78);
     line-height: 1.45;
     display: -webkit-box;
     -webkit-line-clamp: 3;
@@ -850,8 +850,8 @@
 
 .essay-flow-memory-item-open {
     background: transparent;
-    color: #fde68a;
-    border: 1px solid rgba(251, 191, 36, 0.35);
+    color: #f6e3bd;
+    border: 1px solid rgba(232, 181, 88, 0.35);
     border-radius: 999px;
     padding: 3px 10px;
     font: inherit;
@@ -861,8 +861,8 @@
 }
 
 .essay-flow-memory-item-open:hover {
-    background: rgba(251, 191, 36, 0.14);
-    border-color: rgba(251, 191, 36, 0.55);
+    background: rgba(232, 181, 88, 0.14);
+    border-color: rgba(232, 181, 88, 0.55);
 }
 
 /* Path cards */
@@ -881,7 +881,7 @@
     text-align: left;
     background: rgba(0, 0, 0, 0.22);
     border: 1px solid var(--border-glass);
-    border-radius: 12px;
+    border-radius: 6px;
     color: var(--text-primary);
     font-family: var(--font-ui);
     cursor: pointer;
@@ -890,7 +890,7 @@
 
 .essay-flow-path-card:hover:not(:disabled) {
     border-color: var(--accent-primary);
-    background: rgba(59, 130, 246, 0.06);
+    background: rgba(212, 145, 60, 0.06);
     transform: translateY(-1px);
 }
 
@@ -990,7 +990,7 @@
     padding: 12px 14px;
     background: rgba(0, 0, 0, 0.15);
     border: 1px solid var(--border-glass);
-    border-radius: 10px;
+    border-radius: 6px;
 }
 
 .essay-flow-exchange-q {
@@ -1026,7 +1026,7 @@
 
 .essay-flow-skip-question {
     background: transparent;
-    border: 1px solid rgba(148, 163, 184, 0.28);
+    border: 1px solid rgba(185, 169, 136, 0.28);
     color: var(--text-muted);
     border-radius: 999px;
     padding: 4px 10px;
@@ -1040,8 +1040,8 @@
 }
 
 .essay-flow-skip-question:hover:not(:disabled) {
-    background: rgba(148, 163, 184, 0.12);
-    border-color: rgba(148, 163, 184, 0.55);
+    background: rgba(185, 169, 136, 0.12);
+    border-color: rgba(185, 169, 136, 0.55);
     color: var(--text-primary);
 }
 
@@ -1068,9 +1068,9 @@
     align-items: stretch;
     gap: 10px;
     padding: 10px 12px;
-    background: rgba(15, 23, 42, 0.55);
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 10px;
+    background: rgba(26, 19, 12, 0.55);
+    border: 1px solid rgba(185, 169, 136, 0.18);
+    border-radius: 6px;
     position: relative;
 }
 
@@ -1083,8 +1083,8 @@
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: rgba(59, 130, 246, 0.55);
-    color: #f1f5f9;
+    background: rgba(212, 145, 60, 0.55);
+    color: #f6efe0;
     font-family: var(--font-ui);
     font-size: 10px;
     font-weight: 700;
@@ -1101,9 +1101,9 @@
 
 .essay-flow-timeline-arrow {
     background: transparent;
-    border: 1px solid rgba(148, 163, 184, 0.25);
+    border: 1px solid rgba(185, 169, 136, 0.25);
     color: var(--text-muted);
-    border-radius: 4px;
+    border-radius: 3px;
     width: 22px;
     height: 22px;
     font-size: 10px;
@@ -1117,9 +1117,9 @@
 }
 
 .essay-flow-timeline-arrow:hover:not(:disabled) {
-    background: rgba(59, 130, 246, 0.18);
-    border-color: rgba(59, 130, 246, 0.45);
-    color: #bfdbfe;
+    background: rgba(212, 145, 60, 0.18);
+    border-color: rgba(212, 145, 60, 0.45);
+    color: var(--accent-bright);
 }
 
 .essay-flow-timeline-arrow:disabled {
@@ -1139,21 +1139,21 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    color: #93c5fd;
+    color: var(--accent-bright);
     font-weight: 600;
 }
 
 .essay-flow-timeline-what {
-    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-family: var(--font-content, Georgia, serif);
     font-size: 14px;
     line-height: 1.5;
-    color: #e2e8f0;
+    color: #e8dcc6;
     white-space: pre-wrap;
 }
 
 .essay-flow-timeline-remove {
     background: transparent;
-    border: 1px solid rgba(148, 163, 184, 0.25);
+    border: 1px solid rgba(185, 169, 136, 0.25);
     color: var(--text-muted);
     border-radius: 50%;
     width: 22px;
@@ -1169,17 +1169,17 @@
 }
 
 .essay-flow-timeline-remove:hover:not(:disabled) {
-    background: rgba(239, 68, 68, 0.15);
-    color: #fca5a5;
-    border-color: rgba(239, 68, 68, 0.45);
+    background: rgba(205, 106, 74, 0.15);
+    color: #e5a18d;
+    border-color: rgba(205, 106, 74, 0.45);
 }
 
 .essay-flow-timeline-add {
     margin-top: 6px;
     padding: 12px 14px;
-    background: rgba(2, 6, 23, 0.5);
-    border: 1px dashed rgba(148, 163, 184, 0.28);
-    border-radius: 10px;
+    background: rgba(11, 8, 5, 0.5);
+    border: 1px dashed rgba(185, 169, 136, 0.28);
+    border-radius: 6px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1188,7 +1188,7 @@
 .essay-flow-timeline-when-input {
     /* Subtler than the main inputs so it reads as metadata, not the main
        content field. */
-    background: rgba(15, 23, 42, 0.55);
+    background: rgba(26, 19, 12, 0.55);
 }
 
 /* "I don't have a topic yet" link beneath the topic input — softer than
@@ -1199,7 +1199,7 @@
     margin-top: 8px;
     padding: 4px 0;
     font-size: 13px;
-    color: #93c5fd;
+    color: var(--accent-bright);
     background: none;
     border: none;
     cursor: pointer;
@@ -1208,7 +1208,7 @@
 }
 
 .essay-flow-link--soft:hover:not(:disabled) {
-    color: #bfdbfe;
+    color: #f6e3bd;
     text-decoration: underline;
 }
 
@@ -1223,7 +1223,7 @@
 .essay-flow-brainstorm-results {
     margin-top: 8px;
     padding-top: 14px;
-    border-top: 1px solid rgba(148, 163, 184, 0.15);
+    border-top: 1px solid rgba(185, 169, 136, 0.15);
 }
 
 .essay-flow-brainstorm-results-label {
@@ -1232,7 +1232,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: #93c5fd;
+    color: var(--accent-bright);
     margin-bottom: 6px;
 }
 
@@ -1245,10 +1245,10 @@
 
 .essay-flow-brainstorm-card {
     text-align: left;
-    background: rgba(15, 23, 42, 0.55);
-    border: 1px solid rgba(59, 130, 246, 0.28);
+    background: rgba(26, 19, 12, 0.55);
+    border: 1px solid rgba(212, 145, 60, 0.28);
     color: var(--text-primary);
-    border-radius: 10px;
+    border-radius: 6px;
     padding: 12px 14px;
     cursor: pointer;
     display: flex;
@@ -1260,10 +1260,10 @@
 }
 
 .essay-flow-brainstorm-card:hover:not(:disabled) {
-    background: rgba(59, 130, 246, 0.12);
-    border-color: rgba(59, 130, 246, 0.55);
+    background: rgba(212, 145, 60, 0.12);
+    border-color: rgba(212, 145, 60, 0.55);
     transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.12);
+    box-shadow: 0 4px 16px rgba(212, 145, 60, 0.12);
 }
 
 .essay-flow-brainstorm-card:disabled {
@@ -1272,10 +1272,10 @@
 }
 
 .essay-flow-brainstorm-topic {
-    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-family: var(--font-content, Georgia, serif);
     font-size: 16px;
     line-height: 1.4;
-    color: #f1f5f9;
+    color: #f6efe0;
     font-weight: 500;
 }
 
@@ -1311,9 +1311,9 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.16em;
-    color: #f5b462;
+    color: var(--coffee-crema);
     padding: 6px 0 2px;
-    border-bottom: 1px solid rgba(217, 119, 6, 0.18);
+    border-bottom: 1px solid rgba(212, 145, 60, 0.18);
     margin-bottom: 4px;
 }
 
@@ -1342,8 +1342,8 @@
     gap: 10px;
     padding: 10px 12px;
     background: rgba(0, 0, 0, 0.22);
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    border-radius: 10px;
+    border: 1px solid rgba(185, 169, 136, 0.22);
+    border-radius: 6px;
     color: var(--text-primary);
     font-family: var(--font-ui);
     font-size: 14px;
@@ -1355,14 +1355,14 @@
 }
 
 .essay-flow-option:hover:not(:disabled) {
-    background: rgba(217, 119, 6, 0.08);
-    border-color: rgba(217, 119, 6, 0.45);
+    background: rgba(212, 145, 60, 0.08);
+    border-color: rgba(212, 145, 60, 0.45);
 }
 
 .essay-flow-option--selected {
-    background: rgba(217, 119, 6, 0.16);
-    border-color: rgba(245, 180, 98, 0.65);
-    color: #fef3c7;
+    background: rgba(212, 145, 60, 0.16);
+    border-color: rgba(232, 181, 88, 0.65);
+    color: #f6e3bd;
 }
 
 .essay-flow-option:active:not(:disabled) {
@@ -1379,8 +1379,8 @@
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: rgba(148, 163, 184, 0.15);
-    color: #f5b462;
+    background: rgba(185, 169, 136, 0.15);
+    color: var(--coffee-crema);
     font-size: 12px;
     line-height: 18px;
     text-align: center;
@@ -1388,8 +1388,8 @@
 }
 
 .essay-flow-option--selected .essay-flow-option-tick {
-    background: rgba(245, 180, 98, 0.32);
-    color: #fef3c7;
+    background: rgba(232, 181, 88, 0.32);
+    color: #f6e3bd;
 }
 
 .essay-flow-option-label {
@@ -1417,8 +1417,8 @@
 .essay-flow-example-chip {
     padding: 4px 10px;
     background: transparent;
-    border: 1px dashed rgba(245, 180, 98, 0.35);
-    color: rgba(245, 180, 98, 0.85);
+    border: 1px dashed rgba(232, 181, 88, 0.35);
+    color: rgba(232, 181, 88, 0.85);
     border-radius: 999px;
     font-family: var(--font-ui);
     font-size: 12px;
@@ -1429,9 +1429,9 @@
 }
 
 .essay-flow-example-chip:hover:not(:disabled) {
-    background: rgba(217, 119, 6, 0.10);
-    border-color: rgba(245, 180, 98, 0.65);
-    color: #fef3c7;
+    background: rgba(212, 145, 60, 0.10);
+    border-color: rgba(232, 181, 88, 0.65);
+    color: #f6e3bd;
 }
 
 .essay-flow-example-chip:disabled {
@@ -1448,7 +1448,7 @@
 
 .essay-flow-exchange--skipped .essay-flow-exchange-q {
     text-decoration: line-through;
-    text-decoration-color: rgba(148, 163, 184, 0.3);
+    text-decoration-color: rgba(185, 169, 136, 0.3);
 }
 
 .essay-flow-skipped-banner {
@@ -1457,8 +1457,8 @@
     justify-content: space-between;
     gap: 8px;
     padding: 6px 10px;
-    background: rgba(15, 23, 42, 0.4);
-    border: 1px dashed rgba(148, 163, 184, 0.3);
+    background: rgba(26, 19, 12, 0.4);
+    border: 1px dashed rgba(185, 169, 136, 0.3);
     border-radius: 8px;
     font-size: 12px;
     color: var(--text-muted);
@@ -1520,8 +1520,8 @@
 .essay-flow-example {
     margin-top: 8px;
     padding: 10px 12px;
-    background: rgba(59, 130, 246, 0.06);
-    border-left: 3px solid rgba(59, 130, 246, 0.55);
+    background: rgba(212, 145, 60, 0.06);
+    border-left: 3px solid rgba(212, 145, 60, 0.55);
     border-radius: 4px 8px 8px 4px;
 }
 
@@ -1529,7 +1529,7 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: rgba(147, 197, 253, 0.85);
+    color: rgba(233, 194, 133, 0.85);
     margin-bottom: 4px;
     font-weight: 600;
 }
@@ -1552,7 +1552,7 @@
 
 .essay-flow-example-link {
     background: transparent;
-    color: rgba(147, 197, 253, 0.85);
+    color: rgba(233, 194, 133, 0.85);
     border: none;
     padding: 0;
     font-size: 12px;
@@ -1561,7 +1561,7 @@
 }
 
 .essay-flow-example-link:hover:not(:disabled) {
-    color: rgba(147, 197, 253, 1);
+    color: rgba(233, 194, 133, 1);
 }
 
 .essay-flow-example-link:disabled {
@@ -1572,7 +1572,7 @@
 .essay-flow-example-error {
     margin-top: 6px;
     font-size: 12px;
-    color: #fca5a5;
+    color: #e5a18d;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1613,7 +1613,7 @@
     align-items: flex-start;
     gap: 2px;
     padding: 8px 12px;
-    border-radius: 10px;
+    border-radius: 6px;
     border: 1px solid var(--border-glass);
     background: rgba(255, 255, 255, 0.02);
     color: var(--text-primary);
@@ -1624,12 +1624,12 @@
 }
 
 .essay-flow-chip:hover:not(:disabled) {
-    border-color: rgba(59, 130, 246, 0.4);
+    border-color: rgba(212, 145, 60, 0.4);
 }
 
 .essay-flow-chip.active {
-    border-color: rgba(59, 130, 246, 0.6);
-    background: rgba(59, 130, 246, 0.12);
+    border-color: rgba(212, 145, 60, 0.6);
+    background: rgba(212, 145, 60, 0.12);
 }
 
 .essay-flow-chip .chip-main {
@@ -1667,7 +1667,7 @@
 }
 
 .essay-flow-chip-input:focus {
-    border-bottom-color: rgba(59, 130, 246, 0.6);
+    border-bottom-color: rgba(212, 145, 60, 0.6);
 }
 
 /* Hide spinner on number input */
@@ -1701,7 +1701,7 @@
 }
 
 .essay-flow-disclosure:hover:not(:disabled) {
-    color: rgba(59, 130, 246, 1);
+    color: rgba(212, 145, 60, 1);
 }
 
 .essay-flow-disclosure-arrow {
@@ -1733,7 +1733,7 @@
 
 /* Warm bloom behind the card. Same idea as login: cafe lamp glow. */
 .essay-flow--coffee .essay-flow-card {
-    border-color: rgba(217, 119, 6, 0.18);
+    border-color: rgba(212, 145, 60, 0.18);
     box-shadow:
         var(--shadow-glass),
         0 0 60px var(--coffee-crema-glow);
@@ -1753,7 +1753,7 @@
         radial-gradient(
             circle at 6px 0px,
             transparent 4px,
-            rgba(217, 119, 6, 0.18) 4.5px,
+            rgba(212, 145, 60, 0.18) 4.5px,
             transparent 6px
         );
     background-size: 12px 8px;
@@ -1769,7 +1769,7 @@
 
 .essay-flow--coffee .essay-flow-warm-subline {
     margin: -8px 0 4px 0;
-    font-family: var(--font-content, 'Source Serif 4', Georgia, serif);
+    font-family: var(--font-content, Georgia, serif);
     font-size: 14px;
     line-height: 1.5;
     color: var(--coffee-crema);
@@ -1785,7 +1785,7 @@
    so the chip row still reads as quiet options. */
 .essay-flow--coffee .essay-flow-chip:hover:not(:disabled) {
     background: var(--coffee-amber-soft);
-    border-color: rgba(217, 119, 6, 0.45);
+    border-color: rgba(212, 145, 60, 0.45);
     color: var(--coffee-crema-bright);
 }
 
@@ -1857,42 +1857,42 @@
 
 /* Back button — warm border treatment. */
 .essay-flow--coffee .essay-flow-back-btn {
-    border-color: rgba(217, 119, 6, 0.2);
-    background: rgba(217, 119, 6, 0.06);
+    border-color: rgba(212, 145, 60, 0.2);
+    background: rgba(212, 145, 60, 0.06);
     color: var(--coffee-crema);
 }
 
 .essay-flow--coffee .essay-flow-back-btn:hover:not(:disabled) {
-    border-color: rgba(217, 119, 6, 0.4);
-    background: rgba(217, 119, 6, 0.14);
+    border-color: rgba(212, 145, 60, 0.4);
+    background: rgba(212, 145, 60, 0.14);
     color: var(--coffee-crema-bright);
 }
 
 /* Fullscreen button — warm treatment. */
 .essay-flow--coffee .essay-flow-fullscreen-btn {
-    border-color: rgba(217, 119, 6, 0.18);
-    background: rgba(217, 119, 6, 0.06);
+    border-color: rgba(212, 145, 60, 0.18);
+    background: rgba(212, 145, 60, 0.06);
     color: var(--coffee-crema);
 }
 
 .essay-flow--coffee .essay-flow-fullscreen-btn:hover {
-    border-color: rgba(217, 119, 6, 0.4);
-    background: rgba(217, 119, 6, 0.14);
+    border-color: rgba(212, 145, 60, 0.4);
+    background: rgba(212, 145, 60, 0.14);
     color: var(--coffee-crema-bright);
 }
 
 /* Fullscreen mode — warm background. */
 .essay-flow--coffee .essay-flow-step--fullscreen {
-    background: var(--coffee-bg, var(--bg-primary, #1a0e04));
+    background: var(--coffee-bg, var(--bg-primary, #1a130c));
 }
 
 .essay-flow--coffee .essay-flow-step--fullscreen .essay-flow-actions {
-    background: var(--coffee-bg, var(--bg-primary, #1a0e04));
-    border-top-color: rgba(217, 119, 6, 0.15);
+    background: var(--coffee-bg, var(--bg-primary, #1a130c));
+    border-top-color: rgba(212, 145, 60, 0.15);
 }
 
 .essay-flow--coffee .essay-flow-step--fullscreen .essay-flow-fullscreen-btn {
-    background: rgba(30, 15, 5, 0.8);
+    background: rgba(11, 8, 5, 0.8);
     backdrop-filter: blur(8px);
 }
 
@@ -1919,22 +1919,22 @@
 
 .essay-flow--coffee .essay-flow-primary:hover:not(:disabled) {
     background: var(--coffee-amber-deep);
-    box-shadow: 0 0 32px rgba(217, 119, 6, 0.35);
+    box-shadow: 0 0 32px rgba(212, 145, 60, 0.35);
 }
 
 /* Step badge color sync — warm crema instead of cool blue. */
 .essay-flow--coffee .essay-flow-step-badge {
     color: var(--coffee-crema);
-    border-bottom-color: rgba(217, 119, 6, 0.12);
+    border-bottom-color: rgba(212, 145, 60, 0.12);
 }
 
 /* Stepper dots — were cool blue, now warm crema/amber. */
 .essay-flow--coffee .essay-flow-stepper-dot--pending {
-    background: rgba(245, 233, 216, 0.18);
+    background: rgba(239, 229, 209, 0.18);
 }
 
 .essay-flow--coffee .essay-flow-stepper-dot--done {
-    background: rgba(217, 119, 6, 0.55);
+    background: rgba(212, 145, 60, 0.55);
 }
 
 .essay-flow--coffee .essay-flow-stepper-dot--active {
@@ -1953,7 +1953,7 @@
 
 /* Swap / Skip chips — warmer outline, drop the cool gray cast. */
 .essay-flow--coffee .essay-flow-skip-question {
-    border-color: rgba(217, 119, 6, 0.25);
+    border-color: rgba(212, 145, 60, 0.25);
     color: var(--coffee-crema);
 }
 
@@ -1971,7 +1971,7 @@
 /* Example panel — was a blue tinted block. Warm it. */
 .essay-flow--coffee .essay-flow-example {
     background: var(--coffee-amber-soft);
-    border-left-color: rgba(217, 119, 6, 0.55);
+    border-left-color: rgba(212, 145, 60, 0.55);
 }
 
 .essay-flow--coffee .essay-flow-example-label {
@@ -1980,7 +1980,7 @@
 
 /* Field hint italic copy — warm tinted secondary. */
 .essay-flow--coffee .essay-flow-field-hint {
-    color: rgba(245, 233, 216, 0.65);
+    color: rgba(239, 229, 209, 0.65);
 }
 
 /* Memory-recall banner area, skipped banner — warm gray. */
@@ -2076,7 +2076,7 @@
    .coreidea-add pill: small warm dashed amber affordance. */
 .essay-flow--coffee .essay-flow-secondary {
     background: transparent;
-    border: 1px dashed rgba(245, 180, 98, 0.35);
+    border: 1px dashed rgba(232, 181, 88, 0.35);
     color: var(--coffee-crema);
     padding: 6px 14px;
     border-radius: 999px;
@@ -2090,7 +2090,7 @@
 
 .essay-flow--coffee .essay-flow-secondary:hover:not(:disabled) {
     background: var(--coffee-amber-soft);
-    border-color: rgba(245, 180, 98, 0.6);
+    border-color: rgba(232, 181, 88, 0.6);
     color: var(--coffee-crema-bright);
 }
 
@@ -2103,7 +2103,7 @@
    label. Swap to warm so the timeline reads as one continuous
    coffee surface. */
 .essay-flow--coffee .essay-flow-timeline-row::before {
-    background: rgba(217, 119, 6, 0.55);
+    background: rgba(212, 145, 60, 0.55);
     color: var(--coffee-cream);
 }
 
@@ -2117,7 +2117,7 @@
 
 .essay-flow--coffee .essay-flow-timeline-arrow:hover:not(:disabled) {
     background: var(--coffee-amber-soft);
-    border-color: rgba(217, 119, 6, 0.45);
+    border-color: rgba(212, 145, 60, 0.45);
     color: var(--coffee-crema-bright);
 }
 

@@ -2067,7 +2067,7 @@ export default function EssayFlow({
                                                         </div>
                                                     )}
                                                     {fu?.question && (
-                                                        <div className="essay-flow-example" style={{ borderLeftColor: '#fbbf24' }}>
+                                                        <div className="essay-flow-example" style={{ borderLeftColor: '#e8b558' }}>
                                                             <div className="essay-flow-example-label">
                                                                 Coach follow-up
                                                             </div>

@@ -10,7 +10,7 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.7);
     padding: 4px 10px;
-    border-radius: 6px;
+    border-radius: 3px;
     font-size: 0.8rem;
     cursor: pointer;
     display: flex;
@@ -27,9 +27,9 @@
 }
 
 .copy-button.copied {
-    background: rgba(16, 185, 129, 0.2);
-    border-color: rgba(16, 185, 129, 0.4);
-    color: #34d399;
+    background: rgba(163, 181, 109, 0.2);
+    border-color: rgba(163, 181, 109, 0.4);
+    color: #c4d29a;
 }
 
 .copy-button .icon {

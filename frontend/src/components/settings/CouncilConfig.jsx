@@ -382,12 +382,12 @@ export default function CouncilConfig({
                                 ⚠️ Some selected models (e.g. GPT-5.1, o1) enforce fixed temperature and will ignore this setting.
                             </div>
                         )}
-                        <p className="heat-note" style={{ fontSize: '11px', color: '#94a3b8', marginTop: '8px' }}>
+                        <p className="heat-note" style={{ fontSize: '11px', color: '#b9a988', marginTop: '8px' }}>
                             ℹ️ Stage 2 (Peer Ranking) has its own temperature setting.{' '}
                             <button
                                 type="button"
                                 onClick={() => { setActiveSection('prompts'); setActivePromptTab('stage2'); }}
-                                style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: '11px' }}
+                                style={{ background: 'none', border: 'none', color: '#e9c285', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: '11px' }}
                             >
                                 Configure in System Prompts → Stage 2
                             </button>

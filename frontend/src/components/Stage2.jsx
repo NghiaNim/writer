@@ -109,7 +109,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
             <div className="tab-content glass-panel">
                 <div className="model-header">
                     <div className="model-identity">
-                        <span className="model-avatar" style={{ backgroundColor: hasError ? '#ef4444' : currentVisuals.color }}>
+                        <span className="model-avatar" style={{ backgroundColor: hasError ? '#cd6a4a' : currentVisuals.color }}>
                             {currentVisuals.icon}
                         </span>
                         <div className="model-info">

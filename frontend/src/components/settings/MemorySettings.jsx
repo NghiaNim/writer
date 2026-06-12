@@ -2,16 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api';
 
 const colors = {
-    panelBg: 'rgba(15, 23, 42, 0.55)',
-    panelBorder: 'rgba(148, 163, 184, 0.18)',
-    factBg: 'rgba(59, 130, 246, 0.06)',
-    factBorder: 'rgba(59, 130, 246, 0.22)',
-    archivedBg: 'rgba(148, 163, 184, 0.04)',
-    archivedBorder: 'rgba(148, 163, 184, 0.18)',
-    text: '#e2e8f0',
-    textMuted: '#94a3b8',
-    accent: '#60a5fa',
-    danger: '#f87171',
+    panelBg: 'rgba(26, 19, 12, 0.55)',
+    panelBorder: 'rgba(212, 145, 60, 0.18)',
+    factBg: 'rgba(212, 145, 60, 0.06)',
+    factBorder: 'rgba(212, 145, 60, 0.22)',
+    archivedBg: 'rgba(185, 169, 136, 0.04)',
+    archivedBorder: 'rgba(185, 169, 136, 0.18)',
+    text: '#e8dcc6',
+    textMuted: '#b9a988',
+    accent: '#e9c285',
+    danger: '#d98c70',
 };
 
 const CATEGORY_LABELS = {
@@ -120,10 +120,10 @@ export default function MemorySettings() {
                     style={{
                         marginTop: '12px',
                         padding: '10px 12px',
-                        background: 'rgba(248, 113, 113, 0.08)',
-                        border: '1px solid rgba(248, 113, 113, 0.35)',
+                        background: 'rgba(205, 106, 74, 0.08)',
+                        border: '1px solid rgba(205, 106, 74, 0.35)',
                         borderRadius: '8px',
-                        color: '#fca5a5',
+                        color: '#e5a18d',
                         fontSize: '13px',
                     }}
                 >

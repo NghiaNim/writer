@@ -11,7 +11,7 @@
   border: 1px solid var(--border-glass);
   color: var(--text-secondary);
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: 6px;
   cursor: pointer;
   font-family: var(--font-ui);
   font-size: 13px;
@@ -30,8 +30,9 @@
 }
 
 .tab.active {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(125, 171, 156, 0.12);
+  border-color: rgba(125, 171, 156, 0.35);
+  border-bottom: 2px solid var(--accent-stage1);
   color: var(--text-primary);
   box-shadow: var(--shadow-soft);
 }
@@ -54,14 +55,14 @@
 }
 
 .tab-error {
-  border-color: #ef4444 !important;
-  color: #ef4444 !important;
-  background: rgba(239, 68, 68, 0.1);
+  border-color: #cd6a4a !important;
+  color: #cd6a4a !important;
+  background: rgba(205, 106, 74, 0.1);
 }
 
 .error-badge {
   margin-left: auto;
-  background: #ef4444;
+  background: #cd6a4a;
   color: white;
   width: 16px;
   height: 16px;
@@ -76,7 +77,7 @@
 /* Tab Content Area */
 .tab-content {
   padding: 24px;
-  border-radius: 16px; /* Matches glass-panel utility */
+  border-radius: 6px; /* Matches glass-panel utility */
   min-height: 200px;
 }
 
@@ -98,7 +99,7 @@
 .model-avatar {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -139,15 +140,15 @@
 }
 
 .model-status.success {
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(163, 181, 109, 0.1);
+  color: var(--accent-success);
+  border: 1px solid rgba(163, 181, 109, 0.2);
 }
 
 .model-status.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(205, 106, 74, 0.1);
+  color: #cd6a4a;
+  border: 1px solid rgba(205, 106, 74, 0.2);
 }
 
 /* Response Error Styling */
@@ -155,9 +156,9 @@
   display: flex;
   gap: 16px;
   padding: 20px;
-  background: rgba(239, 68, 68, 0.05);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 12px;
+  background: rgba(205, 106, 74, 0.05);
+  border: 1px solid rgba(205, 106, 74, 0.2);
+  border-radius: 6px;
   align-items: flex-start;
 }
 
@@ -167,7 +168,7 @@
 
 .error-title {
   font-weight: 600;
-  color: #ef4444;
+  color: #cd6a4a;
   margin-bottom: 4px;
 }
 
@@ -180,7 +181,7 @@
 /* Animation for loading state (pulsing tabs) */
 @keyframes pulse-border {
   0% { border-color: rgba(255, 255, 255, 0.1); }
-  50% { border-color: var(--accent-primary); }
+  50% { border-color: var(--accent-stage1); }
   100% { border-color: rgba(255, 255, 255, 0.1); }
 }
 

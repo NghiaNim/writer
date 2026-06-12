@@ -1,9 +1,9 @@
 /* Think Block Styling for Reasoning Models */
 .think-block {
   margin-bottom: 16px;
-  border-radius: 10px;
-  background: rgba(148, 163, 184, 0.08);
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 6px;
+  background: rgba(185, 169, 136, 0.08);
+  border: 1px solid rgba(185, 169, 136, 0.15);
   overflow: hidden;
 }
 
@@ -24,7 +24,7 @@
 }
 
 .think-toggle:hover {
-  background: rgba(148, 163, 184, 0.1);
+  background: rgba(185, 169, 136, 0.1);
   color: var(--text-secondary);
 }
 
@@ -52,8 +52,8 @@
 
 .think-content {
   padding: 12px 16px 16px 16px;
-  border-top: 1px solid rgba(148, 163, 184, 0.1);
-  font-family: var(--font-ui);
+  border-top: 1px solid rgba(185, 169, 136, 0.1);
+  font-family: var(--font-content);
   font-size: 13px;
   font-style: italic;
   color: var(--text-muted);

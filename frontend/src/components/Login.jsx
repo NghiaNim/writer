@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { api, API_BASE, warmUpBackend } from '../api';
 import MidnightLogo from './MidnightLogo';
+import EscherBand from './EscherBand';
+import EscherField from './EscherField';
 import './Login.css';
 
 /**
@@ -147,6 +149,7 @@ export default function Login() {
 
     return (
         <div className="login-screen login-screen--coffee">
+            <EscherField />
             <div className="login-card">
                 <div className="login-header">
                     <h1 className="login-title">
@@ -157,6 +160,8 @@ export default function Login() {
                         Slow writing, with a small council. Pour something good.
                     </p>
                 </div>
+
+                <EscherBand height={40} className="login-band" />
 
                 {backendStatus === 'pending' && (
                     <div className="login-status pending" role="status">

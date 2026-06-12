@@ -36,22 +36,22 @@ function AutoGrowTextarea({ value, onChange, style, ...rest }) {
 // ---------------------------------------------------------------------------
 
 const colors = {
-    panelBg: 'rgba(15, 23, 42, 0.55)',
-    panelBorder: 'rgba(148, 163, 184, 0.18)',
-    panelBorderActive: 'rgba(59, 130, 246, 0.45)',
-    ruleBg: 'rgba(59, 130, 246, 0.08)',
-    ruleBorder: 'rgba(59, 130, 246, 0.32)',
-    pendingBg: 'rgba(251, 191, 36, 0.08)',
-    pendingBorder: 'rgba(251, 191, 36, 0.32)',
-    pendingText: '#fde68a',
-    text: '#e2e8f0',
-    textMuted: '#94a3b8',
-    error: '#fca5a5',
-    errorBg: 'rgba(248, 113, 113, 0.08)',
-    errorBorder: 'rgba(248, 113, 113, 0.25)',
-    success: '#86efac',
-    successBg: 'rgba(34, 197, 94, 0.08)',
-    successBorder: 'rgba(34, 197, 94, 0.25)',
+    panelBg: 'rgba(26, 19, 12, 0.55)',
+    panelBorder: 'rgba(212, 145, 60, 0.18)',
+    panelBorderActive: 'rgba(212, 145, 60, 0.45)',
+    ruleBg: 'rgba(212, 145, 60, 0.08)',
+    ruleBorder: 'rgba(212, 145, 60, 0.32)',
+    pendingBg: 'rgba(232, 181, 88, 0.08)',
+    pendingBorder: 'rgba(232, 181, 88, 0.32)',
+    pendingText: '#f6e3bd',
+    text: '#e8dcc6',
+    textMuted: '#b9a988',
+    error: '#e5a18d',
+    errorBg: 'rgba(205, 106, 74, 0.1)',
+    errorBorder: 'rgba(205, 106, 74, 0.28)',
+    success: '#c4d29a',
+    successBg: 'rgba(163, 181, 109, 0.1)',
+    successBorder: 'rgba(163, 181, 109, 0.28)',
 };
 
 const inputStyle = {
@@ -67,10 +67,10 @@ const inputStyle = {
 };
 
 const primaryButtonStyle = {
-    background: '#3b82f6',
-    color: 'white',
+    background: '#d4913c',
+    color: '#1a130c',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '3px',
     padding: '9px 16px',
     cursor: 'pointer',
     fontSize: '13px',
@@ -90,7 +90,7 @@ const secondaryButtonStyle = {
 const removeButtonStyle = {
     background: 'transparent',
     color: colors.error,
-    border: '1px solid rgba(248, 113, 113, 0.4)',
+    border: '1px solid rgba(205, 106, 74, 0.4)',
     borderRadius: '6px',
     padding: '4px 10px',
     fontSize: '12px',
@@ -98,9 +98,9 @@ const removeButtonStyle = {
 };
 
 const acceptButtonStyle = {
-    background: 'rgba(34, 197, 94, 0.12)',
+    background: 'rgba(163, 181, 109, 0.12)',
     color: colors.success,
-    border: '1px solid rgba(34, 197, 94, 0.4)',
+    border: '1px solid rgba(163, 181, 109, 0.4)',
     borderRadius: '6px',
     padding: '4px 10px',
     fontSize: '12px',
@@ -573,12 +573,12 @@ export default function VoiceProfileSettings() {
                         }
                         style={{
                             background: restoreConfirming
-                                ? 'rgba(251, 191, 36, 0.12)'
+                                ? 'rgba(232, 181, 88, 0.12)'
                                 : 'transparent',
-                            color: restoreConfirming ? '#fbbf24' : colors.textMuted,
+                            color: restoreConfirming ? '#e8b558' : colors.textMuted,
                             border: `1px dashed ${
                                 restoreConfirming
-                                    ? 'rgba(251, 191, 36, 0.55)'
+                                    ? 'rgba(232, 181, 88, 0.55)'
                                     : colors.panelBorder
                             }`,
                             borderRadius: '999px',
@@ -631,7 +631,7 @@ export default function VoiceProfileSettings() {
                                 <span
                                     aria-hidden
                                     style={{
-                                        color: '#60a5fa',
+                                        color: '#e9c285',
                                         fontWeight: 700,
                                         fontSize: '13px',
                                         minWidth: '24px',
@@ -987,7 +987,7 @@ export default function VoiceProfileSettings() {
                     position: 'sticky',
                     bottom: 0,
                     background:
-                        'linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.9) 30%, rgba(15, 23, 42, 0.96) 100%)',
+                        'linear-gradient(180deg, rgba(26, 19, 12, 0) 0%, rgba(26, 19, 12, 0.9) 30%, rgba(26, 19, 12, 0.96) 100%)',
                     paddingTop: '24px',
                     paddingBottom: '16px',
                     marginTop: '8px',

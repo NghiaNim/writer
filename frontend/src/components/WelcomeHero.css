@@ -1,0 +1,194 @@
+/* ============================================================
+ * WelcomeHero — frontispiece for the empty chat surface.
+ *
+ * The title page of tonight's edition: a flock rises off the
+ * masthead like steam off the cup, the metamorphosis band sits
+ * beneath the tagline like a printer's ornament, and everything
+ * reveals in a single staggered pass. Specificity is kept at
+ * `.welcome-hero <child>` so these rules win over the legacy
+ * .empty-state / .hero-content styles in ChatInterface.css.
+ * ============================================================ */
+
+.welcome-hero {
+    position: relative;
+    width: 100%;
+    text-align: center;
+}
+
+/* One staggered reveal: flock → title → tagline → band → grid → hint. */
+.welcome-hero > * {
+    opacity: 0;
+    animation: welcome-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.welcome-hero > :nth-child(1) { animation-delay: 0.5s; animation-duration: 1.2s; }
+.welcome-hero > :nth-child(2) { animation-delay: 0s; }
+.welcome-hero > :nth-child(3) { animation-delay: 0.12s; }
+.welcome-hero > :nth-child(4) { animation-delay: 0.22s; }
+.welcome-hero > :nth-child(5) { animation-delay: 0.32s; }
+.welcome-hero > :nth-child(6) { animation-delay: 0.5s; }
+
+@keyframes welcome-rise {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── The flock ─────────────────────────────────────────────────── */
+
+.welcome-flock {
+    display: block;
+    width: 320px;
+    max-width: 70%;
+    height: auto;
+    margin: 0 auto -16px;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.welcome-flock path {
+    fill: var(--coffee-crema);
+}
+
+/* Higher birds are fainter — dissolving into the lamp glow,
+   exactly like the top rows of the login field. */
+.wf-b1 path { fill-opacity: 0.5; }
+.wf-b2 path { fill-opacity: 0.38; }
+.wf-b3 path { fill-opacity: 0.28; }
+.wf-b4 path { fill-opacity: 0.2; }
+.wf-b5 path { fill-opacity: 0.13; }
+
+/* Each bird rides its own slow thermal; negative delays desync
+   the flock from the first frame. */
+.wf-bird {
+    animation: wf-drift 9s ease-in-out infinite;
+}
+
+.wf-b2 { animation-duration: 11s; animation-delay: -3.2s; }
+.wf-b3 { animation-duration: 9.5s; animation-delay: -5.4s; }
+.wf-b4 { animation-duration: 12.5s; animation-delay: -1.7s; }
+.wf-b5 { animation-duration: 10.5s; animation-delay: -7.1s; }
+
+@keyframes wf-drift {
+    0%   { transform: translate(0, 0); }
+    35%  { transform: translate(5px, -7px); }
+    70%  { transform: translate(-4px, -3px); }
+    100% { transform: translate(0, 0); }
+}
+
+/* ── Masthead ──────────────────────────────────────────────────── */
+
+.welcome-hero .welcome-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 2.9rem);
+    font-weight: 600;
+    font-variation-settings: 'opsz' 100;
+    letter-spacing: -0.015em;
+    color: var(--coffee-crema-bright);
+    text-shadow: 0 2px 28px rgba(232, 181, 88, 0.28);
+    margin: 0 0 10px;
+}
+
+.welcome-hero .welcome-tagline {
+    font-family: var(--font-content);
+    font-style: italic;
+    font-size: 16.5px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+    max-width: 420px;
+    margin: 0 auto;
+}
+
+/* The metamorphosis band — square to cube to bean to bird —
+   doubles as the divider between masthead and council. */
+.welcome-hero .welcome-band {
+    display: block;
+    margin: 16px auto 0;
+    max-width: 480px;
+}
+
+.welcome-hero .welcome-grid-container {
+    margin: 1.4rem auto 0;
+}
+
+/* ── Hint line — printer's caps under the plate ────────────────── */
+
+.welcome-hero .welcome-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 20px 0 0;
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.welcome-hint-sep {
+    opacity: 0.5;
+}
+
+.welcome-hero .welcome-hint .config-link {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-underline-offset: 3px;
+}
+
+/* ── Motion safety & small screens ─────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+    .welcome-hero > *,
+    .wf-bird {
+        animation: none;
+    }
+    .welcome-hero > * {
+        opacity: 1;
+    }
+}
+
+/* Short viewports: the empty state is absolutely centered with no
+   scroll, so give the vertical space back before anything clips. */
+@media (max-height: 700px) {
+    .welcome-flock {
+        display: none;
+    }
+
+    .welcome-hero .welcome-grid-container {
+        margin-top: 1rem;
+    }
+
+    .welcome-hero .welcome-hint {
+        margin-top: 14px;
+    }
+}
+
+@media (max-width: 768px) {
+    .welcome-flock {
+        width: 220px;
+        margin-bottom: -10px;
+    }
+
+    .welcome-hero .welcome-title {
+        font-size: 1.75rem;
+    }
+
+    .welcome-hero .welcome-tagline {
+        font-size: 14px;
+        padding: 0 16px;
+    }
+
+    .welcome-hero .welcome-band {
+        max-width: 320px;
+    }
+}
